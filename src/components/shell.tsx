@@ -49,6 +49,9 @@ export function Shell({
           <Usuario actor={actor} team={team} />
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
+        <footer className="mx-auto w-full max-w-6xl px-4 pb-8 text-xs text-muted-foreground md:px-8">
+          Los datos de los usuarios internos (nombre, correo y área) se usan solo para operar esta mesa, según la política de tratamiento de datos de CIFES y Luvania. No registre datos de estudiantes, deudores, pacientes ni socios.
+        </footer>
       </div>
     </div>
   )

@@ -41,8 +41,7 @@ export default async function CatalogosPage() {
               name: tipo.name,
               team: tipo.team,
               description: tipo.description,
-              slaMinutes: tipo.slaMinutes,
-              requiresApproval: tipo.requiresApproval,
+              extra: tipo.extra,
               active: tipo.active,
             }}
           />

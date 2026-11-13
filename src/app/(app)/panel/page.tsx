@@ -10,7 +10,14 @@ import { resumen } from "@/server/requests"
 
 export default async function PanelPage() {
   const actor = await requireActor()
-  const data = await resumen()
+  const data = await resumen(actor)
+  const porEquipo = (["DESARROLLO", "MARKETING"] as const).map((team) => ({
+    team,
+    abiertos: data.abiertos.filter((item) => item.team === team).length,
+    vencidos: data.abiertos.filter((item) => item.team === team && item.sla.state === "VENCIDO").length,
+    enRiesgo: data.abiertos.filter((item) => item.team === team && item.sla.state === "EN_RIESGO").length,
+    enPausa: data.abiertos.filter((item) => item.team === team && item.sla.state === "EN_PAUSA").length,
+  }))
   const mios = data.abiertos.filter((item) => item.requesterId === actor.id)
   const asignados = data.abiertos.filter((item) => item.assigneeId === actor.id)
   const riesgos = data.items.filter((item) => item.sla.state === "VENCIDO" || item.sla.state === "EN_RIESGO").slice(0, 6)
@@ -65,7 +72,7 @@ export default async function PanelPage() {
         </Card>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {data.porEquipo.map((equipo) => (
+        {porEquipo.map((equipo) => (
           <Card key={equipo.team} size="sm">
             <CardHeader><CardTitle>{TEAM_LABEL[equipo.team]}</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground">

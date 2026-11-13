@@ -9,15 +9,21 @@ import { firstIssue, radicarSchema } from "@/lib/schemas"
 import { requireActor } from "@/server/session"
 import {
   actualizarTipo,
-  actualizarUsuario,
   adjuntar,
   asignar,
   comentar,
   crearArea,
   crearTipo,
+  editarCampos,
+  eliminarEstado,
+  guardarEstado,
+  guardarRoles,
+  guardarSla,
+  guardarTransicion,
   marcarAvisosLeidos,
   radicar,
   transicionar,
+  trasladar,
   vigilarSlas,
 } from "@/server/requests"
 
@@ -83,14 +89,18 @@ export async function radicarAction(formData: FormData): Promise<ActionResult> {
 
   let code = ""
   try {
-    const request = await radicar(actor, parsed.data)
+    const request = await radicar(actor, {
+      ...parsed.data,
+      declares: true,
+      reviewedPersonalData: parsed.data.reviewedPersonalData === "1",
+    })
     code = request.code
     if (file) await adjuntar(actor, request.id, file)
   } catch (error) {
     return fallo(error)
   }
   refrescar(code)
-  redirect(`/requerimientos/${code}`)
+  redirect(`/requerimientos/${code}?confirmado=1`)
 }
 
 export async function transicionarAction(formData: FormData): Promise<ActionResult> {
@@ -100,7 +110,13 @@ export async function transicionarAction(formData: FormData): Promise<ActionResu
     const { prisma } = await import("@/lib/prisma")
     const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
     if (!request) return { ok: false, error: "El requerimiento no existe." }
-    await transicionar(actor, request.id, String(formData.get("to") || ""), String(formData.get("comment") || ""))
+    await transicionar(
+      actor,
+      request.id,
+      String(formData.get("name") || formData.get("to") || ""),
+      String(formData.get("comment") || ""),
+      { deliveryUrl: String(formData.get("deliveryUrl") || "") },
+    )
   } catch (error) {
     return fallo(error)
   }
@@ -181,23 +197,25 @@ export async function vigilarSlasAction(): Promise<ActionResult> {
 
 export async function actualizarUsuarioAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
-  const teamRaw = String(formData.get("team") || "")
-  const team: TeamName | null = teamRaw === "DESARROLLO" || teamRaw === "MARKETING" ? teamRaw : null
+  const memberships: { team: TeamName; role: "AGENTE" | "LIDER" | "OBSERVADOR" }[] = []
+  for (const team of ["DESARROLLO", "MARKETING"] as const) {
+    for (const role of ["AGENTE", "LIDER", "OBSERVADOR"] as const) {
+      if (formData.get(`${role}:${team}`) === "1") memberships.push({ team, role })
+    }
+  }
   try {
-    await actualizarUsuario(actor, String(formData.get("userId") || ""), {
-      role: String(formData.get("role") || "SOLICITANTE") as ActorRole,
-      team,
-      areaId: String(formData.get("areaId") || ""),
+    await guardarRoles(actor, String(formData.get("userId") || ""), {
+      isAdmin: formData.get("isAdmin") === "1",
       active: formData.get("active") === "1",
+      areaId: String(formData.get("areaId") || ""),
+      memberships,
     })
   } catch (error) {
     return fallo(error)
   }
   refrescar()
-  return { ok: true, message: "Usuario actualizado." }
+  return { ok: true, message: "Roles actualizados. El cambio quedó en la auditoría." }
 }
-
-type ActorRole = "SOLICITANTE" | "AGENTE" | "LIDER" | "ADMINISTRADOR" | "OBSERVADOR"
 
 export async function crearAreaAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
@@ -219,8 +237,7 @@ export async function crearTipoAction(formData: FormData): Promise<ActionResult>
       team,
       name: String(formData.get("name") || ""),
       description: String(formData.get("description") || ""),
-      slaHours: Number(formData.get("slaHours") || 0),
-      requiresApproval: formData.get("requiresApproval") === "1",
+      extra: String(formData.get("extra") || ""),
     })
   } catch (error) {
     return fallo(error)
@@ -234,8 +251,7 @@ export async function actualizarTipoAction(formData: FormData): Promise<ActionRe
   try {
     await actualizarTipo(actor, String(formData.get("id") || ""), {
       description: String(formData.get("description") || ""),
-      slaHours: Number(formData.get("slaHours") || 0),
-      requiresApproval: formData.get("requiresApproval") === "1",
+      extra: String(formData.get("extra") || ""),
       active: formData.get("active") === "1",
     })
   } catch (error) {
@@ -243,4 +259,116 @@ export async function actualizarTipoAction(formData: FormData): Promise<ActionRe
   }
   refrescar()
   return { ok: true, message: "Tipo actualizado." }
+}
+
+function exigir(error: unknown): never {
+  if (error instanceof DomainError) throw new Error(error.message)
+  throw error
+}
+
+export async function editarCamposAction(formData: FormData) {
+  const actor = await requireActor()
+  const code = String(formData.get("code") || "")
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
+    if (!request) throw new Error("El requerimiento no existe.")
+    await editarCampos(actor, request.id, {
+      priority: String(formData.get("priority") || "") || undefined,
+      brand: String(formData.get("brand") || "") || undefined,
+      typeId: String(formData.get("typeId") || "") || undefined,
+      committedDate: String(formData.get("committedDate") || "") || null,
+    })
+  } catch (error) {
+    exigir(error)
+  }
+  refrescar(code)
+}
+
+export async function trasladarAction(formData: FormData) {
+  const actor = await requireActor()
+  const code = String(formData.get("code") || "")
+  const team = String(formData.get("team") || "")
+  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
+    if (!request) throw new Error("El requerimiento no existe.")
+    await trasladar(actor, request.id, team)
+  } catch (error) {
+    exigir(error)
+  }
+  refrescar(code)
+}
+
+export async function guardarEstadoAction(formData: FormData) {
+  const actor = await requireActor()
+  const team = String(formData.get("team") || "")
+  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  try {
+    await guardarEstado(actor, {
+      id: String(formData.get("id") || "") || undefined,
+      team,
+      key: String(formData.get("key") || ""),
+      name: String(formData.get("name") || ""),
+      category: String(formData.get("category") || "EN_CURSO"),
+      boardColumn: String(formData.get("boardColumn") || ""),
+    })
+  } catch (error) {
+    exigir(error)
+  }
+  refrescar()
+}
+
+export async function eliminarEstadoAction(formData: FormData) {
+  const actor = await requireActor()
+  try {
+    await eliminarEstado(actor, String(formData.get("id") || ""), String(formData.get("moveTo") || "") || undefined)
+  } catch (error) {
+    exigir(error)
+  }
+  refrescar()
+}
+
+export async function guardarTransicionAction(formData: FormData) {
+  const actor = await requireActor()
+  const team = String(formData.get("team") || "")
+  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  try {
+    await guardarTransicion(actor, {
+      id: String(formData.get("id") || "") || undefined,
+      team,
+      name: String(formData.get("name") || ""),
+      fromKeys: String(formData.get("fromKeys") || ""),
+      toKey: String(formData.get("toKey") || ""),
+      allowedRoles: String(formData.get("allowedRoles") || "LIDER"),
+      requiresComment: formData.get("requiresComment") === "1",
+      requiresAssignee: formData.get("requiresAssignee") === "1",
+      requiresCommittedDate: formData.get("requiresCommittedDate") === "1",
+      requiresDelivery: formData.get("requiresDelivery") === "1",
+      slaEffect: String(formData.get("slaEffect") || "NONE"),
+    })
+  } catch (error) {
+    exigir(error)
+  }
+  refrescar()
+}
+
+export async function guardarSlaAction(formData: FormData) {
+  const actor = await requireActor()
+  const team = String(formData.get("team") || "")
+  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  try {
+    await guardarSla(actor, {
+      id: String(formData.get("id") || "") || undefined,
+      team,
+      priority: String(formData.get("priority") || "MEDIA"),
+      typeId: String(formData.get("typeId") || "") || null,
+      firstResponseMinutes: Number(formData.get("firstHours") || 0) * 60,
+      resolutionMinutes: Number(formData.get("resolutionHours") || 0) * 60,
+    })
+  } catch (error) {
+    exigir(error)
+  }
+  refrescar()
 }

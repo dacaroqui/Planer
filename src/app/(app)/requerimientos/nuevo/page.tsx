@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { puedeRadicar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { requireActor } from "@/server/session"
+import { asegurarCatalogo } from "@/server/semilla"
 
 export default async function NuevoPage() {
   const actor = await requireActor()
@@ -14,9 +15,12 @@ export default async function NuevoPage() {
       </div>
     )
   }
-  const [tipos, area] = await Promise.all([
+  await asegurarCatalogo()
+  const [tipos, area, marcas, prioridades] = await Promise.all([
     prisma.requestType.findMany({ where: { active: true }, orderBy: [{ team: "asc" }, { name: "asc" }] }),
     prisma.area.findUnique({ where: { id: actor.areaId } }),
+    prisma.catalogItem.findMany({ where: { kind: "MARCA", active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.catalogItem.findMany({ where: { kind: "PRIORIDAD", active: true }, orderBy: { sortOrder: "asc" } }),
   ])
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -36,9 +40,10 @@ export default async function NuevoPage() {
               team: tipo.team,
               name: tipo.name,
               description: tipo.description,
-              slaMinutes: tipo.slaMinutes,
-              requiresApproval: tipo.requiresApproval,
+              extra: tipo.extra,
             }))}
+            marcas={marcas.map((item) => ({ key: item.key, name: item.name }))}
+            prioridades={prioridades.map((item) => ({ key: item.key, name: item.name }))}
           />
         </CardContent>
       </Card>

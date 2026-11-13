@@ -19,6 +19,8 @@ export function consultaDesde(
     brand: one("brand"),
     mine: one("mine") === "1",
     assignedToMe: one("assigned") === "1",
+    from: one("from"),
+    to: one("to"),
     page: Number.isFinite(page) ? page : 1,
     ...extra,
     ...(extra.queueTeam ? { queueTeam: extra.queueTeam } : {}),

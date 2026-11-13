@@ -95,9 +95,13 @@ Quien entra por primera vez con una cuenta válida del dominio queda como solici
 
 El reloj cuenta solo minutos hábiles: lunes a viernes, dentro de las franjas, en `America/Bogota`. Resta los festivos nacionales, con la Ley Emiliani, y desde 2026 incluye el Día de Nuestra Señora del Rosario de Chiquinquirá. No incluye festivos municipales.
 
-Se pausa en «Pendiente de información» y en «Pendiente de brief». Un caso cancelado no tiene SLA. El semáforo distingue a tiempo, en riesgo, vencido, en pausa, cumplido e incumplido.
+Hay dos relojes: primera respuesta y solución. La primera se detiene al pasar a análisis o revisión de brief, o con el primer comentario público del equipo. La solución se pausa en «En espera de información» y mientras el solicitante valida. El semáforo es verde si queda más de la mitad, amarillo si queda la mitad o menos, y rojo si venció.
 
-El administrador puede lanzar la revisión desde Gerencia. En un servidor, programe el POST a `/api/cron/sla`.
+Las metas se configuran por área y prioridad en Flujos y SLA. Un cambio no mueve los requerimientos ya radicados.
+
+El respaldo diario es `BACKUP_PASSPHRASE=... npm run backup`. Restaura con `npm run restore -- respaldos/diario/mesa-XXXX.tar.enc`. Conserva 30 diarios y 12 mensuales.
+
+En un servidor, programe el POST a `/api/cron/sla` con `Authorization: Bearer $CRON_SECRET`.
 
 ## Alcance
 
@@ -106,7 +110,7 @@ El MVP está en `docs/HU_STATUS.md`. No incluye base de conocimiento, encuestas,
 ## Supuestos que conviene confirmar
 
 - La jornada real de CIFES y Luvania, y si el sábado cuenta para algún equipo.
-- Si el líder que aprueba es el del equipo destino (así está hecho) o el jefe del área que radica.
-- Si toda la organización debe ver el historial público de cualquier requerimiento (así está hecho) o solo quienes participan.
+- El líder que aprueba es el del área destino (Desarrollo o Marketing), como dice la hoja de flujos.
+- Cada persona ve los requerimientos que radicó y, si tiene rol en un área, todos los de esa área.
 - La ciudad, si quieren sumar los dos festivos municipales.
 - El tenant, la aplicación de Entra ID y el servidor de correo de producción. El alojamiento todavía no está decidido: la imagen de Docker es el camino de despliegue.

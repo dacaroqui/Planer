@@ -3,7 +3,7 @@ import type { NextAuthConfig } from "next-auth"
 export const authConfig = {
   trustHost: true,
   secret: process.env.AUTH_SECRET,
-  session: { strategy: "jwt", maxAge: 60 * 60 * 12 },
+  session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
   pages: { signIn: "/login", error: "/login" },
   providers: [],
   callbacks: {

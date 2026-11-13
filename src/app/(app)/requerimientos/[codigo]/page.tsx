@@ -1,26 +1,44 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Gestion } from "@/components/gestion"
-import { EquipoBadge, EstadoBadge, MarcaTexto, PrioridadTexto, SlaBadge } from "@/components/insignias"
+import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
+import { renderMarkdown } from "@/lib/markdown"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ROLE_LABEL } from "@/lib/domain"
 import { formatBytes, formatDate, formatDateTime } from "@/lib/format"
 import { formatDuration } from "@/lib/sla"
+import { editarCamposAction, trasladarAction } from "@/server/actions"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
+import { prisma } from "@/lib/prisma"
 
-export default async function DetallePage({ params }: { params: Promise<{ codigo: string }> }) {
+export default async function DetallePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ codigo: string }>
+  searchParams: Promise<{ confirmado?: string }>
+}) {
   const actor = await requireActor()
   const { codigo } = await params
+  const consulta = await searchParams
   const detail = await getDetalle(actor, codigo)
   if (!detail) notFound()
   const { request, sla } = detail
+  const tiposArea = detail.canPriority
+    ? await prisma.requestType.findMany({ where: { team: request.team, active: true }, orderBy: { name: "asc" } })
+    : []
   const ratio = Math.max(0, Math.min(100, Math.round(sla.ratio * 100)))
 
   return (
     <div className="space-y-6">
       <div>
+        {consulta.confirmado === "1" ? (
+          <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+            Quedó radicado con el código {request.code}. También enviamos la confirmación al correo de los líderes del área. <a className="underline" href={`/requerimientos/${request.code}`}>Abrir este detalle</a>.
+          </p>
+        ) : null}
         <Link href="/requerimientos" className="text-sm text-muted-foreground hover:underline">Volver al listado</Link>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <EstadoBadge status={request.status} />
@@ -76,7 +94,7 @@ export default async function DetallePage({ params }: { params: Promise<{ codigo
                       {comment.internal ? " · Nota interna" : ""}
                     </span>
                   </p>
-                  <p className="mt-2 text-sm whitespace-pre-wrap">{comment.body}</p>
+                  <div className="mt-2 text-sm [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.body) }} />
                 </article>
               ))}
             </TabsContent>
@@ -110,24 +128,60 @@ export default async function DetallePage({ params }: { params: Promise<{ codigo
             <CardHeader><CardTitle>Ficha</CardTitle></CardHeader>
             <CardContent className="grid gap-2 text-sm">
               <Fila etiqueta="Tipo" valor={request.type.name} />
-              <Fila etiqueta="Prioridad" valor={<PrioridadTexto priority={request.priority} />} />
-              <Fila etiqueta="Marca" valor={<MarcaTexto brand={request.brand} />} />
+              <Fila etiqueta="Prioridad" valor={request.priority} />
+              <Fila etiqueta="Prioridad sugerida" valor={request.prioritySuggested} />
+              <Fila etiqueta="Marca" valor={request.brand === "AMBAS" ? "Ambas/Transversal" : request.brand} />
               <Fila etiqueta="Área" valor={request.area.name} />
               <Fila etiqueta="Solicitante" valor={request.requester.name} />
               <Fila etiqueta="Asignado" valor={request.assignee?.name ?? "Sin asignar"} />
               <Fila etiqueta="Fecha deseada" valor={formatDate(request.desiredDate)} />
-              <Fila etiqueta="Aprobación" valor={request.type.requiresApproval ? "La exige el tipo" : "No la exige el tipo"} />
+              <Fila etiqueta="Resolución" valor={request.resolution || "—"} />
+              <Fila etiqueta="Fecha comprometida" valor={formatDate(request.committedDate)} />
             </CardContent>
           </Card>
+          {detail.canPriority ? (
+            <Card>
+              <CardHeader><CardTitle>Clasificar</CardTitle></CardHeader>
+              <CardContent>
+                <form action={editarCamposAction} className="grid gap-2 text-sm">
+                  <input type="hidden" name="code" value={request.code} />
+                  <select name="typeId" defaultValue={request.typeId} className="h-9 rounded-lg border border-input px-2" aria-label="Tipo">
+                    {tiposArea.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.name}</option>)}
+                  </select>
+                  <select name="priority" defaultValue={request.priority} className="h-9 rounded-lg border border-input px-2" aria-label="Prioridad">
+                    <option value="CRITICA">Crítica</option>
+                    <option value="ALTA">Alta</option>
+                    <option value="MEDIA">Media</option>
+                    <option value="BAJA">Baja</option>
+                  </select>
+                  <select name="brand" defaultValue={request.brand} className="h-9 rounded-lg border border-input px-2" aria-label="Marca">
+                    <option value="CIFES">CIFES</option>
+                    <option value="LUVANIA">Luvania</option>
+                    <option value="AMBAS">Ambas/Transversal</option>
+                  </select>
+                  <input name="committedDate" type="date" lang="es-CO" defaultValue={request.committedDate ? request.committedDate.toISOString().slice(0, 10) : ""} className="h-9 rounded-lg border border-input px-2" aria-label="Fecha comprometida" />
+                  <button className="h-9 rounded-lg bg-secondary text-sm" type="submit">Guardar clasificación</button>
+                </form>
+                {detail.canMove ? (
+                  <form action={trasladarAction} className="mt-3">
+                    <input type="hidden" name="code" value={request.code} />
+                    <input type="hidden" name="team" value={request.team === "DESARROLLO" ? "MARKETING" : "DESARROLLO"} />
+                    <button className="text-sm underline" type="submit">Trasladar a {request.team === "DESARROLLO" ? "Marketing" : "Desarrollo"}</button>
+                  </form>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
           <Card>
             <CardHeader><CardTitle>Gestionar</CardTitle></CardHeader>
             <CardContent>
               <Gestion
                 code={request.code}
                 transiciones={detail.transitions.map((item) => ({
-                  to: item.to,
-                  label: item.label,
-                  requiresComment: item.requiresComment,
+                  to: item.name,
+                  label: item.name,
+                  requiresComment: Boolean(item.requiresComment),
+                  requiresDelivery: Boolean(item.requiresDelivery),
                 }))}
                 puedeAsignar={detail.canAssign}
                 agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name }))}

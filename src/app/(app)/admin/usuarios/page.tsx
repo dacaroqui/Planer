@@ -26,10 +26,12 @@ export default async function UsuariosPage() {
               id: user.id,
               name: user.name,
               email: user.email,
-              role: user.role,
-              team: user.team,
               areaId: user.areaId,
               active: user.active,
+              isAdmin: user.role === "ADMINISTRADOR",
+              memberships: user.areaRoles
+                .filter((item) => item.role === "AGENTE" || item.role === "LIDER" || item.role === "OBSERVADOR")
+                .map((item) => ({ team: item.team, role: item.role as "AGENTE" | "LIDER" | "OBSERVADOR" })),
             }}
           />
         ))}

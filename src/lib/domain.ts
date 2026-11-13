@@ -8,6 +8,8 @@ export type TeamName = (typeof TEAMS)[number]
 export type BrandName = (typeof BRANDS)[number]
 export type PriorityName = (typeof PRIORITIES)[number]
 
+export type Membership = { team: TeamName; role: "AGENTE" | "LIDER" | "OBSERVADOR" }
+
 export type Actor = {
   id: string
   email: string
@@ -16,6 +18,8 @@ export type Actor = {
   team: TeamName | null
   areaId: string
   active: boolean
+  isAdmin: boolean
+  memberships: Membership[]
 }
 
 export const ROLE_LABEL: Record<RoleName, string> = {
@@ -34,7 +38,7 @@ export const TEAM_LABEL: Record<TeamName, string> = {
 export const BRAND_LABEL: Record<BrandName, string> = {
   CIFES: "CIFES",
   LUVANIA: "Luvania",
-  AMBAS: "Ambas marcas",
+  AMBAS: "Ambas/Transversal",
 }
 
 export const PRIORITY_LABEL: Record<PriorityName, string> = {
@@ -45,28 +49,27 @@ export const PRIORITY_LABEL: Record<PriorityName, string> = {
 }
 
 export const STATUS_LABEL: Record<string, string> = {
-  RADICADO: "Radicado",
+  NUEVO: "Nuevo",
   EN_ANALISIS: "En análisis",
-  PENDIENTE_INFORMACION: "Pendiente de información",
-  PENDIENTE_APROBACION: "Pendiente de aprobación",
-  DEVUELTO: "Devuelto",
-  APROBADO: "Aprobado",
+  APROBADO: "Aprobado / En cola",
+  EN_ESPERA: "En espera de información",
   EN_DESARROLLO: "En desarrollo",
-  EN_PRUEBAS: "En pruebas",
-  RESUELTO: "Resuelto",
-  EN_REVISION: "En revisión",
-  PENDIENTE_BRIEF: "Pendiente de brief",
+  BLOQUEADO: "Bloqueado",
+  EN_PRUEBAS: "En pruebas (QA)",
+  EN_VALIDACION: "En validación del solicitante",
+  EN_REVISION_BRIEF: "En revisión de brief",
   EN_PRODUCCION: "En producción",
-  EN_APROBACION_PIEZA: "En aprobación de pieza",
-  EN_AJUSTES: "En ajustes",
-  ENTREGADO: "Entregado",
+  EN_REVISION_INTERNA: "En revisión interna",
+  EN_APROBACION: "En aprobación del solicitante",
+  PROGRAMADO: "Programado / Publicado",
   CERRADO: "Cerrado",
+  RECHAZADO: "Rechazado",
   CANCELADO: "Cancelado",
 }
 
 export const SLA_LABEL = {
   A_TIEMPO: "A tiempo",
-  EN_RIESGO: "En riesgo",
+  EN_RIESGO: "Por vencer",
   VENCIDO: "Vencido",
   EN_PAUSA: "En pausa",
   CUMPLIDO: "Cumplido",
@@ -76,10 +79,10 @@ export const SLA_LABEL = {
 
 export type SlaState = keyof typeof SLA_LABEL
 
-export const PAUSE_STATUSES = new Set(["PENDIENTE_INFORMACION", "PENDIENTE_BRIEF"])
-export const RESOLVED_STATUSES = new Set(["RESUELTO", "ENTREGADO"])
-export const TERMINAL_STATUSES = new Set(["CERRADO", "CANCELADO"])
-export const DONE_STATUSES = new Set(["RESUELTO", "ENTREGADO", "CERRADO", "CANCELADO"])
+export const PAUSE_STATUSES = new Set(["EN_ESPERA", "EN_VALIDACION", "EN_APROBACION"])
+export const RESOLVED_STATUSES = new Set(["CERRADO", "RECHAZADO"])
+export const TERMINAL_STATUSES = new Set(["CERRADO", "RECHAZADO", "CANCELADO"])
+export const DONE_STATUSES = new Set(["CERRADO", "RECHAZADO", "CANCELADO"])
 
 export function statusLabel(status: string) {
   return STATUS_LABEL[status] ?? status

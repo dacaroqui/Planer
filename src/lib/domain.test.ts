@@ -14,13 +14,18 @@ import {
   projectDue,
   slaSnapshot,
 } from "@/lib/sla"
-import { TRANSITIONS, transicionesDelEstado } from "@/lib/workflow"
-import { encontrarTransicion, puedeComentar } from "@/lib/permissions"
-import { STATUS_LABEL, type Actor } from "@/lib/domain"
+import { ESTADOS_OFICIALES, TRANSICIONES_OFICIALES } from "@/lib/flujo-oficial"
+import { encontrarTransicion, puedeComentar, puedeVer } from "@/lib/permissions"
+import type { Actor } from "@/lib/domain"
 
 const bogota = (iso: string) => DateTime.fromISO(iso, { zone: ZONE }).toJSDate()
 
 function actor(partial: Partial<Actor> & Pick<Actor, "role">): Actor {
+  const memberships = partial.memberships ?? (
+    partial.team && (partial.role === "AGENTE" || partial.role === "LIDER" || partial.role === "OBSERVADOR")
+      ? [{ team: partial.team, role: partial.role }]
+      : []
+  )
   return {
     id: partial.id ?? partial.role,
     email: partial.email ?? `${partial.role.toLowerCase()}@cifes.edu.co`,
@@ -29,6 +34,8 @@ function actor(partial: Partial<Actor> & Pick<Actor, "role">): Actor {
     team: partial.team ?? null,
     areaId: partial.areaId ?? "area",
     active: partial.active ?? true,
+    isAdmin: partial.isAdmin ?? partial.role === "ADMINISTRADOR",
+    memberships,
   }
 }
 
@@ -141,26 +148,22 @@ describe("RQ-22 y RQ-23 SLA en horas hábiles", () => {
   })
 })
 
-describe("RQ-17 RQ-18 RQ-19 RQ-21 flujos y roles", () => {
+describe("RQ-10 RQ-21 flujo oficial y visibilidad", () => {
   const solicitud = {
     id: "r1",
     team: "DESARROLLO" as const,
-    status: "RADICADO",
+    status: "NUEVO",
     requesterId: "sol",
-    requiresApproval: true,
+    assigneeId: null as string | null,
   }
 
-  it("cubre los dos equipos y solo estados conocidos", () => {
-    const estados = new Set(Object.keys(STATUS_LABEL))
-    for (const transition of TRANSITIONS) {
-      expect(estados.has(transition.from)).toBe(true)
-      expect(estados.has(transition.to)).toBe(true)
+  it("cubre los estados oficiales de las dos áreas", () => {
+    const claves = new Set(ESTADOS_OFICIALES.map((estado) => `${estado.team}:${estado.key}`))
+    for (const transition of TRANSICIONES_OFICIALES) {
+      for (const origen of transition.from) expect(claves.has(`${transition.team}:${origen}`)).toBe(true)
+      expect(claves.has(`${transition.team}:${transition.to}`)).toBe(true)
     }
-    expect(transicionesDelEstado("DESARROLLO", "EN_ANALISIS", true).map((item) => item.to)).toContain("PENDIENTE_APROBACION")
-    expect(transicionesDelEstado("DESARROLLO", "EN_ANALISIS", true).map((item) => item.to)).not.toContain("EN_DESARROLLO")
-    expect(transicionesDelEstado("DESARROLLO", "EN_ANALISIS", false).map((item) => item.to)).toContain("EN_DESARROLLO")
-    expect(transicionesDelEstado("MARKETING", "EN_REVISION", false).map((item) => item.to)).toContain("EN_PRODUCCION")
-    expect(transicionesDelEstado("MARKETING", "RADICADO", false).map((item) => item.to)).not.toContain("EN_DESARROLLO")
+    expect(TRANSICIONES_OFICIALES.some((item) => item.team === "MARKETING" && item.to === "EN_DESARROLLO")).toBe(false)
   })
 
   it("impide que el solicitante ejecute y que otro equipo apruebe", () => {
@@ -169,21 +172,18 @@ describe("RQ-17 RQ-18 RQ-19 RQ-21 flujos y roles", () => {
     const marketing = actor({ id: "mk", role: "AGENTE", team: "MARKETING" })
     const lider = actor({ id: "ld", role: "LIDER", team: "DESARROLLO" })
     const otroLider = actor({ id: "lm", role: "LIDER", team: "MARKETING" })
-    const observador = actor({ role: "OBSERVADOR" })
+    const observador = actor({ id: "ob", role: "OBSERVADOR", team: "DESARROLLO" })
 
-    expect(encontrarTransicion(solicitante, solicitud, "EN_DESARROLLO")).toBeNull()
-    expect(encontrarTransicion(solicitante, solicitud, "CANCELADO")?.label).toBe("Cancelar")
-    expect(encontrarTransicion(actor({ id: "otro", role: "SOLICITANTE" }), solicitud, "CANCELADO")).toBeNull()
-    expect(encontrarTransicion(agente, solicitud, "EN_ANALISIS")?.to).toBe("EN_ANALISIS")
-    expect(encontrarTransicion(marketing, solicitud, "EN_ANALISIS")).toBeNull()
-    expect(encontrarTransicion(observador, solicitud, "EN_ANALISIS")).toBeNull()
-
-    const enAprobacion = { ...solicitud, status: "PENDIENTE_APROBACION" }
-    expect(encontrarTransicion(lider, enAprobacion, "APROBADO")?.label).toBe("Aprobar")
-    expect(encontrarTransicion(lider, enAprobacion, "DEVUELTO")?.requiresComment).toBe(true)
-    expect(encontrarTransicion(agente, enAprobacion, "APROBADO")).toBeNull()
-    expect(encontrarTransicion(otroLider, enAprobacion, "APROBADO")).toBeNull()
-    expect(encontrarTransicion(solicitante, enAprobacion, "DEVUELTO")).toBeNull()
+    expect(encontrarTransicion(solicitante, solicitud, "Iniciar análisis")).toBeNull()
+    expect(encontrarTransicion(solicitante, solicitud, "Cancelar")?.name).toBe("Cancelar")
+    expect(encontrarTransicion(actor({ id: "otro", role: "SOLICITANTE" }), solicitud, "Cancelar")).toBeNull()
+    expect(encontrarTransicion(lider, solicitud, "Iniciar análisis")?.to).toBe("EN_ANALISIS")
+    expect(encontrarTransicion(agente, solicitud, "Iniciar análisis")).toBeNull()
+    expect(encontrarTransicion(marketing, solicitud, "Iniciar análisis")).toBeNull()
+    expect(encontrarTransicion(observador, solicitud, "Iniciar análisis")).toBeNull()
+    expect(puedeVer(marketing, solicitud)).toBe(false)
+    expect(puedeVer(solicitante, solicitud)).toBe(true)
+    expect(encontrarTransicion(otroLider, { ...solicitud, status: "EN_ANALISIS" }, "Aprobar")).toBeNull()
     expect(puedeComentar(observador, solicitud, false)).toBe(false)
     expect(puedeComentar(solicitante, solicitud, true)).toBe(false)
     expect(puedeComentar(agente, solicitud, true)).toBe(true)

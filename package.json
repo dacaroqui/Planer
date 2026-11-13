@@ -10,7 +10,9 @@
     "test": "DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test prisma migrate deploy && vitest run",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:setup": "prisma migrate deploy && prisma db seed"
+    "db:setup": "prisma migrate deploy && prisma db seed",
+    "backup": "sh scripts/respaldo.sh",
+    "restore": "sh scripts/restaurar.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

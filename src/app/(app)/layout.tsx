@@ -13,15 +13,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/panel", label: "Panel", icon: "panel" },
     { href: "/requerimientos", label: "Requerimientos", icon: "lista" },
   ]
+  items.push({ href: "/mis-solicitudes", label: "Mis solicitudes", icon: "lista" })
   if (puedeRadicar(actor)) items.push({ href: "/requerimientos/nuevo", label: "Radicar", icon: "radicar" })
-  if (actor.role === "AGENTE" || actor.role === "LIDER" || actor.role === "ADMINISTRADOR") {
-    items.push({ href: "/bandeja", label: "Bandeja", icon: "bandeja" })
+  if (actor.isAdmin || actor.memberships.some((item) => item.role === "LIDER")) {
+    items.push({ href: "/cola", label: "Cola de entrada", icon: "bandeja" })
   }
-  items.push({ href: "/gerencia", label: "Gerencia", icon: "gerencia" })
+  if (actor.isAdmin || actor.memberships.length > 0) {
+    items.push({ href: "/tablero", label: "Tablero", icon: "bandeja" })
+    items.push({ href: "/gerencia", label: "Dashboard", icon: "gerencia" })
+  }
   items.push({ href: "/notificaciones", label: "Avisos", icon: "avisos", badge: unread })
   if (puedeAdministrar(actor)) {
     items.push({ href: "/admin/usuarios", label: "Usuarios", icon: "usuarios" })
     items.push({ href: "/admin/catalogos", label: "Catálogos", icon: "catalogos" })
+    items.push({ href: "/admin/flujos", label: "Flujos y SLA", icon: "catalogos" })
   }
   return <Shell actor={actor} items={items}>{children}</Shell>
 }

@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { PRIORITY_LABEL, type BrandName, type PriorityName, type SlaState, type TeamName } from "@/lib/domain"
+import { PRIORITY_LABEL, type SlaState, type TeamName } from "@/lib/domain"
 import { formatDateTime } from "@/lib/format"
 
 export type FilaRequerimiento = {
@@ -9,8 +9,8 @@ export type FilaRequerimiento = {
   title: string
   status: string
   team: TeamName
-  priority: PriorityName
-  brand: BrandName
+  priority: string
+  brand: string
   updatedAt: Date
   requester: { name: string }
   assignee: { name: string } | null
@@ -49,7 +49,7 @@ export function TablaRequerimientos({ items, vacio }: { items: FilaRequerimiento
                     {item.title}
                   </Link>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {item.code} · {item.type.name} · {PRIORITY_LABEL[item.priority]} · {item.requester.name}
+                    {item.code} · {item.type.name} · {PRIORITY_LABEL[item.priority as keyof typeof PRIORITY_LABEL] ?? item.priority} · {item.requester.name}
                   </p>
                 </TableCell>
                 <TableCell><EstadoBadge status={item.status} /></TableCell>

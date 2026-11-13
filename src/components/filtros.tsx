@@ -85,6 +85,10 @@ export function Filtros({
           ]}
         />
       </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input type="date" lang="es-CO" aria-label="Desde" defaultValue={params.get("from") ?? ""} onChange={(event) => aplicar("from", event.target.value)} />
+        <Input type="date" lang="es-CO" aria-label="Hasta" defaultValue={params.get("to") ?? ""} onChange={(event) => aplicar("to", event.target.value)} />
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant={params.get("mine") === "1" ? "default" : "outline"} onClick={() => aplicar("mine", params.get("mine") === "1" ? "" : "1")}>
           Solo los míos
