@@ -12,8 +12,8 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-ENV PORT=38471
+ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-EXPOSE 38471
+EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx next start -H 0.0.0.0 -p 38471"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npx next start -H 0.0.0.0 -p 3000"]

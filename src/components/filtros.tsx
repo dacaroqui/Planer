@@ -12,10 +12,18 @@ export function Filtros({
   ruta,
   estados,
   mostrarEquipo = true,
+  empresas = [],
+  proyectos = [],
+  tipos = [],
+  solicitantes = [],
 }: {
   ruta: string
   estados: Opcion[]
   mostrarEquipo?: boolean
+  empresas?: Opcion[]
+  proyectos?: Opcion[]
+  tipos?: Opcion[]
+  solicitantes?: Opcion[]
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -73,6 +81,18 @@ export function Filtros({
             { value: "BAJA", label: "Baja" },
           ]}
         />
+        {empresas.length > 0 ? (
+          <Elegir etiqueta="Empresa" valor={params.get("empresa") ?? "TODOS"} onChange={(valor) => aplicar("empresa", valor)} opciones={[{ value: "TODOS", label: "Todas las empresas" }, ...empresas]} />
+        ) : null}
+        {proyectos.length > 0 ? (
+          <Elegir etiqueta="Proyecto" valor={params.get("proyecto") ?? "TODOS"} onChange={(valor) => aplicar("proyecto", valor)} opciones={[{ value: "TODOS", label: "Todos los proyectos" }, ...proyectos]} />
+        ) : null}
+        {tipos.length > 0 ? (
+          <Elegir etiqueta="Tipo" valor={params.get("tipo") ?? "TODOS"} onChange={(valor) => aplicar("tipo", valor)} opciones={[{ value: "TODOS", label: "Todos los tipos" }, ...tipos]} />
+        ) : null}
+        {solicitantes.length > 0 ? (
+          <Elegir etiqueta="Solicitante" valor={params.get("solicitante") ?? "TODOS"} onChange={(valor) => aplicar("solicitante", valor)} opciones={[{ value: "TODOS", label: "Todos los solicitantes" }, ...solicitantes]} />
+        ) : null}
         <Elegir
           etiqueta="Marca"
           valor={params.get("brand") ?? "TODOS"}

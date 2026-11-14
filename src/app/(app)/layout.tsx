@@ -11,6 +11,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const unread = await prisma.notification.count({ where: { userId: actor.id, readAt: null } })
   const items: NavItem[] = [
     { href: "/panel", label: "Panel", icon: "panel" },
+    { href: "/proyectos", label: "Proyectos", icon: "lista" },
+    { href: "/planner", label: "Planner", icon: "planner" },
     { href: "/requerimientos", label: "Requerimientos", icon: "lista" },
   ]
   items.push({ href: "/mis-solicitudes", label: "Mis solicitudes", icon: "lista" })

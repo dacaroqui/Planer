@@ -46,6 +46,9 @@ const detailInclude = {
   area: true,
   requester: true,
   assignee: true,
+  empresa: true,
+  project: true,
+  tasks: { include: { assignee: true }, orderBy: { createdAt: "asc" as const } },
   comments: { include: { author: true }, orderBy: { createdAt: "asc" as const } },
   activities: { include: { actor: true }, orderBy: { createdAt: "asc" as const } },
   attachments: { include: { uploadedBy: true }, orderBy: { createdAt: "asc" as const } },
@@ -226,6 +229,8 @@ export async function radicar(
     typeId: string
     priority: string
     brand: string
+    empresaId?: string
+    projectId?: string | null
     justification?: string
     desiredDate?: string | null
     stepsToReproduce?: string
@@ -253,6 +258,18 @@ export async function radicar(
   }
   const area = await prisma.area.findFirst({ where: { id: actor.areaId, active: true } })
   if (!area) throw new DomainError("Su usuario no tiene un área activa.")
+  const empresa = input.empresaId
+    ? await prisma.empresa.findFirst({ where: { id: input.empresaId, active: true } })
+    : await prisma.empresa.findFirst({
+        where: { name: input.brand === "LUVANIA" ? "Luvania" : "CIFES", active: true },
+      }) ?? await prisma.empresa.findFirst({ where: { active: true }, orderBy: { name: "asc" } })
+  if (!empresa) throw new DomainError("Elija una empresa activa.")
+  let projectId: string | null = null
+  if (input.projectId) {
+    const proyecto = await prisma.proyecto.findFirst({ where: { id: input.projectId, empresaId: empresa.id } })
+    if (!proyecto) throw new DomainError("El proyecto no pertenece a la empresa elegida.")
+    projectId = proyecto.id
+  }
   const now = clock(deps)
   let desired: Date | null = null
   if (input.desiredDate) {
@@ -278,6 +295,8 @@ export async function radicar(
         expectedResult: input.justification ?? "",
         justification: input.justification ?? "",
         brand: input.brand,
+        empresaId: empresa.id,
+        projectId,
         priority: input.priority,
         prioritySuggested: input.priority,
         team: input.team,
@@ -350,6 +369,12 @@ export async function transicionar(
   if (transition.requiresComment && note.length < 2) throw new DomainError("Escriba el motivo o la pregunta. Queda visible para el solicitante.")
   if (transition.requiresAssignee && !current.assigneeId) throw new DomainError("Asigne un responsable antes de aprobar.")
   if (transition.requiresCommittedDate && !current.committedDate) throw new DomainError("Defina la fecha comprometida antes de aprobar.")
+  if ((name === "Aprobar" || name === "Aprobar y programar") && !current.projectId) {
+    const empresa = await prisma.empresa.findUnique({ where: { id: current.empresaId } })
+    if (empresa?.exigirProyectoAlClasificar) {
+      throw new DomainError("Esta empresa exige asociar un proyecto antes de clasificar el requerimiento.")
+    }
+  }
   const delivery = (extra?.deliveryUrl || current.deliveryUrl || "").trim()
   if (transition.requiresDelivery && !delivery && current.attachments.length === 0) {
     throw new DomainError("Agregue un enlace o un adjunto de la entrega.")
@@ -538,7 +563,7 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
 export async function editarCampos(
   actor: Actor,
   requestId: string,
-  input: { title?: string; description?: string; typeId?: string; brand?: string; priority?: string; committedDate?: string | null; moduleName?: string },
+  input: { title?: string; description?: string; typeId?: string; brand?: string; priority?: string; committedDate?: string | null; moduleName?: string; projectId?: string | null },
   deps?: Deps,
 ) {
   const current = await prisma.request.findUnique({ where: { id: requestId } })
@@ -581,7 +606,25 @@ export async function editarCampos(
     cambios.push({ field: "fecha_comprometida", from: current.committedDate?.toISOString() ?? "", to: parsed?.toISOString() ?? "", message: "Definió la fecha comprometida." })
   }
   if (input.moduleName !== undefined) data.moduleName = input.moduleName
-  if (cambios.length === 0) return current
+  if (input.projectId !== undefined && input.projectId !== current.projectId) {
+    if (!puedeCambiarPrioridad(actor, current.team) && !esAdmin(actor)) {
+      throw new DomainError("Solo el líder asocia el proyecto al clasificar.")
+    }
+    if (input.projectId) {
+      const proyecto = await prisma.proyecto.findFirst({ where: { id: input.projectId, empresaId: current.empresaId } })
+      if (!proyecto) throw new DomainError("El proyecto no pertenece a la empresa del requerimiento.")
+      data.project = { connect: { id: proyecto.id } }
+      cambios.push({ field: "proyecto", from: current.projectId ?? "", to: proyecto.id, message: `Asoció el proyecto ${proyecto.name}.` })
+    }
+  }
+  if (puedeCambiarPrioridad(actor, current.team) && cambios.length > 0) {
+    const empresa = await prisma.empresa.findUnique({ where: { id: current.empresaId } })
+    const proyectoFinal = input.projectId !== undefined ? input.projectId : current.projectId
+    if (empresa?.exigirProyectoAlClasificar && !proyectoFinal) {
+      throw new DomainError("Esta empresa exige asociar un proyecto antes de clasificar el requerimiento.")
+    }
+  }
+  if (cambios.length === 0 && input.moduleName === undefined) return current
   return prisma.$transaction(async (tx) => {
     const saved = await tx.request.update({ where: { id: requestId }, data })
     for (const cambio of cambios) {
@@ -741,6 +784,8 @@ export type ListQuery = {
   status?: string
   priority?: string
   brand?: string
+  empresaId?: string
+  projectId?: string
   typeId?: string
   assigneeId?: string
   requesterId?: string
@@ -776,6 +821,8 @@ export async function listar(actor: Actor, query: ListQuery) {
   if (query.status) and.push({ status: query.status })
   if (query.priority) and.push({ priority: query.priority })
   if (query.brand) and.push({ brand: query.brand })
+  if (query.empresaId) and.push({ empresaId: query.empresaId })
+  if (query.projectId) and.push({ projectId: query.projectId })
   if (query.typeId) and.push({ typeId: query.typeId })
   if (query.assigneeId) and.push({ assigneeId: query.assigneeId })
   if (query.requesterId) and.push({ requesterId: query.requesterId })
@@ -793,13 +840,20 @@ export async function listar(actor: Actor, query: ListQuery) {
       },
     })
   }
-  const sortField = ["updatedAt", "createdAt", "code", "priority", "status"].includes(query.sort || "") ? query.sort! : "updatedAt"
+  const dir = query.dir === "asc" ? "asc" : "desc"
+  const orderBy: Prisma.RequestOrderByWithRelationInput =
+    query.sort === "requester" ? { requester: { name: dir } }
+    : query.sort === "type" ? { type: { name: dir } }
+    : query.sort === "title" ? { title: dir }
+    : ["updatedAt", "createdAt", "code", "priority", "status"].includes(query.sort || "")
+      ? { [query.sort!]: dir }
+      : { updatedAt: "desc" }
   const [total, rows] = await prisma.$transaction([
     prisma.request.count({ where }),
     prisma.request.findMany({
       where,
-      include: { type: true, requester: true, assignee: true, area: true, pauses: true },
-      orderBy: { [sortField]: query.dir === "asc" ? "asc" : "desc" },
+      include: { type: true, requester: true, assignee: true, area: true, empresa: true, project: true, pauses: true, tasks: true },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -828,13 +882,15 @@ export async function resumen(actor: Actor) {
   return { items: decorated, abiertos, resueltos7 }
 }
 
-export async function dashboard(actor: Actor, filters: { team?: string; brand?: string; from?: string; to?: string }) {
+export async function dashboard(actor: Actor, filters: { team?: string; brand?: string; empresaId?: string; projectId?: string; from?: string; to?: string }) {
   const now = new Date()
   const from = filters.from ? new Date(filters.from) : new Date(now.getTime() - 56 * 24 * 60 * 60 * 1000)
   const to = filters.to ? new Date(filters.to) : now
   const base: Prisma.RequestWhereInput[] = [visibilidad(actor)]
   if (filters.team === "DESARROLLO" || filters.team === "MARKETING") base.push({ team: filters.team })
   if (filters.brand) base.push({ brand: filters.brand })
+  if (filters.empresaId) base.push({ empresaId: filters.empresaId })
+  if (filters.projectId) base.push({ projectId: filters.projectId })
   if (!esAdmin(actor)) {
     const teams = actor.memberships.map((item) => item.team)
     if (teams.length === 0) base.push({ id: "__ninguno__" })

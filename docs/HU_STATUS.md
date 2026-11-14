@@ -22,7 +22,7 @@ Códigos y títulos oficiales de `HUs_Plataforma_Requerimientos.xlsx`. El PM hac
 | RQ-21 | Restringir lo que cada rol puede ver y hacer | Hecho | El solicitante ve lo propio. Agente y líder ven su área. El observador no modifica. |
 | RQ-22 | Notificar por correo los eventos clave | Hecho | Alta, asignación, estado y comentario. Quien actúa no se escribe a sí mismo. El correo solo lleva el enlace. |
 | RQ-25 | Ver un tablero por área | Hecho | Columnas del flujo, semáforo y filtros de marca, responsable y tipo. Arrastrar ejecuta la transición si el rol puede. |
-| RQ-26 | Consultar una lista con filtros | Parcial | Filtra área, marca, estado, prioridad, fechas y texto, y pagina de a 50. Falta ordenar con un clic en la columna y filtrar por tipo o solicitante en la pantalla. |
+| RQ-26 | Consultar una lista con filtros | Hecho | Ordena al hacer clic en la columna y filtra por tipo, solicitante, empresa, proyecto, estado, prioridad y fechas. |
 | RQ-28 | Ver el historial de gestión del requerimiento | Hecho | Línea de tiempo con valores anterior y nuevo. No se edita. El solicitante no ve notas internas. |
 | RQ-29 | Definir tiempos de respuesta (SLA) por área y prioridad | Hecho | Primera respuesta y solución en horario hábil. El cambio vale para los nuevos y no mueve los ya radicados. |
 | RQ-30 | Ver el semáforo de SLA en cada requerimiento | Hecho | Verde por encima del 50 %, amarillo hasta el 50 %, rojo vencido. La primera respuesta se detiene al aceptar o al primer comentario del equipo. |
@@ -31,6 +31,12 @@ Códigos y títulos oficiales de `HUs_Plataforma_Requerimientos.xlsx`. El PM hac
 | RQ-36 | Administrar áreas, tipos, prioridades, marcas y campos | Hecho | Tipos nuevos aparecen en el formulario. Desactivar los oculta sin borrarlos de lo ya radicado. Marcas: CIFES, Luvania y Ambas/Transversal. |
 | RQ-38 | Iniciar sesión con la cuenta de Microsoft 365 | Hecho | Entra ID del tenant y rechazo de otro dominio. Una cuenta deshabilitada en Microsoft no obtiene token. |
 | RQ-44 | Respaldar y restaurar la información | Hecho | `scripts/respaldo.sh` cifra base y adjuntos, guarda 30 diarios y 12 mensuales. `scripts/restaurar.sh` recupera. |
+| RQ-46 | Gestionar empresas | Hecho | CIFES y Luvania son la semilla. Un líder o el administrador crea empresas y puede exigir proyecto al clasificar. La marca se conserva. |
+| RQ-47 | Gestionar proyectos por empresa | Hecho | Nombre, descripción, responsable, fechas y estado. El proyecto es opcional al radicar y obligatorio al clasificar si la empresa lo exige. |
+| RQ-48 | Ver % de avance del proyecto | Hecho | Barra en la lista y el detalle. Sale del promedio de sus tareas y, si no hay tareas, de los requerimientos cerrados. |
+| RQ-49 | Gestionar tareas del requerimiento/proyecto | Hecho | Título, responsable, fecha límite y estado Pendiente, En curso o Hecha. Marcar hecha queda en el historial y mueve el avance. |
+| RQ-50 | Segmentar lista, tablero y dashboard por empresa y proyecto | Hecho | Los tres filtros existen. El dashboard muestra el avance de cada proyecto del corte. |
+| RQ-51 | Gestionar subtareas en Planner | Hecho | Planner es un tablero Pendiente / En curso / Hecha, agrupado por proyecto. Cada tarea tiene una lista de subtareas con responsable, fecha y estado. El % de la tarea sale de esas subtareas. |
 
 ## Adelantado (Fase 2)
 

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Gestion } from "@/components/gestion"
+import { TareasPanel } from "@/components/tareas-panel"
 import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
 import { renderMarkdown } from "@/lib/markdown"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,8 @@ import { formatDuration } from "@/lib/sla"
 import { editarCamposAction, trasladarAction } from "@/server/actions"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
+import { avanceDesdeLista, tareaVencida } from "@/lib/avance"
+import { puedeGestionarTareas } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
 
 export default async function DetallePage({
@@ -29,6 +32,13 @@ export default async function DetallePage({
   const tiposArea = detail.canPriority
     ? await prisma.requestType.findMany({ where: { team: request.team, active: true }, orderBy: { name: "asc" } })
     : []
+  const proyectosEmpresa = await prisma.proyecto.findMany({ where: { empresaId: request.empresaId }, orderBy: { name: "asc" } })
+  const agentesTarea = await prisma.user.findMany({
+    where: { active: true, areaRoles: { some: { team: request.team, role: { in: ["AGENTE", "LIDER"] } } } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  })
+  const avance = avanceDesdeLista(request.tasks, request.status)
   const ratio = Math.max(0, Math.min(100, Math.round(sla.ratio * 100)))
 
   return (
@@ -50,6 +60,26 @@ export default async function DetallePage({
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle>Tareas · {avance.porcentaje}%</CardTitle></CardHeader>
+            <CardContent>
+              <TareasPanel
+                porcentaje={avance.porcentaje}
+                puede={puedeGestionarTareas(actor, request.team)}
+                requestId={request.id}
+                projectId={request.projectId ?? undefined}
+                agentes={agentesTarea}
+                tareas={request.tasks.map((tarea) => ({
+                  id: tarea.id,
+                  title: tarea.title,
+                  status: tarea.status,
+                  dueDate: tarea.dueDate ? formatDate(tarea.dueDate) : null,
+                  assignee: tarea.assignee?.name ?? "Sin responsable",
+                  vencida: tareaVencida(tarea),
+                }))}
+              />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader><CardTitle>Qué se pidió</CardTitle></CardHeader>
             <CardContent className="space-y-4 text-sm leading-relaxed">
@@ -130,6 +160,8 @@ export default async function DetallePage({
               <Fila etiqueta="Tipo" valor={request.type.name} />
               <Fila etiqueta="Prioridad" valor={request.priority} />
               <Fila etiqueta="Prioridad sugerida" valor={request.prioritySuggested} />
+              <Fila etiqueta="Empresa" valor={request.empresa.name} />
+              <Fila etiqueta="Proyecto" valor={request.project?.name ?? "Sin proyecto"} />
               <Fila etiqueta="Marca" valor={request.brand === "AMBAS" ? "Ambas/Transversal" : request.brand} />
               <Fila etiqueta="Área" valor={request.area.name} />
               <Fila etiqueta="Solicitante" valor={request.requester.name} />
@@ -153,6 +185,10 @@ export default async function DetallePage({
                     <option value="ALTA">Alta</option>
                     <option value="MEDIA">Media</option>
                     <option value="BAJA">Baja</option>
+                  </select>
+                  <select name="projectId" defaultValue={request.projectId ?? ""} className="h-9 rounded-lg border border-input px-2" aria-label="Proyecto">
+                    <option value="">Sin proyecto</option>
+                    {proyectosEmpresa.map((proyecto) => <option key={proyecto.id} value={proyecto.id}>{proyecto.name}</option>)}
                   </select>
                   <select name="brand" defaultValue={request.brand} className="h-9 rounded-lg border border-input px-2" aria-label="Marca">
                     <option value="CIFES">CIFES</option>

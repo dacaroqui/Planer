@@ -31,5 +31,25 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 2
 | RQ-36 | Administrar áreas, tipos, prioridades, marcas y campos | MVP |
 | RQ-38 | Iniciar sesión con la cuenta de Microsoft 365 | MVP |
 | RQ-44 | Respaldar y restaurar la información | MVP |
+| RQ-46 | Gestionar empresas | Pedido del dueño |
+| RQ-47 | Gestionar proyectos por empresa | Pedido del dueño |
+| RQ-48 | Ver % de avance del proyecto | Pedido del dueño |
+| RQ-49 | Gestionar tareas del requerimiento/proyecto | Pedido del dueño |
+| RQ-50 | Segmentar lista, tablero y dashboard por empresa y proyecto | Pedido del dueño |
+| RQ-51 | Gestionar subtareas en Planner | Pedido del dueño |
+
+## Criterios de RQ-46 a RQ-51
+
+**RQ-46.** Dado un líder o administrador, cuando crea una empresa, entonces aparece en los filtros y en el formulario. Dado la semilla, cuando se abre el catálogo, entonces existen CIFES y Luvania. La marca del requerimiento se conserva.
+
+**RQ-47.** Dado un líder, cuando crea un proyecto, entonces indica empresa, nombre, descripción, responsable, fecha de inicio, fecha objetivo y estado. Dado el formulario de radicación, cuando no elige proyecto, entonces el requerimiento se crea igual. Dado que la empresa exige proyecto al clasificar, cuando el líder aprueba sin proyecto, entonces la mesa no avanza.
+
+**RQ-48.** Dado un proyecto con tareas, cuando se abre su tarjeta, entonces el porcentaje es el promedio del avance de sus tareas y se ve una barra. Dado un proyecto sin tareas, cuando se calcula el avance, entonces es requerimientos cerrados sobre el total.
+
+**RQ-49.** Dado un agente del área, cuando crea una tarea en un requerimiento o proyecto, entonces guarda título, responsable, fecha límite y estado. Dado que la marca Hecha, cuando se guarda, entonces el avance del requerimiento y del proyecto cambia y queda una línea en el historial.
+
+**RQ-50.** Dado la lista, el tablero y el dashboard, cuando filtro por empresa o proyecto, entonces solo queda ese corte. Dado el dashboard, cuando elijo una empresa, entonces veo el avance de cada proyecto.
+
+**RQ-51.** Dado Planner, cuando lo abro, entonces veo columnas Pendiente, En curso y Hecha, agrupadas por proyecto, y puedo filtrar por empresa, proyecto y responsable. Dado una tarea, cuando agrego subtareas con responsable, fecha y estado, entonces el porcentaje de la tarea es subtareas hechas sobre el total.
 
 RQ-07, RQ-15, RQ-16, RQ-18, RQ-19, RQ-23, RQ-24, RQ-27, RQ-31, RQ-33, RQ-34, RQ-37, RQ-39, RQ-40, RQ-41, RQ-42, RQ-43 y RQ-45 no son MVP.

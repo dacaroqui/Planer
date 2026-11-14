@@ -25,16 +25,22 @@ export function FormularioRadicar({
   area,
   marcas,
   prioridades,
+  empresas,
+  proyectos,
 }: {
   tipos: TipoOpcion[]
   area: string
   marcas: { key: string; name: string }[]
   prioridades: { key: string; name: string }[]
+  empresas: { id: string; name: string }[]
+  proyectos: { id: string; empresaId: string; name: string }[]
 }) {
   const [team, setTeam] = useState<TeamName | "">("")
   const [typeId, setTypeId] = useState("")
   const [priority, setPriority] = useState("MEDIA")
   const [brand, setBrand] = useState(marcas[0]?.key ?? "CIFES")
+  const [empresaId, setEmpresaId] = useState(empresas[0]?.id ?? "")
+  const [projectId, setProjectId] = useState("")
   const [declares, setDeclares] = useState(false)
   const [reviewed, setReviewed] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +78,8 @@ export function FormularioRadicar({
         data.set("typeId", typeId)
         data.set("priority", priority)
         data.set("brand", brand)
+        data.set("empresaId", empresaId)
+        if (projectId) data.set("projectId", projectId)
         data.set("declares", "1")
         data.set("reviewedPersonalData", reviewed ? "1" : "0")
         start(async () => {
@@ -99,6 +107,25 @@ export function FormularioRadicar({
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               {prioridades.map((item) => <SelectItem key={item.key} value={item.key}>{item.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Campo>
+        <Campo etiqueta="Empresa">
+          <Select value={empresaId} onValueChange={(value) => { setEmpresaId(value); setProjectId("") }}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Empresa" /></SelectTrigger>
+            <SelectContent>
+              {empresas.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Campo>
+        <Campo etiqueta="Proyecto (opcional)">
+          <Select value={projectId || "NINGUNO"} onValueChange={(value) => setProjectId(value === "NINGUNO" ? "" : value)}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Sin proyecto" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="NINGUNO">Sin proyecto</SelectItem>
+              {proyectos.filter((item) => item.empresaId === empresaId).map((item) => (
+                <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Campo>

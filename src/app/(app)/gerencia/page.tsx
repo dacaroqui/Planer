@@ -1,9 +1,12 @@
 import Link from "next/link"
+import { Barra } from "@/components/barra"
 import { EstadoBadge, SlaBadge } from "@/components/insignias"
 import { esAdmin, rolEn } from "@/lib/permissions"
 import { statusLabel } from "@/lib/domain"
 import { requireActor } from "@/server/session"
 import { dashboard } from "@/server/requests"
+import { listarProyectos } from "@/server/proyectos"
+import { prisma } from "@/lib/prisma"
 
 export default async function DashboardPage({
   searchParams,
@@ -18,7 +21,15 @@ export default async function DashboardPage({
   }
   const team = one("team")
   const brand = one("brand")
-  const data = await dashboard(actor, { team, brand, from: one("from"), to: one("to") })
+  const empresaId = one("empresa")
+  const projectId = one("proyecto")
+  const data = await dashboard(actor, { team, brand, empresaId, projectId, from: one("from"), to: one("to") })
+  const [empresas, proyectosCatalogo, avanceProyectos] = await Promise.all([
+    prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
+    listarProyectos(actor, empresaId),
+  ])
+  const avances = projectId ? avanceProyectos.filter((item) => item.id === projectId) : avanceProyectos
   const puede = esAdmin(actor) || actor.memberships.length > 0
   if (!puede) {
     return (
@@ -37,7 +48,7 @@ export default async function DashboardPage({
           Abiertos por estado, creados frente a resueltos y cumplimiento de SLA. {soloLectura ? "Está en modo solo lectura." : ""}
         </p>
       </div>
-      <form className="grid gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-4">
+      <form className="grid gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-3 lg:grid-cols-6">
         <select name="team" defaultValue={team ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Área">
           <option value="">Todas las áreas</option>
           <option value="DESARROLLO">Desarrollo</option>
@@ -48,6 +59,16 @@ export default async function DashboardPage({
           <option value="CIFES">CIFES</option>
           <option value="LUVANIA">Luvania</option>
           <option value="AMBAS">Ambas/Transversal</option>
+        </select>
+        <select name="empresa" defaultValue={empresaId ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Empresa">
+          <option value="">Todas las empresas</option>
+          {empresas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <select name="proyecto" defaultValue={projectId ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Proyecto">
+          <option value="">Todos los proyectos</option>
+          {proyectosCatalogo.filter((item) => !empresaId || item.empresaId === empresaId).map((item) => (
+            <option key={item.id} value={item.id}>{item.name}</option>
+          ))}
         </select>
         <input name="from" type="date" defaultValue={one("from")} lang="es-CO" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Desde" />
         <button className="h-9 rounded-lg bg-primary text-sm text-primary-foreground" type="submit">Recalcular</button>
@@ -95,6 +116,17 @@ export default async function DashboardPage({
           <p className="mt-2 text-xs text-muted-foreground">Vino: creados. Verde: resueltos. Últimas 8 semanas del periodo.</p>
         </section>
       </div>
+      <section className="rounded-xl border border-border bg-card p-4">
+        <h2 className="font-heading text-xl">Avance por proyecto</h2>
+        <div className="mt-3 grid gap-3">
+          {avances.length === 0 ? <p className="text-sm text-muted-foreground">No hay proyectos en este corte.</p> : avances.map((proyecto) => (
+            <Link key={proyecto.id} href={`/proyectos/${proyecto.id}`} className="grid gap-1 text-sm">
+              <span className="flex justify-between"><span>{proyecto.empresa.name} · {proyecto.name}</span><span>{proyecto.avance.porcentaje}%</span></span>
+              <Barra porcentaje={proyecto.avance.porcentaje} />
+            </Link>
+          ))}
+        </div>
+      </section>
       <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="font-heading text-xl">Vencidos</h2>
         <div className="mt-3 grid gap-2">

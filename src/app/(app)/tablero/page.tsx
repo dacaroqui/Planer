@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma"
 export default async function TableroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string }>
+  searchParams: Promise<{ team?: string; empresa?: string; proyecto?: string }>
 }) {
   const actor = await requireActor()
   const params = await searchParams
@@ -24,9 +24,13 @@ export default async function TableroPage({
       </div>
     )
   }
-  const estados = await prisma.workflowState.findMany({ where: { team, active: true, hiddenOnBoard: false }, orderBy: { sortOrder: "asc" } })
+  const [estados, empresas, proyectos] = await Promise.all([
+    prisma.workflowState.findMany({ where: { team, active: true, hiddenOnBoard: false }, orderBy: { sortOrder: "asc" } }),
+    prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
+  ])
   const columnas = [...new Set(estados.map((estado) => estado.boardColumn))]
-  const data = await listar(actor, { team, openOnly: true, pageSize: 100 })
+  const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto })
   const transiciones = await prisma.workflowTransition.findMany({ where: { team, active: true } })
   const catalogo = transiciones.map((item) => ({
     team,
@@ -51,6 +55,20 @@ export default async function TableroPage({
           </div>
         ) : null}
       </div>
+      <form className="grid gap-2 sm:grid-cols-3">
+        <input type="hidden" name="team" value={team} />
+        <select name="empresa" defaultValue={params.empresa ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Empresa">
+          <option value="">Todas las empresas</option>
+          {empresas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <select name="proyecto" defaultValue={params.proyecto ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Proyecto">
+          <option value="">Todos los proyectos</option>
+          {proyectos.filter((item) => !params.empresa || item.empresaId === params.empresa).map((item) => (
+            <option key={item.id} value={item.id}>{item.name}</option>
+          ))}
+        </select>
+        <button className="h-9 rounded-lg bg-primary text-sm text-primary-foreground" type="submit">Filtrar</button>
+      </form>
       <Tablero
         soloLectura={!esAdmin(actor) && rolEn(actor, team) === "OBSERVADOR"}
         columnas={columnas}

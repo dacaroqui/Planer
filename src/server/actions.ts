@@ -6,6 +6,7 @@ import { signIn, signOut } from "@/auth"
 import { DomainError, type TeamName } from "@/lib/domain"
 import { assertAllowedFile } from "@/lib/files"
 import { firstIssue, radicarSchema } from "@/lib/schemas"
+import { guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
 import { requireActor } from "@/server/session"
 import {
   actualizarTipo,
@@ -93,6 +94,8 @@ export async function radicarAction(formData: FormData): Promise<ActionResult> {
       ...parsed.data,
       declares: true,
       reviewedPersonalData: parsed.data.reviewedPersonalData === "1",
+      empresaId: String(formData.get("empresaId") || "") || undefined,
+      projectId: String(formData.get("projectId") || "") || null,
     })
     code = request.code
     if (file) await adjuntar(actor, request.id, file)
@@ -278,6 +281,7 @@ export async function editarCamposAction(formData: FormData) {
       brand: String(formData.get("brand") || "") || undefined,
       typeId: String(formData.get("typeId") || "") || undefined,
       committedDate: String(formData.get("committedDate") || "") || null,
+      projectId: String(formData.get("projectId") || "") || null,
     })
   } catch (error) {
     exigir(error)
@@ -371,4 +375,71 @@ export async function guardarSlaAction(formData: FormData) {
     exigir(error)
   }
   refrescar()
+}
+
+export async function guardarTareaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const status = String(formData.get("status") || "PENDIENTE")
+  if (status !== "PENDIENTE" && status !== "EN_CURSO" && status !== "HECHA") {
+    return { ok: false, error: "Estado de tarea no válido." }
+  }
+  try {
+    const opcional = (key: string) => (formData.has(key) ? String(formData.get(key) || "") || null : undefined)
+    await guardarTarea(actor, {
+      id: String(formData.get("id") || "") || undefined,
+      title: String(formData.get("title") || ""),
+      assigneeId: opcional("assigneeId"),
+      dueDate: opcional("dueDate"),
+      status,
+      requestId: opcional("requestId"),
+      projectId: opcional("projectId"),
+      parentId: opcional("parentId"),
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  revalidatePath("/proyectos")
+  revalidatePath("/planner")
+  return { ok: true, message: status === "HECHA" ? "Tarea hecha. El avance se actualizó." : "Tarea guardada." }
+}
+
+export async function guardarProyectoAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const status = String(formData.get("status") || "PLANIFICADO")
+  if (status !== "PLANIFICADO" && status !== "EN_CURSO" && status !== "EN_PAUSA" && status !== "CERRADO") {
+    return { ok: false, error: "Estado de proyecto no válido." }
+  }
+  try {
+    await guardarProyecto(actor, {
+      id: String(formData.get("id") || "") || undefined,
+      empresaId: String(formData.get("empresaId") || ""),
+      name: String(formData.get("name") || ""),
+      description: String(formData.get("description") || ""),
+      leaderId: String(formData.get("leaderId") || ""),
+      startsAt: String(formData.get("startsAt") || ""),
+      targetAt: String(formData.get("targetAt") || ""),
+      status,
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  revalidatePath("/proyectos")
+  return { ok: true, message: "Proyecto guardado." }
+}
+
+export async function guardarEmpresaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await guardarEmpresa(actor, {
+      id: String(formData.get("id") || "") || undefined,
+      name: String(formData.get("name") || ""),
+      active: formData.get("active") !== "0",
+      exigirProyectoAlClasificar: formData.get("exigir") === "1",
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  revalidatePath("/proyectos")
+  return { ok: true, message: "Empresa guardada." }
 }

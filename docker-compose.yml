@@ -18,12 +18,16 @@ services:
   app:
     build: .
     ports:
-      - "38471:38471"
-    env_file: .env
+      - "3000:3000"
     environment:
       DATABASE_URL: postgresql://requerimientos:requerimientos@db:5432/requerimientos
-      APP_URL: http://127.0.0.1:38471
-      AUTH_URL: http://127.0.0.1:38471
+      APP_URL: http://127.0.0.1:3000
+      AUTH_URL: http://127.0.0.1:3000
+      AUTH_SECRET: demo-mesa-cifes-luvania-cambie-esto
+      AUTH_ALLOWED_EMAIL_DOMAIN: cifes.edu.co
+      DEV_AUTH_ENABLED: "true"
+      EMAIL_PROVIDER: console
+      PORT: "3000"
     depends_on:
       db:
         condition: service_healthy

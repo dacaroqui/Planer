@@ -74,6 +74,75 @@ model User {
   attachments   Attachment[]
   notifications Notification[]
   audits        AuditLog[]
+  ledProjects   Proyecto[]     @relation("ProjectLeader")
+  assignedTasks Tarea[]        @relation("TaskAssignee")
+  createdTasks  Tarea[]        @relation("TaskCreator")
+}
+
+model Empresa {
+  id                           String     @id @default(cuid())
+  name                         String     @unique
+  active                       Boolean    @default(true)
+  exigirProyectoAlClasificar   Boolean    @default(false)
+  projects                     Proyecto[]
+  requests                     Request[]
+  createdAt                    DateTime   @default(now())
+}
+
+enum EstadoProyecto {
+  PLANIFICADO
+  EN_CURSO
+  EN_PAUSA
+  CERRADO
+}
+
+enum EstadoTarea {
+  PENDIENTE
+  EN_CURSO
+  HECHA
+}
+
+model Proyecto {
+  id          String         @id @default(cuid())
+  empresaId   String
+  empresa     Empresa        @relation(fields: [empresaId], references: [id])
+  name        String
+  description String         @default("")
+  leaderId    String
+  leader      User           @relation("ProjectLeader", fields: [leaderId], references: [id])
+  startsAt    DateTime
+  targetAt    DateTime
+  status      EstadoProyecto @default(PLANIFICADO)
+  requests    Request[]
+  tasks       Tarea[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([empresaId])
+}
+
+model Tarea {
+  id          String      @id @default(cuid())
+  title       String
+  assigneeId  String?
+  assignee    User?       @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  dueDate     DateTime?
+  status      EstadoTarea @default(PENDIENTE)
+  requestId   String?
+  request     Request?    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Proyecto?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Tarea?      @relation("Subtareas", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Tarea[]     @relation("Subtareas")
+  createdById String
+  createdBy   User        @relation("TaskCreator", fields: [createdById], references: [id])
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([requestId])
+  @@index([projectId])
 }
 
 model AreaRole {
@@ -162,6 +231,10 @@ model Request {
   expectedResult         String       @default("")
   justification          String       @default("")
   brand                  String
+  empresaId              String
+  empresa                Empresa      @relation(fields: [empresaId], references: [id])
+  projectId              String?
+  project                Proyecto?    @relation(fields: [projectId], references: [id])
   priority               String
   prioritySuggested      String
   team                   Team
@@ -197,6 +270,7 @@ model Request {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   comments               Comment[]
+  tasks                  Tarea[]
   activities             Activity[]
   attachments            Attachment[]
   pauses                 SlaPause[]
@@ -206,6 +280,8 @@ model Request {
   @@index([requesterId])
   @@index([assigneeId])
   @@index([createdAt])
+  @@index([empresaId])
+  @@index([projectId])
 }
 
 model SlaPause {

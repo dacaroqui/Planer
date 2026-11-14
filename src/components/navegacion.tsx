@@ -6,6 +6,7 @@ import {
   BellIcon,
   EyeIcon,
   InboxIcon,
+  Columns3Icon,
   LayoutDashboardIcon,
   ListIcon,
   MenuIcon,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils"
 
 const ICONS = {
   panel: LayoutDashboardIcon,
+  planner: Columns3Icon,
   lista: ListIcon,
   radicar: PlusIcon,
   bandeja: InboxIcon,

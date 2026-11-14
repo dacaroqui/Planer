@@ -30,16 +30,14 @@ La mesa queda en [http://127.0.0.1:38471](http://127.0.0.1:38471).
 
 | Correo | Rol |
 | --- | --- |
-| ana.ejemplo@cifes.edu.co | Solicitante de Académico |
-| julian.ejemplo@cifes.edu.co | Solicitante de Clínica Luvania |
-| valentina.ejemplo@cifes.edu.co | Agente de Desarrollo |
-| helena.ejemplo@cifes.edu.co | Líder de Desarrollo |
-| camila.ejemplo@cifes.edu.co | Agente de Marketing |
-| sara.ejemplo@cifes.edu.co | Líder de Marketing |
 | admin.ejemplo@cifes.edu.co | Administrador |
+| helena.ejemplo@cifes.edu.co | Líder de Desarrollo |
+| sara.ejemplo@cifes.edu.co | Líder de Marketing |
+| valentina.ejemplo@cifes.edu.co | Agente de Desarrollo |
+| ana.ejemplo@cifes.edu.co | Solicitante de Académico |
 | gerencia.ejemplo@cifes.edu.co | Observador, solo lectura |
 
-También están Mateo y Tomás, agentes de apoyo. Ninguno corresponde a una persona real.
+También están Julián (solicitante de Luvania), Camila (agente de Marketing), Mateo y Tomás. Ninguno corresponde a una persona real. La semilla trae CIFES y Luvania, cinco proyectos con distinto avance, veinte requerimientos y tareas con subtareas en Planner. Cada arranque de Docker vuelve a cargar esa semilla y reemplaza los datos de demostración.
 
 ## Pruebas
 
@@ -55,17 +53,10 @@ Cubren radicar, el consecutivo, la transición según el rol, el comentario, la 
 ## Docker
 
 ```bash
-cp .env.example .env
 docker compose up --build
 ```
 
-La primera vez, cargue la semilla:
-
-```bash
-docker compose run --rm app npx prisma db seed
-```
-
-El contenedor escucha el puerto 38471 y aplica las migraciones al arrancar.
+Ese único comando levanta PostgreSQL y la mesa en [http://127.0.0.1:3000](http://127.0.0.1:3000), aplica las migraciones y carga la semilla. No hace falta un archivo `.env`: Compose define `DEV_AUTH_ENABLED=true` y un secreto de demostración. Cambie `AUTH_SECRET` antes de salir de la máquina local. El desarrollo con `npm run dev` sigue en el puerto 38471.
 
 ## Variables de entorno
 

@@ -3,6 +3,13 @@ import { ESTADOS_OFICIALES, SLA_POR_DEFECTO, TIPOS_OFICIALES, TRANSICIONES_OFICI
 import { prisma } from "@/lib/prisma"
 
 export async function asegurarCatalogo(client: PrismaClient = prisma) {
+  for (const name of ["CIFES", "Luvania"]) {
+    await client.empresa.upsert({
+      where: { name },
+      update: { active: true },
+      create: { name },
+    })
+  }
   for (const estado of ESTADOS_OFICIALES) {
     await client.workflowState.upsert({
       where: { team_key: { team: estado.team, key: estado.key } },

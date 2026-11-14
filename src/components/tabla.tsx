@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
+import { EstadoBadge, SlaBadge } from "@/components/insignias"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PRIORITY_LABEL, type SlaState, type TeamName } from "@/lib/domain"
 import { formatDateTime } from "@/lib/format"
@@ -18,7 +18,31 @@ export type FilaRequerimiento = {
   sla: { state: SlaState }
 }
 
-export function TablaRequerimientos({ items, vacio }: { items: FilaRequerimiento[]; vacio: string }) {
+export function TablaRequerimientos({
+  items,
+  vacio,
+  ruta,
+  consulta = "",
+  sort,
+  dir,
+}: {
+  items: FilaRequerimiento[]
+  vacio: string
+  ruta?: string
+  consulta?: string
+  sort?: string
+  dir?: string
+}) {
+  function orden(columna: string) {
+    if (!ruta) return undefined
+    const params = new URLSearchParams(consulta)
+    const siguiente = sort === columna && dir !== "asc" ? "asc" : "desc"
+    params.set("sort", columna)
+    params.set("dir", siguiente)
+    params.delete("page")
+    const query = params.toString()
+    return query ? `${ruta}?${query}` : ruta
+  }
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
@@ -33,12 +57,12 @@ export function TablaRequerimientos({ items, vacio }: { items: FilaRequerimiento
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Requerimiento</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead><Orden href={orden("title")} activo={sort === "title"}>Requerimiento</Orden></TableHead>
+              <TableHead><Orden href={orden("status")} activo={sort === "status"}>Estado</Orden></TableHead>
               <TableHead>SLA</TableHead>
-              <TableHead>Equipo</TableHead>
-              <TableHead>Asignado</TableHead>
-              <TableHead>Actualizado</TableHead>
+              <TableHead><Orden href={orden("code")} activo={sort === "code"}>Código</Orden></TableHead>
+              <TableHead><Orden href={orden("requester")} activo={sort === "requester"}>Solicitante</Orden></TableHead>
+              <TableHead><Orden href={orden("updatedAt")} activo={sort === "updatedAt"}>Actualizado</Orden></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -54,8 +78,8 @@ export function TablaRequerimientos({ items, vacio }: { items: FilaRequerimiento
                 </TableCell>
                 <TableCell><EstadoBadge status={item.status} /></TableCell>
                 <TableCell><SlaBadge state={item.sla.state} /></TableCell>
-                <TableCell><EquipoBadge team={item.team} /></TableCell>
-                <TableCell>{item.assignee?.name ?? "Sin asignar"}</TableCell>
+                <TableCell>{item.code}</TableCell>
+                <TableCell>{item.requester.name}</TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(item.updatedAt)}</TableCell>
               </TableRow>
             ))}
@@ -78,6 +102,11 @@ export function TablaRequerimientos({ items, vacio }: { items: FilaRequerimiento
       </div>
     </>
   )
+}
+
+function Orden({ href, activo, children }: { href?: string; activo?: boolean; children: React.ReactNode }) {
+  if (!href) return <>{children}</>
+  return <Link href={href} className={activo ? "underline" : "hover:underline"}>{children}</Link>
 }
 
 export function Paginacion({ page, pages, ruta, query }: { page: number; pages: number; ruta: string; query: string }) {
