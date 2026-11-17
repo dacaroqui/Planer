@@ -137,6 +137,8 @@ export async function crearInvitacion(
     },
   })
   const enlace = `${appBaseUrl()}/invitar/${token}`
+  const equipos = input.teams.length ? input.teams.map((team) => team === "DESARROLLO" ? "Desarrollo" : "Marketing").join(" y ") : "sin equipo"
+  const resumen = `${email} · ${input.rol} · ${equipos}`
   let enviado = false
   try {
     enviado = await enviar(
@@ -148,7 +150,7 @@ export async function crearInvitacion(
     console.error("No se pudo enviar la invitación", error)
   }
   await auditar(actor.id, "INVITACION", email, input.rol)
-  return { enlace, enviado }
+  return { enlace, enviado, resumen }
 }
 
 export async function leerInvitacion(token: string) {

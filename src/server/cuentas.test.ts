@@ -72,6 +72,17 @@ describe("RQ-52 RQ-54 autenticación e invitación", () => {
     expect(auditoria).toHaveLength(1)
   })
 
+  it("guarda solo el equipo marcado en cada invitación", async () => {
+    const { actor, area } = await admin()
+    await crearInvitacion(actor, { email: "mkt.ejemplo@cifes.edu.co", rol: "LIDER", areaId: area.id, areaIds: [], empresaIds: [], teams: ["MARKETING"] })
+    await crearInvitacion(actor, { email: "dev.ejemplo@cifes.edu.co", rol: "AGENTE", areaId: area.id, areaIds: [], empresaIds: [], teams: ["DESARROLLO"] })
+    const filas = await prisma.invitacion.findMany()
+    const marketing = filas.find((item) => item.email.startsWith("mkt"))
+    const desarrollo = filas.find((item) => item.email.startsWith("dev"))
+    expect(JSON.parse(marketing?.memberships || "[]")).toEqual([{ team: "MARKETING", role: "LIDER" }])
+    expect(JSON.parse(desarrollo?.memberships || "[]")).toEqual([{ team: "DESARROLLO", role: "AGENTE" }])
+  })
+
   it("bloquea la cuenta tras cinco contraseñas incorrectas", async () => {
     const { area } = await admin()
     const { hashClave } = await import("@/lib/clave")

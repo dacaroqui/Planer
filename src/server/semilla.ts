@@ -96,4 +96,13 @@ export async function asegurarCatalogo(client: PrismaClient = prisma) {
       })
     }
   }
+  const agenteDemo = await client.user.findUnique({ where: { email: "agente.demo@cifes.edu.co" } })
+  if (agenteDemo) {
+    await client.areaRole.deleteMany({ where: { userId: agenteDemo.id, team: "MARKETING" } })
+    await client.areaRole.upsert({
+      where: { userId_team_role: { userId: agenteDemo.id, team: "DESARROLLO", role: "AGENTE" } },
+      update: {},
+      create: { userId: agenteDemo.id, team: "DESARROLLO", role: "AGENTE" },
+    })
+  }
 }

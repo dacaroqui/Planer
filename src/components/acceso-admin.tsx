@@ -88,8 +88,10 @@ export function FormularioInvitacion({
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [enlace, setEnlace] = useState<string | null>(null)
+  const [resumen, setResumen] = useState<string | null>(null)
+  const [clave, setClave] = useState(0)
   return (
-    <form className="grid gap-3 rounded-xl border border-border bg-card p-4" onSubmit={(event) => {
+    <form key={clave} className="grid gap-3 rounded-xl border border-border bg-card p-4" onSubmit={(event) => {
       event.preventDefault()
       const data = new FormData(event.currentTarget)
       start(async () => {
@@ -97,10 +99,13 @@ export function FormularioInvitacion({
         if (!result.ok) {
           setError(result.error)
           setEnlace(null)
+          setResumen(null)
           return
         }
         setError(null)
         setEnlace(result.enlace || null)
+        setResumen(result.resumen || null)
+        setClave((value) => value + 1)
         toast.success(result.message || "Invitación lista.")
       })
     }}>
@@ -110,7 +115,12 @@ export function FormularioInvitacion({
       </div>
       <CamposComunes areas={areas} empresas={empresas} />
       {error ? <p className="text-sm text-red-800">{error}</p> : null}
-      {enlace ? <Enlace enlace={enlace} /> : null}
+      {enlace ? (
+        <div className="grid gap-2">
+          {resumen ? <p className="text-sm">Invitación para {resumen}. El enlace es de un solo uso.</p> : null}
+          <Enlace enlace={enlace} />
+        </div>
+      ) : null}
       <div><Button type="submit" disabled={pending}>{pending ? "Generando…" : "Generar invitación"}</Button></div>
     </form>
   )
