@@ -345,6 +345,10 @@ model Request {
   @@index([createdAt])
   @@index([empresaId])
   @@index([projectId])
+  @@index([updatedAt])
+  @@index([areaId])
+  @@index([resolvedAt])
+  @@index([team, status, updatedAt])
 }
 
 model SlaPause {

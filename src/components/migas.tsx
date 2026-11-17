@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { etiquetaMiga } from "@/lib/migas-etiqueta"
+
+let nombrePendiente = ""
 
 const NOMBRES: Record<string, string> = {
   panel: "Inicio",
@@ -20,14 +23,24 @@ const NOMBRES: Record<string, string> = {
   usuarios: "Usuarios",
   catalogos: "Catálogos",
   flujos: "Flujos y SLA",
+  espacios: "Espacios",
+  paginas: "Páginas",
+  formularios: "Formularios",
+  adjuntos: "Adjuntos",
+  calendario: "Calendario",
+  lista: "Lista",
+  perfil: "Mi perfil",
 }
 
 export function Migas() {
   const path = usePathname()
-  const [nombre, setNombre] = useState("")
+  const [nombre, setNombre] = useState(nombrePendiente)
   useEffect(() => {
+    setNombre(nombrePendiente)
     function oir(event: Event) {
-      setNombre(String((event as CustomEvent<string>).detail || ""))
+      const valor = String((event as CustomEvent<string>).detail || "")
+      nombrePendiente = valor
+      setNombre(valor)
     }
     window.addEventListener("mesa-miga", oir)
     return () => {
@@ -40,9 +53,7 @@ export function Migas() {
   partes.forEach((parte, index) => {
     if (parte === "panel") return
     acumulado += `/${parte}`
-    const conocida = NOMBRES[parte]
-    const ultima = index === partes.length - 1
-    migas.push({ href: acumulado, label: conocida ?? (ultima && nombre ? nombre : decodeURIComponent(parte)) })
+    migas.push({ href: acumulado, label: etiquetaMiga(parte, index, partes, nombre, NOMBRES) })
   })
   return (
     <nav aria-label="Miga de pan" className="mx-auto w-full max-w-6xl px-4 pt-4 text-sm text-muted-foreground md:px-8">
@@ -63,8 +74,10 @@ export function Migas() {
 
 export function NombreMiga({ nombre }: { nombre: string }) {
   useEffect(() => {
+    nombrePendiente = nombre
     window.dispatchEvent(new CustomEvent("mesa-miga", { detail: nombre }))
     return () => {
+      nombrePendiente = ""
       window.dispatchEvent(new CustomEvent("mesa-miga", { detail: "" }))
     }
   }, [nombre])

@@ -1,12 +1,27 @@
+import { Suspense } from "react"
+import { Esqueleto } from "@/components/esqueleto"
 import { Tablero } from "@/components/tablero"
 import { equiposVisibles, esAdmin, rolEn, transicionesPara } from "@/lib/permissions"
 import { nombreEstado } from "@/lib/flujo-oficial"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
 import { requireActor } from "@/server/session"
-import { listar, opcionesTablero } from "@/server/requests"
+import { catalogoPara } from "@/server/catalogo-nav"
+import { listar } from "@/server/requests"
 import { prisma } from "@/lib/prisma"
 
-export default async function TableroPage({
+export default function TableroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ team?: string; empresa?: string; proyecto?: string; area?: string }>
+}) {
+  return (
+    <Suspense fallback={<Esqueleto />}>
+      <TableroCargado searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function TableroCargado({
   searchParams,
 }: {
   searchParams: Promise<{ team?: string; empresa?: string; proyecto?: string; area?: string }>
@@ -25,15 +40,13 @@ export default async function TableroPage({
       </div>
     )
   }
-  const [estados, opciones] = await Promise.all([
-    prisma.workflowState.findMany({ where: { team, active: true, hiddenOnBoard: false }, orderBy: { sortOrder: "asc" } }),
-    opcionesTablero(actor, team),
-  ])
+  const opciones = await catalogoPara(actor)
+  const estados = await prisma.workflowState.findMany({ where: { team, active: true, hiddenOnBoard: false }, orderBy: { sortOrder: "asc" } })
   const empresas = opciones.empresas
   const proyectos = opciones.proyectos
   const areasOrg = opciones.areas
   const columnas = estados.map((estado) => estado.name)
-  const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto, areaId: params.area })
+  const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto, areaId: params.area, conPausas: true, conTareas: false })
   const transiciones = await prisma.workflowTransition.findMany({ where: { team, active: true } })
   const catalogo = catalogoTablero(transiciones.map((item) => ({ ...item, team })))
   const columnaDe = (status: string) => estados.find((estado) => estado.key === status)?.name ?? nombreEstado(team, status)

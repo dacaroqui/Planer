@@ -9,7 +9,7 @@ export default async function AprobacionesEspacio({ params }: { params: Promise<
   const { id } = await params
   const empresa = await prisma.empresa.findUnique({ where: { id } })
   if (!empresa) notFound()
-  const casos = await listar(actor, { empresaId: id, pageSize: 100 })
+  const casos = await listar(actor, { empresaId: id, pageSize: 100, conPausas: false, conTareas: false })
   const pendientes = casos.items.filter((item) => item.status === "EN_VALIDACION" || item.status === "EN_APROBACION" || item.status === "EN_ANALISIS")
   return (
     <div className="space-y-4">

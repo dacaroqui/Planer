@@ -10,7 +10,7 @@ export default async function AdjuntosEspacio({ params }: { params: Promise<{ id
   const { id } = await params
   const empresa = await prisma.empresa.findUnique({ where: { id } })
   if (!empresa) notFound()
-  const casos = await listar(actor, { empresaId: id, pageSize: 200 })
+  const casos = await listar(actor, { empresaId: id, pageSize: 200, conPausas: false, conTareas: false })
   const archivos = await prisma.attachment.findMany({
     where: { requestId: { in: casos.items.map((item) => item.id) } },
     orderBy: { createdAt: "desc" },

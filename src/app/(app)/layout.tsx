@@ -1,23 +1,23 @@
+import { Suspense } from "react"
+import { Esqueleto } from "@/components/esqueleto"
 import { Marco } from "@/components/marco"
 import { puedeAdministrar, puedeRadicar, puedeVerPlanner } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
-import { opcionesVisibles } from "@/server/requests"
+import { catalogoPara } from "@/server/catalogo-nav"
 import { requireActor } from "@/server/session"
 
 export const dynamic = "force-dynamic"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireActor()
-  const [unread, opciones] = await Promise.all([
-    prisma.notification.count({ where: { userId: actor.id, readAt: null } }),
-    opcionesVisibles(actor),
-  ])
+  const catalogo = await catalogoPara(actor)
+  const unread = await prisma.notification.count({ where: { userId: actor.id, readAt: null } })
   const lider = actor.isAdmin || actor.memberships.some((item) => item.role === "LIDER")
   const equipo = actor.isAdmin || actor.memberships.length > 0
   return (
     <Marco
       actor={actor}
-      espacios={opciones.empresas.map((item) => ({ id: item.id, name: item.name }))}
+      espacios={catalogo.empresas.map((item) => ({ id: item.id, name: item.name }))}
       unread={unread}
       puedeAdmin={puedeAdministrar(actor)}
       puedeRadicar={puedeRadicar(actor)}
@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       puedeCola={lider}
       puedeTablero={equipo}
     >
-      {children}
+      <Suspense fallback={<Esqueleto />}>{children}</Suspense>
     </Marco>
   )
 }

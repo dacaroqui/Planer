@@ -909,6 +909,15 @@ export type ListQuery = {
   dir?: "asc" | "desc"
   page?: number
   pageSize?: number
+  conPausas?: boolean
+  conTareas?: boolean
+}
+
+export function relacionesListar(query: { conPausas?: boolean; conTareas?: boolean }) {
+  return {
+    pauses: query.conPausas !== false,
+    tasks: query.conTareas === true,
+  }
 }
 
 export async function listar(actor: Actor, query: ListQuery) {
@@ -958,11 +967,21 @@ export async function listar(actor: Actor, query: ListQuery) {
     : ["updatedAt", "createdAt", "code", "priority", "status"].includes(query.sort || "")
       ? { [query.sort!]: dir }
       : { updatedAt: "desc" }
+  const relaciones = relacionesListar(query)
   const [total, rows] = await prisma.$transaction([
     prisma.request.count({ where }),
     prisma.request.findMany({
       where,
-      include: { type: true, requester: true, assignee: true, area: true, empresa: true, project: true, pauses: true, tasks: true },
+      include: {
+        type: { select: { id: true, name: true, team: true } },
+        requester: { select: { id: true, name: true } },
+        assignee: { select: { id: true, name: true } },
+        area: { select: { id: true, name: true } },
+        empresa: { select: { id: true, name: true, exigirProyectoAlClasificar: true } },
+        project: { select: { id: true, name: true } },
+        ...(relaciones.pauses ? { pauses: { select: { startedAt: true, endedAt: true } } } : {}),
+        ...(relaciones.tasks ? { tasks: { select: { id: true, title: true, status: true, parentId: true } } } : {}),
+      },
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -972,7 +991,7 @@ export async function listar(actor: Actor, query: ListQuery) {
     total,
     page,
     pages: Math.max(1, Math.ceil(total / pageSize)),
-    items: rows.map((row) => ({ ...row, sla: evaluarSla(row) })),
+    items: rows.map((row) => ({ ...row, pauses: "pauses" in row ? row.pauses : [], sla: evaluarSla({ ...row, pauses: "pauses" in row ? row.pauses : [] }) })),
   }
 }
 
@@ -980,7 +999,14 @@ export async function resumen(actor: Actor) {
   const now = new Date()
   const items = await prisma.request.findMany({
     where: { AND: [visibilidad(actor), { status: { notIn: ["CERRADO", "CANCELADO", "RECHAZADO"] } }] },
-    include: { pauses: true, type: true, requester: true, assignee: true, area: true, empresa: true },
+    include: {
+      pauses: { select: { startedAt: true, endedAt: true } },
+      type: { select: { id: true, name: true } },
+      requester: { select: { id: true, name: true } },
+      assignee: { select: { id: true, name: true } },
+      area: { select: { id: true, name: true } },
+      empresa: { select: { id: true, name: true } },
+    },
     orderBy: { updatedAt: "desc" },
   })
   const decorated = items.map((item) => ({ ...item, sla: evaluarSla(item, now) }))

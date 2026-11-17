@@ -1,5 +1,6 @@
 import { ParaTi } from "@/components/para-ti"
-import { opcionesVisibles, resumen } from "@/server/requests"
+import { catalogoPara } from "@/server/catalogo-nav"
+import { resumen } from "@/server/requests"
 import { requireActor } from "@/server/session"
 
 export default async function PanelPage({
@@ -9,7 +10,8 @@ export default async function PanelPage({
 }) {
   const actor = await requireActor()
   const params = await searchParams
-  const [data, opciones] = await Promise.all([resumen(actor), opcionesVisibles(actor)])
+  const opciones = await catalogoPara(actor)
+  const data = await resumen(actor)
   return (
     <ParaTi
       actorId={actor.id}

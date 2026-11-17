@@ -25,7 +25,7 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
   if (!empresa) notFound()
   const [proyectos, casos] = await Promise.all([
     listarProyectos(actor, id),
-    listar(actor, { empresaId: id, pageSize: 200 }),
+    listar(actor, { empresaId: id, pageSize: 200, conPausas: false, conTareas: false }),
   ])
   const actividad = await prisma.activity.findMany({
     where: { requestId: { in: casos.items.map((item) => item.id) }, internal: false },

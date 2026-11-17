@@ -11,7 +11,7 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
   const { id } = await params
   const empresa = await prisma.empresa.findUnique({ where: { id } })
   if (!empresa) notFound()
-  const casos = await listar(actor, { empresaId: id, pageSize: 100 })
+  const casos = await listar(actor, { empresaId: id, pageSize: 100, conPausas: false, conTareas: false })
   return (
     <div className="overflow-hidden rounded-md border border-[#dfe1e6] bg-white">
       <table className="w-full text-left text-sm">

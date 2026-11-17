@@ -18,8 +18,8 @@ export default async function TableroEspacioPage({
   const query = await searchParams
   const empresa = await prisma.empresa.findUnique({ where: { id } })
   if (!empresa) notFound()
-  const [casos, estados, transiciones] = await Promise.all([
-    listar(actor, { empresaId: id, projectId: query.proyecto, pageSize: 120 }),
+  const casos = await listar(actor, { empresaId: id, projectId: query.proyecto, pageSize: 120, conPausas: false, conTareas: false })
+  const [estados, transiciones] = await Promise.all([
     prisma.workflowState.findMany({ where: { active: true, hiddenOnBoard: false } }),
     prisma.workflowTransition.findMany({ where: { active: true } }),
   ])

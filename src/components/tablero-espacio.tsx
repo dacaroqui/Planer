@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { Avatar, IconoPrioridad, IconoTipo } from "@/components/iconos-planer"
 import { transicionarAction } from "@/server/actions"
 import { COLUMNAS_KANBAN, claveGrupo, columnaDeEstado, necesitaInformacion, transicionHaciaColumna, type ColumnaKanban, type GrupoTablero } from "@/lib/kanban"
-import { FilterIcon, MoreHorizontalIcon, PlusIcon, SlidersHorizontalIcon } from "lucide-react"
+import { FilterIcon, MoreHorizontalIcon, SlidersHorizontalIcon } from "lucide-react"
 import { PRIORITY_LABEL } from "@/lib/domain"
 
 export type TarjetaEspacio = {
@@ -120,7 +120,7 @@ export function TableroEspacio({
             <option value="area">Por área</option>
           </select>
         </label>
-        <button type="button" aria-pressed={chip} onClick={() => setChip((valor) => !valor)} className={`h-8 rounded-md px-2 text-sm ${chip ? "bg-[#1658B0] text-white" : "hover:bg-white"}`}>
+        <button type="button" aria-pressed={chip} onClick={() => setChip((valor) => !valor)} className={`h-8 rounded-full px-3 text-sm ${chip ? "bg-[#F1CEB3] font-medium text-[#15122A]" : "bg-white text-[#15122A] ring-1 ring-[#F0A486]"}`}>
           Necesita información
         </button>
         <span className="ml-auto flex items-center">
@@ -161,7 +161,10 @@ export function TableroEspacio({
                     {cartas.map((item) => (
                       <article key={item.code} draggable={!pending} onDragStart={(event) => { event.dataTransfer.setData("text/plain", item.code); event.dataTransfer.effectAllowed = "move" }} className="cursor-grab rounded-md border border-[#dfe1e6] bg-white p-3 text-sm shadow-[0_1px_1px_rgba(9,30,66,0.12)]">
                         <Link href={`/requerimientos/${item.code}`} className="line-clamp-2 font-medium leading-5 text-[#15122A] hover:underline">{item.title}</Link>
-                        <p className="mt-2"><span className="rounded bg-[#F1F2F4] px-1.5 py-0.5 text-xs text-[#44546f]">{item.area}</span></p>
+                        <p className="mt-2 flex flex-wrap gap-1">
+                          <span className="rounded bg-[#F1F2F4] px-1.5 py-0.5 text-xs text-[#44546f]">{item.area}</span>
+                          {necesitaInformacion(item.status) ? <span className="rounded-full bg-[#F1CEB3] px-2 py-0.5 text-xs text-[#15122A]">Necesita información</span> : null}
+                        </p>
                         <p className="mt-3 flex items-center gap-1.5">
                           <IconoTipo nombre={item.tipo} />
                           <Link href={`/requerimientos/${item.code}`} className="text-xs font-medium text-[#1658B0] hover:underline">{item.code}</Link>
@@ -174,7 +177,7 @@ export function TableroEspacio({
                     ))}
                   </div>
                   <Link href={`/espacios/${espacioId}/formularios`} className="mt-2 inline-flex items-center gap-1 rounded px-1 py-1 text-sm text-[#44546f] hover:bg-white">
-                    <PlusIcon className="size-4" /> Crear
+                    + Crear
                   </Link>
                 </section>
               )
