@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma"
 export default async function TableroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string; empresa?: string; proyecto?: string }>
+  searchParams: Promise<{ team?: string; empresa?: string; proyecto?: string; area?: string }>
 }) {
   const actor = await requireActor()
   const params = await searchParams
@@ -31,8 +31,9 @@ export default async function TableroPage({
   ])
   const empresas = opciones.empresas
   const proyectos = opciones.proyectos
+  const areasOrg = opciones.areas
   const columnas = estados.map((estado) => estado.name)
-  const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto })
+  const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto, areaId: params.area })
   const transiciones = await prisma.workflowTransition.findMany({ where: { team, active: true } })
   const catalogo = catalogoTablero(transiciones.map((item) => ({ ...item, team })))
   const columnaDe = (status: string) => estados.find((estado) => estado.key === status)?.name ?? nombreEstado(team, status)
@@ -55,7 +56,7 @@ export default async function TableroPage({
           </div>
         ) : null}
       </div>
-      <form className="grid gap-2 sm:grid-cols-3">
+      <form className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <input type="hidden" name="team" value={team} />
         <select name="empresa" defaultValue={params.empresa ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Empresa">
           <option value="">Todas las empresas</option>
@@ -66,6 +67,10 @@ export default async function TableroPage({
           {proyectos.filter((item) => !params.empresa || item.empresaId === params.empresa).map((item) => (
             <option key={item.id} value={item.id}>{item.name}</option>
           ))}
+        </select>
+        <select name="area" defaultValue={params.area ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Área">
+          <option value="">Todas las áreas</option>
+          {areasOrg.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
         <button className="h-9 rounded-lg bg-primary text-sm text-primary-foreground" type="submit">Filtrar</button>
       </form>

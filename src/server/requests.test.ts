@@ -12,13 +12,20 @@ import { toActor } from "@/lib/actor"
 import {
   adjuntar,
   asignar,
+  asignarMasiva,
+  cambiarPrioridadMasiva,
   comentar,
+  dashboard,
   editarCampos,
   getDetalle,
   deshacerTransicion,
   eliminarEstado,
+  listar,
+  opcionesTablero,
+  opcionesVisibles,
   radicar,
   transicionar,
+  transicionarMasiva,
 } from "@/server/requests"
 
 let dir = ""
@@ -88,7 +95,7 @@ async function mundo() {
   const helena = await persona("Helena Ejemplo", "helena.ejemplo@cifes.edu.co", area.id, [{ team: "DESARROLLO", role: "LIDER" }])
   const sara = await persona("Sara Ejemplo", "sara.ejemplo@cifes.edu.co", area.id, [{ team: "MARKETING", role: "LIDER" }])
   const gerencia = await persona("Gerencia Ejemplo", "gerencia.ejemplo@cifes.edu.co", area.id, [{ team: "DESARROLLO", role: "OBSERVADOR" }])
-  return { incidencia, pieza, ana, julian, valentina, camila, helena, sara, gerencia }
+  return { area, clinica, incidencia, pieza, ana, julian, valentina, camila, helena, sara, gerencia }
 }
 
 const base = {
@@ -348,3 +355,106 @@ describe("tablero: transición, entrega y deshacer", () => {
 })
 
 void (0 as unknown as Actor)
+
+describe("filtro y columna de área del solicitante", () => {
+  it("filtra listar y el dashboard por el área del solicitante y la expone en las opciones", async () => {
+    const { area, clinica, incidencia, ana, julian, helena } = await mundo()
+    await radicar(ana, {
+      ...base,
+      title: "Error del aula de colorimetría",
+      description: "El módulo de colorimetría no abre para la cohorte de demostración.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el módulo con el usuario de prueba.",
+    })
+    await radicar(julian, {
+      ...base,
+      title: "Agenda clínica de prueba no carga",
+      description: "La agenda de la sucursal de demostración queda en blanco al abrir el día.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "LUVANIA",
+      stepsToReproduce: "Abrir la agenda del día con el usuario de prueba.",
+    })
+    const academico = await listar(helena, { areaId: area.id })
+    expect(academico.items).toHaveLength(1)
+    expect(academico.items[0].area?.name).toBe("Académico")
+    expect(academico.items[0].requester.name).toBe("Ana Ejemplo")
+    const clinicaLista = await listar(helena, { areaId: clinica.id })
+    expect(clinicaLista.items.map((item) => item.requester.name)).toEqual(["Julián Ejemplo"])
+    const opciones = await opcionesVisibles(helena)
+    expect(opciones.areas.map((item) => item.name).sort()).toEqual(["Académico", "Clínica Luvania"])
+    const tablero = await opcionesTablero(helena, "DESARROLLO")
+    expect(tablero.areas.some((item) => item.name === "Académico")).toBe(true)
+    const panel = await dashboard(helena, { areaId: area.id })
+    expect(panel.abiertos).toBe(1)
+  })
+})
+
+describe("acciones masivas sobre la selección", () => {
+  it("cambia la prioridad de varios y respeta el permiso de líder", async () => {
+    const { incidencia, ana, valentina, helena } = await mundo()
+    const uno = await radicar(ana, {
+      ...base,
+      title: "Falla al entrar al aula de prueba",
+      description: "El aula demo no carga el módulo de colorimetría para la cohorte.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Entrar al aula con el usuario de prueba.",
+    })
+    const dos = await radicar(ana, {
+      ...base,
+      title: "Exportar asistencia no descarga",
+      description: "El botón de exportar de la cohorte demo no genera el archivo.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir asistencia demo y pulsar exportar.",
+    })
+    await expect(cambiarPrioridadMasiva(valentina, [uno.code, dos.code], "ALTA")).rejects.toBeInstanceOf(DomainError)
+    const total = await cambiarPrioridadMasiva(helena, [uno.code, dos.code], "ALTA")
+    expect(total).toBe(2)
+    const lista = await listar(helena, {})
+    expect(lista.items.every((item) => item.priority === "ALTA")).toBe(true)
+  })
+
+  it("transiciona y asigna en lote conservando los permisos individuales", async () => {
+    const { incidencia, ana, valentina, helena } = await mundo()
+    const uno = await radicar(ana, {
+      ...base,
+      title: "Listado de cohortes incompleto",
+      description: "Falta la cohorte de demostración en el listado del aula de prueba.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el listado de cohortes con el usuario demo.",
+    })
+    const dos = await radicar(ana, {
+      ...base,
+      title: "Botón de guardar no responde",
+      description: "En el formulario de prueba el botón guardar no confirma el cambio.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Editar un dato y pulsar guardar.",
+    })
+    const transicionAgente = await transicionarMasiva(valentina, [uno.code, dos.code], "EN_ANALISIS")
+    expect(transicionAgente).toBe(0)
+    const transicionLider = await transicionarMasiva(helena, [uno.code, dos.code], "EN_ANALISIS")
+    expect(transicionLider).toBe(2)
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: uno.id } })).status).toBe("EN_ANALISIS")
+    const asignaSolicitante = await asignarMasiva(ana, [uno.code, dos.code], valentina.id)
+    expect(asignaSolicitante).toBe(0)
+    const asignados = await asignarMasiva(helena, [uno.code, dos.code], valentina.id)
+    expect(asignados).toBe(2)
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: dos.id } })).assigneeId).toBe(valentina.id)
+  })
+})

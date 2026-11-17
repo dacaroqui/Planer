@@ -1,10 +1,11 @@
 import { Suspense } from "react"
-import { AccionesMasivas } from "@/components/acciones-masivas"
 import { Filtros } from "@/components/filtros"
-import { Paginacion, TablaRequerimientos } from "@/components/tabla"
+import { ListaRequerimientos } from "@/components/lista-requerimientos"
+import { Paginacion } from "@/components/tabla"
 import { STATUS_LABEL } from "@/lib/domain"
 import { consultaDesde, queryString } from "@/lib/list-query"
 import { esAdmin } from "@/lib/permissions"
+import { prisma } from "@/lib/prisma"
 import { requireActor } from "@/server/session"
 import { listar, opcionesVisibles } from "@/server/requests"
 
@@ -23,6 +24,16 @@ export default async function RequerimientosPage({
     const value = params[key]
     return Array.isArray(value) ? value[0] : value
   }
+  const puedePrioridad = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER")
+  const puedeEstado = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER" || item.role === "AGENTE")
+  const puedeAsignar = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER")
+  const agentes = puedeAsignar
+    ? await prisma.user.findMany({
+        where: { active: true, areaRoles: { some: { role: { in: ["AGENTE", "LIDER"] } } } },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : []
   return (
     <div className="space-y-6">
       <div>
@@ -38,17 +49,22 @@ export default async function RequerimientosPage({
           empresas={opciones.empresas.map((item) => ({ value: item.id, label: item.name }))}
           proyectos={opciones.proyectos.map((item) => ({ value: item.id, label: item.name }))}
           tipos={opciones.tipos.map((item) => ({ value: item.id, label: item.name }))}
+          areas={opciones.areas.map((item) => ({ value: item.id, label: item.name }))}
           solicitantes={opciones.personas.map((item) => ({ value: item.id, label: item.name }))}
         />
       </Suspense>
-      {esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER") ? <AccionesMasivas codes={data.items.map((item) => item.code)} /> : null}
-      <TablaRequerimientos
+      <ListaRequerimientos
         items={data.items}
         vacio="No hay requerimientos con esos filtros. Pruebe otra búsqueda o radique uno nuevo."
         ruta="/requerimientos"
         consulta={queryString(params)}
         sort={uno("sort")}
         dir={uno("dir")}
+        puedePrioridad={puedePrioridad}
+        puedeEstado={puedeEstado}
+        puedeAsignar={puedeAsignar}
+        estados={estados}
+        agentes={agentes}
       />
       <Paginacion page={data.page} pages={data.pages} ruta="/requerimientos" query={queryString(params)} />
     </div>

@@ -23,10 +23,12 @@ export default async function DashboardPage({
   const brand = one("brand")
   const empresaId = one("empresa")
   const projectId = one("proyecto")
-  const data = await dashboard(actor, { team, brand, empresaId, projectId, from: one("from"), to: one("to") })
-  const [empresas, proyectosCatalogo, avanceProyectos] = await Promise.all([
+  const areaId = one("area")
+  const data = await dashboard(actor, { team, brand, empresaId, projectId, areaId, from: one("from"), to: one("to") })
+  const [empresas, proyectosCatalogo, areasCatalogo, avanceProyectos] = await Promise.all([
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
+    prisma.area.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     listarProyectos(actor, empresaId),
   ])
   const avances = projectId ? avanceProyectos.filter((item) => item.id === projectId) : avanceProyectos
@@ -48,9 +50,9 @@ export default async function DashboardPage({
           Abiertos por estado, creados frente a resueltos y cumplimiento de SLA. {soloLectura ? "Está en modo solo lectura." : ""}
         </p>
       </div>
-      <form className="grid gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-3 lg:grid-cols-6">
-        <select name="team" defaultValue={team ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Área">
-          <option value="">Todas las áreas</option>
+      <form className="grid gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <select name="team" defaultValue={team ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Equipo">
+          <option value="">Todos los equipos</option>
           <option value="DESARROLLO">Desarrollo</option>
           <option value="MARKETING">Marketing</option>
         </select>
@@ -70,11 +72,15 @@ export default async function DashboardPage({
             <option key={item.id} value={item.id}>{item.name}</option>
           ))}
         </select>
+        <select name="area" defaultValue={areaId ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Área">
+          <option value="">Todas las áreas</option>
+          {areasCatalogo.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
         <input name="from" type="date" defaultValue={one("from")} lang="es-CO" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Desde" />
         <button className="h-9 rounded-lg bg-primary text-sm text-primary-foreground" type="submit">Recalcular</button>
       </form>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Link href={`/requerimientos?${new URLSearchParams({ ...(team ? { team } : {}), ...(brand ? { brand } : {}) }).toString()}`} className="rounded-xl border border-border bg-card p-4">
+        <Link href={`/requerimientos?${new URLSearchParams({ ...(team ? { team } : {}), ...(brand ? { brand } : {}), ...(areaId ? { area: areaId } : {}) }).toString()}`} className="rounded-xl border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Abiertos</p>
           <p className="font-heading text-4xl">{data.abiertos}</p>
         </Link>
@@ -93,7 +99,7 @@ export default async function DashboardPage({
           <ul className="mt-3 grid gap-2 text-sm">
             {data.porEstado.length === 0 ? <li className="text-muted-foreground">No hay abiertos con ese filtro.</li> : data.porEstado.map((item) => (
               <li key={item.status}>
-                <Link className="flex justify-between hover:underline" href={`/requerimientos?status=${item.status}${team ? `&team=${team}` : ""}`}>
+                <Link className="flex justify-between hover:underline" href={`/requerimientos?status=${item.status}${team ? `&team=${team}` : ""}${areaId ? `&area=${areaId}` : ""}`}>
                   <span>{statusLabel(item.status)}</span><span>{item.total}</span>
                 </Link>
               </li>

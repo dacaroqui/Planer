@@ -17,6 +17,7 @@ export function Filtros({
   proyectos = [],
   tipos = [],
   solicitantes = [],
+  areas = [],
 }: {
   ruta: string
   estados: Opcion[]
@@ -25,6 +26,7 @@ export function Filtros({
   proyectos?: Opcion[]
   tipos?: Opcion[]
   solicitantes?: Opcion[]
+  areas?: Opcion[]
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -98,6 +100,9 @@ export function Filtros({
         ) : null}
         {tipos.length > 0 ? (
           <Elegir etiqueta="Tipo" valor={params.get("tipo") ?? "TODOS"} onChange={(valor) => aplicar("tipo", valor)} opciones={[{ value: "TODOS", label: "Todos los tipos" }, ...tipos]} />
+        ) : null}
+        {areas.length > 0 ? (
+          <Elegir etiqueta="Área" valor={params.get("area") ?? "TODOS"} onChange={(valor) => aplicar("area", valor)} opciones={[{ value: "TODOS", label: "Todas las áreas" }, ...areas]} />
         ) : null}
         {solicitantes.length > 0 ? (
           <Elegir etiqueta="Solicitante" valor={params.get("solicitante") ?? "TODOS"} onChange={(valor) => aplicar("solicitante", valor)} opciones={[{ value: "TODOS", label: "Todos los solicitantes" }, ...solicitantes]} />

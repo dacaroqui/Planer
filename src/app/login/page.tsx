@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { auth, modoAuth } from "@/auth"
-import { entrarComo, entrarConClave, entrarConMicrosoft, solicitarRestablecimientoAction } from "@/server/actions"
+import { entrarComo, entrarConMicrosoft, solicitarRestablecimientoAction } from "@/server/actions"
+import { FormularioIngreso } from "@/components/formulario-ingreso"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -64,17 +65,7 @@ export default async function LoginPage({
           {error ? (
             <p role="alert" className={`rounded-lg px-3 py-2 text-sm ${aviso ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>{error}</p>
           ) : null}
-          <form action={entrarConClave} className="grid gap-3">
-            <div className="grid gap-1">
-              <Label htmlFor="email">Correo</Label>
-              <Input id="email" name="email" type="email" autoComplete="username" required />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" name="password" type="password" autoComplete="current-password" required />
-            </div>
-            <Button type="submit" size="lg">Ingresar</Button>
-          </form>
+          <FormularioIngreso />
           {correoSmtpActivo() ? (
             <form action={solicitarRestablecimientoAction} className="grid gap-2">
               <Label htmlFor="recuperar">Olvidó la contraseña</Label>

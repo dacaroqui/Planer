@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server"
 import { handlers } from "@/auth"
-import { ajustarRedireccion, cookieSegura } from "@/lib/auth-host"
+import { ajustarRedireccion, reescribirSetCookie } from "@/lib/auth-host"
 
 async function responder(request: NextRequest, metodo: "GET" | "POST") {
   const origen = metodo === "GET" ? handlers.GET : handlers.POST
@@ -14,8 +14,7 @@ async function responder(request: NextRequest, metodo: "GET" | "POST") {
   if (cookies.length > 0) {
     headers.delete("set-cookie")
     for (const cookie of cookies) {
-      const sinSecure = cookie.replace(/;\s*Secure/gi, "").replace(/__Secure-/g, "").replace(/__Host-/g, "")
-      headers.append("set-cookie", cookieSegura(proto) ? `${sinSecure}; Secure` : sinSecure)
+      headers.append("set-cookie", reescribirSetCookie(cookie, proto))
     }
   }
   return new Response(respuesta.body, { status: respuesta.status, headers })

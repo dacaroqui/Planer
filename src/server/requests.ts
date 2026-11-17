@@ -841,6 +841,7 @@ export async function opcionesVisibles(actor: Actor) {
       empresa: { select: { id: true, name: true } },
       project: { select: { id: true, name: true, empresa: { select: { name: true } } } },
       type: { select: { id: true, name: true } },
+      area: { select: { id: true, name: true } },
       requester: { select: { id: true, name: true } },
       assignee: { select: { id: true, name: true } },
     },
@@ -851,6 +852,7 @@ export async function opcionesVisibles(actor: Actor) {
     empresas: porId(rows.map((row) => row.empresa)).sort((a, b) => a.name.localeCompare(b.name, "es")),
     proyectos: porId(rows.map((row) => row.project)).sort((a, b) => a.name.localeCompare(b.name, "es")),
     tipos: porId(rows.map((row) => row.type)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    areas: porId(rows.map((row) => row.area)).sort((a, b) => a.name.localeCompare(b.name, "es")),
     personas: porId(rows.flatMap((row) => (soloLoPropio ? [row.requester] : [row.requester, row.assignee]))).sort((a, b) => a.name.localeCompare(b.name, "es")),
   }
 }
@@ -861,12 +863,14 @@ export async function opcionesTablero(actor: Actor, team: "DESARROLLO" | "MARKET
     select: {
       empresa: { select: { id: true, name: true } },
       project: { select: { id: true, name: true, empresaId: true } },
+      area: { select: { id: true, name: true } },
     },
   })
   const porId = <T extends { id: string }>(items: Array<T | null | undefined>) => [...new Map(items.filter((item): item is T => Boolean(item)).map((item) => [item.id, item])).values()]
   return {
     empresas: porId(rows.map((row) => row.empresa)).sort((a, b) => a.name.localeCompare(b.name, "es")),
     proyectos: porId(rows.map((row) => row.project)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    areas: porId(rows.map((row) => row.area)).sort((a, b) => a.name.localeCompare(b.name, "es")),
   }
 }
 
@@ -890,6 +894,7 @@ export type ListQuery = {
   empresaId?: string
   projectId?: string
   typeId?: string
+  areaId?: string
   assigneeId?: string
   requesterId?: string
   mine?: boolean
@@ -927,6 +932,7 @@ export async function listar(actor: Actor, query: ListQuery) {
   if (query.empresaId) and.push({ empresaId: query.empresaId })
   if (query.projectId) and.push({ projectId: query.projectId })
   if (query.typeId) and.push({ typeId: query.typeId })
+  if (query.areaId) and.push({ areaId: query.areaId })
   if (query.assigneeId) and.push({ assigneeId: query.assigneeId })
   if (query.requesterId) and.push({ requesterId: query.requesterId })
   if (query.mine) and.push({ requesterId: actor.id })
@@ -946,6 +952,7 @@ export async function listar(actor: Actor, query: ListQuery) {
   const dir = query.dir === "asc" ? "asc" : "desc"
   const orderBy: Prisma.RequestOrderByWithRelationInput =
     query.sort === "requester" ? { requester: { name: dir } }
+    : query.sort === "area" ? { area: { name: dir } }
     : query.sort === "type" ? { type: { name: dir } }
     : query.sort === "title" ? { title: dir }
     : ["updatedAt", "createdAt", "code", "priority", "status"].includes(query.sort || "")
@@ -985,7 +992,7 @@ export async function resumen(actor: Actor) {
   return { items: decorated, abiertos, resueltos7 }
 }
 
-export async function dashboard(actor: Actor, filters: { team?: string; brand?: string; empresaId?: string; projectId?: string; from?: string; to?: string }) {
+export async function dashboard(actor: Actor, filters: { team?: string; brand?: string; empresaId?: string; projectId?: string; areaId?: string; from?: string; to?: string }) {
   const now = new Date()
   const from = filters.from ? new Date(filters.from) : new Date(now.getTime() - 56 * 24 * 60 * 60 * 1000)
   const to = filters.to ? new Date(filters.to) : now
@@ -994,6 +1001,7 @@ export async function dashboard(actor: Actor, filters: { team?: string; brand?: 
   if (filters.brand) base.push({ brand: filters.brand })
   if (filters.empresaId) base.push({ empresaId: filters.empresaId })
   if (filters.projectId) base.push({ projectId: filters.projectId })
+  if (filters.areaId) base.push({ areaId: filters.areaId })
   if (!esAdmin(actor)) {
     const teams = actor.memberships.map((item) => item.team)
     if (teams.length === 0) base.push({ id: "__ninguno__" })
@@ -1281,4 +1289,41 @@ export async function guardarSla(
 export async function alternarCatalogo(actor: Actor, id: string, active: boolean) {
   if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador gestiona el catálogo.")
   return prisma.catalogItem.update({ where: { id }, data: { active } })
+}
+
+export async function transicionarMasiva(actor: Actor, codes: string[], name: string) {
+  if (!name.trim()) throw new DomainError("Elija un estado.")
+  let cambiados = 0
+  for (const code of codes) {
+    const request = await prisma.request.findUnique({ where: { code } })
+    if (!request || !puedeVer(actor, request)) continue
+    const catalogo = await catalogoDe(request.team)
+    const now = new Date()
+    const disponibles = transicionesPara(actor, acceso(request), catalogo, now)
+    const transicion = disponibles.find((item) => item.name === name || item.to === name)
+    if (!transicion) continue
+    try {
+      await transicionar(actor, request.id, transicion.name, "")
+      cambiados += 1
+    } catch {
+      // Se conservan permisos y validaciones de cada transición; las que no aplican se omiten.
+    }
+  }
+  return cambiados
+}
+
+export async function asignarMasiva(actor: Actor, codes: string[], assigneeId: string) {
+  if (!assigneeId) throw new DomainError("Elija un responsable.")
+  let cambiados = 0
+  for (const code of codes) {
+    const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
+    if (!request) continue
+    try {
+      await asignar(actor, request.id, assigneeId)
+      cambiados += 1
+    } catch {
+      // Se conservan permisos de asignación; los que no aplican se omiten.
+    }
+  }
+  return cambiados
 }

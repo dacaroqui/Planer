@@ -27,3 +27,10 @@ export function urlDeLogin(hostHeader: string, protoHeader: string, path: string
 export function cookieSegura(proto: string) {
   return proto.split(",")[0]?.trim() === "https"
 }
+
+export function reescribirSetCookie(cookie: string, proto: string) {
+  if (cookieSegura(proto)) {
+    return /;\s*Secure/i.test(cookie) ? cookie : `${cookie}; Secure`
+  }
+  return cookie.replace(/;\s*Secure/gi, "").replace(/__Secure-/g, "").replace(/__Host-/g, "")
+}

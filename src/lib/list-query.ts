@@ -21,6 +21,7 @@ export function consultaDesde(
     projectId: one("proyecto"),
     typeId: one("tipo"),
     requesterId: one("solicitante"),
+    areaId: one("area"),
     mine: one("mine") === "1",
     assignedToMe: one("assigned") === "1",
     from: one("from"),

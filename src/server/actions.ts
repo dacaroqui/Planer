@@ -27,6 +27,8 @@ import {
   crearArea,
   crearTipo,
   cambiarPrioridadMasiva,
+  transicionarMasiva,
+  asignarMasiva,
   editarCampos,
   eliminarEstado,
   guardarEstado,
@@ -454,6 +456,34 @@ export async function prioridadMasivaAction(formData: FormData): Promise<ActionR
     const total = await cambiarPrioridadMasiva(actor, codes, String(formData.get("priority") || ""))
     refrescar()
     return { ok: true, message: `Prioridad actualizada en ${total} requerimientos.` }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+function codesDe(formData: FormData) {
+  return String(formData.get("codes") || "").split(",").map((item) => item.trim()).filter(Boolean)
+}
+
+export async function estadoMasivaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    const total = await transicionarMasiva(actor, codesDe(formData), String(formData.get("status") || formData.get("name") || ""))
+    refrescar()
+    if (!total) return { ok: false, error: "No se pudo cambiar el estado de los seleccionados. Revise transiciones y campos requeridos." }
+    return { ok: true, message: `Estado actualizado en ${total} requerimientos.` }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function asignarMasivaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    const total = await asignarMasiva(actor, codesDe(formData), String(formData.get("assigneeId") || ""))
+    refrescar()
+    if (!total) return { ok: false, error: "No se pudo asignar el responsable de los seleccionados." }
+    return { ok: true, message: `Responsable asignado en ${total} requerimientos.` }
   } catch (error) {
     return fallo(error)
   }
