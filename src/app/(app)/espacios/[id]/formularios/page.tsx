@@ -1,7 +1,5 @@
 import { notFound } from "next/navigation"
 import { FormularioRadicar } from "@/components/formulario-radicar"
-import { NombreMiga } from "@/components/migas"
-import { PestanasEspacio } from "@/components/pestanas-espacio"
 import { puedeRadicar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { requireActor } from "@/server/session"
@@ -14,8 +12,6 @@ export default async function FormulariosEspacio({ params }: { params: Promise<{
   if (!puedeRadicar(actor)) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">{empresa.name}</h1>
-        <PestanasEspacio id={id} actual="formularios" />
         <p className="text-sm text-muted-foreground">Su perfil no puede radicar requerimientos.</p>
       </div>
     )
@@ -29,9 +25,6 @@ export default async function FormulariosEspacio({ params }: { params: Promise<{
   ])
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <NombreMiga nombre={empresa.name} />
-      <h1 className="text-2xl font-semibold">{empresa.name}</h1>
-      <PestanasEspacio id={id} actual="formularios" />
       <FormularioRadicar
         area={area?.name ?? "su área"}
         tipos={tipos.map((tipo) => ({ id: tipo.id, team: tipo.team, name: tipo.name, description: tipo.description, extra: tipo.extra }))}

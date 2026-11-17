@@ -25,6 +25,10 @@ export function transicionHaciaColumna(
 
 export type GrupoTablero = "ninguno" | "asignado" | "prioridad" | "area"
 
+export function necesitaInformacion(status: string) {
+  return status === "EN_ESPERA"
+}
+
 export function claveGrupo(item: { asignado: string; priority: string; area: string }, grupo: GrupoTablero) {
   if (grupo === "asignado") return item.asignado || "Sin asignar"
   if (grupo === "prioridad") return item.priority

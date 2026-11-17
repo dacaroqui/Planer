@@ -1,6 +1,4 @@
 import { notFound } from "next/navigation"
-import { NombreMiga } from "@/components/migas"
-import { PestanasEspacio } from "@/components/pestanas-espacio"
 import { TableroEspacio } from "@/components/tablero-espacio"
 import { equiposVisibles, esAdmin, rolEn, transicionesPara } from "@/lib/permissions"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
@@ -31,11 +29,9 @@ export default async function TableroEspacioPage({
   }
   return (
     <div className="space-y-4">
-      <NombreMiga nombre={empresa.name} />
-      <h1 className="text-2xl font-semibold">{empresa.name}</h1>
-      <PestanasEspacio id={id} actual="tablero" />
       <TableroEspacio
         actorId={actor.id}
+        espacioId={id}
         estados={estados.map((item) => ({ key: item.key, name: item.name, category: item.category }))}
         tarjetas={casos.items.map((item) => {
           const catalogo = porEquipo.get(item.team) ?? []

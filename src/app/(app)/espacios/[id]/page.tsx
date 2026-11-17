@@ -1,7 +1,5 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { NombreMiga } from "@/components/migas"
-import { PestanasEspacio } from "@/components/pestanas-espacio"
 import { Barra } from "@/components/barra"
 import { PRIORITY_LABEL, statusLabel, type PriorityName } from "@/lib/domain"
 import { formatDateTime } from "@/lib/format"
@@ -40,12 +38,6 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
   const porArea = conteo(casos.items.map((item) => ({ key: item.areaId, label: item.area.name })))
   return (
     <div className="space-y-4">
-      <NombreMiga nombre={empresa.name} />
-      <div>
-        <p className="text-xs text-muted-foreground">Espacio</p>
-        <h1 className="text-2xl font-semibold">{empresa.name}</h1>
-      </div>
-      <PestanasEspacio id={id} actual="resumen" />
       <div className="grid gap-4 lg:grid-cols-3">
         <Conteo titulo="Por estado" filas={porEstado} />
         <Conteo titulo="Por prioridad" filas={porPrioridad} />

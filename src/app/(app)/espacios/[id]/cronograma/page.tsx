@@ -1,6 +1,4 @@
 import { notFound } from "next/navigation"
-import { NombreMiga } from "@/components/migas"
-import { PestanasEspacio } from "@/components/pestanas-espacio"
 import { Barra } from "@/components/barra"
 import { formatDate } from "@/lib/format"
 import { prisma } from "@/lib/prisma"
@@ -15,9 +13,6 @@ export default async function CronogramaEspacio({ params }: { params: Promise<{ 
   const proyectos = await listarProyectos(actor, id)
   return (
     <div className="space-y-4">
-      <NombreMiga nombre={empresa.name} />
-      <h1 className="text-2xl font-semibold">{empresa.name}</h1>
-      <PestanasEspacio id={id} actual="cronograma" />
       <ul className="grid gap-3">
         {proyectos.length === 0 ? <li className="text-sm text-muted-foreground">No hay proyectos para armar el cronograma.</li> : proyectos.map((proyecto) => (
           <li key={proyecto.id} className="rounded-lg border border-border bg-white p-4">

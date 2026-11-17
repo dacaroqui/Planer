@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { claveGrupo, columnaDeEstado, transicionHaciaColumna } from "@/lib/kanban"
+import { claveGrupo, columnaDeEstado, necesitaInformacion, transicionHaciaColumna } from "@/lib/kanban"
 import { estadoEnlace, MENSAJE_ENLACE } from "@/lib/invitacion-estado"
 import { pistasClave } from "@/lib/clave"
 
@@ -11,6 +11,7 @@ describe("tablero del espacio e invitación", () => {
     expect(columnaDeEstado({ category: "EN_CURSO", key: "EN_DESARROLLO", name: "En desarrollo" })).toBe("En progreso")
     expect(columnaDeEstado({ category: "EN_CURSO", key: "EN_PRUEBAS", name: "En pruebas (QA)" })).toBe("En revisión")
     expect(columnaDeEstado({ category: "TERMINADO", key: "CERRADO", name: "Cerrado" })).toBe("Hecho")
+    expect(columnaDeEstado({ category: "EN_CURSO", key: "EN_ESPERA", name: "En espera de información" })).toBe("En progreso")
   })
 
   it("un movimiento no permitido vuelve a su columna", () => {
@@ -34,5 +35,7 @@ describe("tablero del espacio e invitación", () => {
     expect(pistasClave("abc", "ana@cifes.edu.co").some((item) => !item.ok)).toBe(true)
     expect(pistasClave("clave1234", "ana@cifes.edu.co").every((item) => item.ok)).toBe(true)
     expect(claveGrupo({ asignado: "Ana", priority: "ALTA", area: "Académico" }, "area")).toBe("Académico")
+    expect(necesitaInformacion("EN_ESPERA")).toBe(true)
+    expect(necesitaInformacion("NUEVO")).toBe(false)
   })
 })

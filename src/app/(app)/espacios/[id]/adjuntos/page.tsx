@@ -1,7 +1,5 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { NombreMiga } from "@/components/migas"
-import { PestanasEspacio } from "@/components/pestanas-espacio"
 import { formatDateTime } from "@/lib/format"
 import { prisma } from "@/lib/prisma"
 import { listar } from "@/server/requests"
@@ -20,9 +18,6 @@ export default async function AdjuntosEspacio({ params }: { params: Promise<{ id
   })
   return (
     <div className="space-y-4">
-      <NombreMiga nombre={empresa.name} />
-      <h1 className="text-2xl font-semibold">{empresa.name}</h1>
-      <PestanasEspacio id={id} actual="adjuntos" />
       <ul className="divide-y divide-border rounded-lg border border-border bg-white">
         {archivos.length === 0 ? <li className="p-4 text-sm text-muted-foreground">Este espacio no tiene adjuntos visibles.</li> : archivos.map((archivo) => (
           <li key={archivo.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
