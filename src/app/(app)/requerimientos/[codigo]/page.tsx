@@ -11,7 +11,8 @@ import { formatDuration } from "@/lib/sla"
 import { trasladarAction } from "@/server/actions"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
-import { avanceDesdeLista, tareaVencida } from "@/lib/avance"
+import { TEXTO_AVANCE_REQUERIMIENTO, avanceDesdeLista, tareaVencida } from "@/lib/avance"
+import { transicionDeDetalle } from "@/lib/tablero-movimiento"
 import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 import { RESOLUCION_LABEL } from "@/lib/flujo-oficial"
 import { FormularioClasificar } from "@/components/formulario-clasificar"
@@ -83,7 +84,7 @@ export default async function DetallePage({
           <section aria-labelledby="seguimiento" className="space-y-3">
           <h2 id="seguimiento" className="font-heading text-2xl">Seguimiento</h2>
           <Card>
-            <CardHeader><CardTitle>Tareas · {avance.porcentaje}%</CardTitle></CardHeader>
+            <CardHeader><CardTitle title={TEXTO_AVANCE_REQUERIMIENTO}>Tareas · {avance.porcentaje}%</CardTitle></CardHeader>
             <CardContent>
               <TareasPanel
                 porcentaje={avance.porcentaje}
@@ -208,12 +209,7 @@ export default async function DetallePage({
             <CardContent>
               <Gestion
                 code={request.code}
-                transiciones={detail.transitions.map((item) => ({
-                  to: item.name,
-                  label: item.name,
-                  requiresComment: Boolean(item.requiresComment),
-                  requiresDelivery: Boolean(item.requiresDelivery),
-                }))}
+                transiciones={detail.transitions.map((item) => transicionDeDetalle(item))}
                 puedeAsignar={detail.canAssign}
                 agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name }))}
                 asignadoId={request.assigneeId}

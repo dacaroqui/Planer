@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
-import { debePedirProyecto, debePedirResponsable, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, transicionDeDetalle, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
 
 const tarjetas: TarjetaMovible[] = [
   {
@@ -65,5 +65,20 @@ describe("tablero: la tarjeta arrastrada", () => {
     const cerrar = { name: "Aprobar entrega", to: "CERRADO", column: "Cerrado" }
     expect(movimientoCierra(cerrar)).toBe(true)
     expect(movimientoExigeDialogo(cerrar)).toBe(true)
+  })
+
+  it("en el detalle, cerrar abre diálogo aunque el botón se llame Aprobar entrega", () => {
+    expect(detalleExigeDialogo({ name: "Aprobar entrega", to: "CERRADO" })).toBe(true)
+    expect(detalleExigeDialogo({ name: "Cerrar", to: "CERRADO", requiresDelivery: true })).toBe(true)
+    expect(detalleExigeDialogo({ name: "Aprobar sin publicación", to: "CERRADO" })).toBe(true)
+    expect(detalleExigeDialogo({ name: "Iniciar desarrollo", to: "EN_DESARROLLO" })).toBe(false)
+    expect(transicionDeDetalle({ name: "Aprobar entrega", to: "CERRADO" }).name).toBe("Aprobar entrega")
+    expect(transicionDeDetalle({ name: "Aprobar entrega", to: "CERRADO" }).to).toBe("CERRADO")
+  })
+
+  it("el aviso de error se va al acertar y la fecha de aprobar es obligatoria", () => {
+    expect(avisoTrasMovimiento(true, "No se pudo")).toBeNull()
+    expect(avisoTrasMovimiento(false, "Escriba el motivo.")).toBe("Escriba el motivo.")
+    expect(marcaObligatoria("Fecha comprometida")).toEqual({ etiqueta: "Fecha comprometida *", ariaRequired: true })
   })
 })

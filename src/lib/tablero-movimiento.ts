@@ -26,6 +26,35 @@ export function movimientoCierra(move: { to: string }) {
   return move.to === "CERRADO" || move.to === "RECHAZADO" || move.to === "CANCELADO"
 }
 
+export function transicionDeDetalle(item: { name: string; to: string; requiresComment?: boolean; requiresDelivery?: boolean }) {
+  return {
+    name: item.name,
+    label: item.name,
+    to: item.to,
+    requiresComment: Boolean(item.requiresComment),
+    requiresDelivery: Boolean(item.requiresDelivery),
+  }
+}
+
+export function detalleExigeDialogo(item: { name: string; to: string; requiresComment?: boolean; requiresDelivery?: boolean }) {
+  const transicion = transicionDeDetalle(item)
+  return movimientoExigeDialogo({
+    name: transicion.name,
+    column: "",
+    to: transicion.to,
+    requiresComment: transicion.requiresComment,
+    requiresDelivery: transicion.requiresDelivery,
+  })
+}
+
+export function avisoTrasMovimiento(ok: boolean, error: string | null) {
+  return ok ? null : error
+}
+
+export function marcaObligatoria(etiqueta: string) {
+  return { etiqueta: `${etiqueta} *`, ariaRequired: true as const }
+}
+
 export function movimientoExigeDialogo(move: MovimientoTablero) {
   return Boolean(move.requiresComment || move.requiresDelivery || movimientoCierra(move))
 }

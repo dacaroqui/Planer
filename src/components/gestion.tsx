@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { adjuntarAction, asignarAction, comentarAction, transicionarAction, type ActionResult } from "@/server/actions"
+import { adjuntarAction, asignarAction, comentarAction, deshacerTransicionAction, transicionarAction, type ActionResult } from "@/server/actions"
 import { SelectorArchivo } from "@/components/archivo"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { movimientoCierra, validarDatosMovimiento } from "@/lib/tablero-movimiento"
+import { detalleExigeDialogo, movimientoCierra, validarDatosMovimiento } from "@/lib/tablero-movimiento"
 
-type Transicion = { to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean }
+type Transicion = { name: string; to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean }
 type Agente = { id: string; name: string }
 
 export function Gestion({
@@ -47,7 +47,7 @@ export function Gestion({
   const [resolucion, setResolucion] = useState("RESUELTO")
   const [pending, start] = useTransition()
 
-  function correr(action: (data: FormData) => Promise<ActionResult>, data: FormData) {
+  function correr(action: (data: FormData) => Promise<ActionResult>, data: FormData, deshacer = false) {
     setError(null)
     start(async () => {
       const result = await action(data)
@@ -57,7 +57,28 @@ export function Gestion({
         return
       }
       setDialogo(null)
-      if (result.message) toast.success(result.message)
+      if (deshacer) {
+        toast.success(result.message || "Cambio guardado.", {
+          duration: 10000,
+          action: {
+            label: "Deshacer",
+            onClick: () => {
+              const vuelta = new FormData()
+              vuelta.set("code", code)
+              start(async () => {
+                const hecho = await deshacerTransicionAction(vuelta)
+                if (!hecho.ok) {
+                  setError(hecho.error)
+                  toast.error(hecho.error)
+                  return
+                }
+                toast.success(hecho.message || "Se deshizo el cambio.")
+                router.refresh()
+              })
+            },
+          },
+        })
+      } else if (result.message) toast.success(result.message)
       setComment("")
       router.refresh()
     })
@@ -78,11 +99,11 @@ export function Gestion({
     }
     const data = new FormData()
     data.set("code", code)
-    data.set("name", transicion.to)
+    data.set("name", transicion.name)
     data.set("comment", note)
     data.set("deliveryUrl", deliveryUrl)
-    if (movimientoCierra(transicion)) data.set("resolution", resolucion)
-    correr(transicionarAction, data)
+    if (transicion.to === "CERRADO") data.set("resolution", resolucion)
+    correr(transicionarAction, data, true)
   }
 
   return (
@@ -118,12 +139,12 @@ export function Gestion({
           <div className="flex flex-col gap-2">
             {transiciones.map((transicion) => (
               <Button
-                key={transicion.to}
+                key={transicion.name}
                 type="button"
                 variant={transicion.to === "CANCELADO" || transicion.to === "DEVUELTO" ? "outline" : "default"}
                 disabled={pending}
                 onClick={() => {
-                  if (transicion.requiresComment || transicion.requiresDelivery || movimientoCierra(transicion)) {
+                  if (detalleExigeDialogo(transicion)) {
                     setMotivo(comment)
                     setEntrega("")
                     setResolucion("RESUELTO")
@@ -191,7 +212,7 @@ export function Gestion({
           <DialogHeader>
             <DialogTitle>{dialogo?.label}</DialogTitle>
           </DialogHeader>
-          {dialogo && movimientoCierra(dialogo) ? (
+          {dialogo?.to === "CERRADO" ? (
             <div className="grid gap-1">
               <Label htmlFor="resolucion-gestion">Resolución</Label>
               <select id="resolucion-gestion" className="h-9 rounded-lg border border-input px-2 text-sm" value={resolucion} onChange={(event) => setResolucion(event.target.value)} aria-label="Resolución">
