@@ -3,29 +3,27 @@ import path from "node:path"
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { uploadDir } from "@/lib/files"
-import { prisma } from "@/lib/prisma"
+import { resolverAdjunto } from "@/server/adjuntos"
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await auth()
-  const email = session?.user?.email?.toLowerCase()
-  if (!email) return new NextResponse("Debe iniciar sesión.", { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email } })
-  if (!user?.active) return new NextResponse("Usuario inactivo.", { status: 403 })
+  const email = session?.user?.email?.toLowerCase() ?? null
   const { id } = await context.params
-  const file = await prisma.attachment.findUnique({ where: { id } })
-  if (!file) return new NextResponse("No encontrado.", { status: 404 })
-  const stored = path.join(uploadDir(), file.storedName)
+  const acceso = await resolverAdjunto(email, id)
+  if (acceso.status === 401) return new NextResponse("Debe iniciar sesión.", { status: 401 })
+  if (acceso.status === 403) return new NextResponse("Usuario inactivo.", { status: 403 })
+  if (acceso.status !== 200) return new NextResponse("No encontrado.", { status: 404 })
   try {
-    const bytes = await readFile(stored)
-    const inline = file.mimeType.startsWith("image/")
+    const bytes = await readFile(path.join(uploadDir(), acceso.storedName))
+    const inline = acceso.mimeType.startsWith("image/")
     return new NextResponse(bytes, {
       headers: {
-        "Content-Type": file.mimeType,
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+        "Content-Type": acceso.mimeType,
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(acceso.filename)}`,
         "Cache-Control": "private, no-store",
       },
     })
   } catch {
-    return new NextResponse("El archivo no está en el disco.", { status: 404 })
+    return new NextResponse("No encontrado.", { status: 404 })
   }
 }
