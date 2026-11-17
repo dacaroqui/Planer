@@ -140,7 +140,7 @@ export default async function DetallePage({
                 <div key={activity.id} className="border-l-2 border-primary/30 pl-3">
                   <p className="text-sm">{activity.message}</p>
                   <p className="text-xs text-muted-foreground">
-                    {activity.actor ? `${activity.actor.name} · ${etiquetaDeAutor(activity.actor, request.team)}` : "Mesa"} · {formatDateTime(activity.createdAt)}
+                    {activity.actor ? `${activity.actor.name} · ${etiquetaDeAutor(activity.actor, request.team)}` : "Planer"} · {formatDateTime(activity.createdAt)}
                     {activity.internal ? " · Interno" : ""}
                   </p>
                 </div>

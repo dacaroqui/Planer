@@ -28,7 +28,7 @@ export function Shell({
       <aside className="hidden bg-sidebar text-sidebar-foreground lg:flex lg:flex-col lg:border-r lg:border-sidebar-border">
         <div className="px-5 pt-6 pb-4">
           <Link href="/panel" className="block">
-            <p className="font-heading text-3xl leading-none tracking-tight">Mesa</p>
+            <p className="font-heading text-3xl leading-none tracking-tight">Planer</p>
             <p className="mt-2 text-xs tracking-wide text-sidebar-foreground/70">CIFES · Luvania</p>
           </Link>
         </div>
@@ -44,7 +44,7 @@ export function Shell({
           <div className="flex items-center gap-3">
             <MenuMovil items={items} />
             <div>
-              <p className="font-heading text-xl leading-none">Mesa</p>
+              <p className="font-heading text-xl leading-none">Planer</p>
               <p className="text-[11px] text-muted-foreground">CIFES · Luvania</p>
             </div>
           </div>

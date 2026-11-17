@@ -1,32 +1,27 @@
 import type { Metadata } from "next"
-import { Fraunces, Source_Sans_3 } from "next/font/google"
+import { Poppins } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 export const dynamic = "force-dynamic"
 
-const sans = Source_Sans_3({
+const poppins = Poppins({
   subsets: ["latin"],
-  variable: "--font-source",
-  display: "swap",
-})
-
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
   display: "swap",
 })
 
 export const metadata: Metadata = {
-  title: "Mesa · Requerimientos CIFES y Luvania",
-  description: "Mesa interna para radicar y seguir requerimientos de Desarrollo y Marketing.",
+  title: "Planer · Requerimientos CIFES y Luvania",
+  description: "Planer, la mesa interna para radicar y seguir requerimientos de Desarrollo y Marketing.",
   robots: { index: false, follow: false },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es-CO">
-      <body className={`${sans.variable} ${display.variable} antialiased`}>
+      <body className={`${poppins.variable} font-sans antialiased`}>
         {children}
         <Toaster position="top-center" />
       </body>

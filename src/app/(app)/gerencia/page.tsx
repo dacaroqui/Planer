@@ -4,7 +4,7 @@ import { EstadoBadge, SlaBadge } from "@/components/insignias"
 import { esAdmin, rolEn } from "@/lib/permissions"
 import { statusLabel } from "@/lib/domain"
 import { requireActor } from "@/server/session"
-import { dashboard } from "@/server/requests"
+import { dashboard, listar } from "@/server/requests"
 import { listarProyectos } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
 
@@ -25,6 +25,7 @@ export default async function DashboardPage({
   const projectId = one("proyecto")
   const areaId = one("area")
   const data = await dashboard(actor, { team, brand, empresaId, projectId, areaId, from: one("from"), to: one("to") })
+  const mias = await listar(actor, { assignedToMe: true, openOnly: true, pageSize: 8, areaId: areaId || undefined })
   const [empresas, proyectosCatalogo, areasCatalogo, avanceProyectos] = await Promise.all([
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
@@ -36,7 +37,7 @@ export default async function DashboardPage({
   if (!puede) {
     return (
       <div className="max-w-xl">
-        <h1 className="font-heading text-4xl">Panel de gestión</h1>
+        <h1 className="text-2xl font-semibold">Paneles</h1>
         <p className="mt-3 text-sm text-muted-foreground">El dashboard es para los equipos y para gerencia. Como solicitante, el seguimiento está en Mis solicitudes.</p>
       </div>
     )
@@ -45,7 +46,7 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-4xl">Panel de gestión</h1>
+        <h1 className="text-2xl font-semibold">Paneles</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Abiertos por estado, creados frente a resueltos y cumplimiento de SLA. {soloLectura ? "Está en modo solo lectura." : ""}
         </p>
@@ -79,6 +80,39 @@ export default async function DashboardPage({
         <input name="from" type="date" defaultValue={one("from")} lang="es-CO" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Desde" />
         <button className="h-9 rounded-lg bg-primary text-sm text-primary-foreground" type="submit">Recalcular</button>
       </form>
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <section className="rounded-lg border border-[#1658B0] bg-white">
+          <header className="flex items-center justify-between border-b border-border px-3 py-2 text-sm font-medium">
+            <span>Mis asignaciones</span>
+            <Link href="/requerimientos?assigned=1" className="text-xs text-[#1658B0]">Actualizar</Link>
+          </header>
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs text-muted-foreground"><tr><th className="px-3 py-1">T</th><th>Clave</th><th>Resumen</th><th className="px-3">Pr</th></tr></thead>
+            <tbody>
+              {mias.items.map((item) => (
+                <tr key={item.id} className="border-t border-border">
+                  <td className="px-3 py-1.5 text-[#1658B0]">□</td>
+                  <td><Link href={`/requerimientos/${item.code}`} className="text-[#1658B0] hover:underline">{item.code}</Link></td>
+                  <td className="max-w-[16rem] truncate">{item.title}</td>
+                  <td className="px-3">{item.priority === "CRITICA" || item.priority === "ALTA" ? "↑" : item.priority === "BAJA" ? "↓" : "="}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="px-3 py-2 text-xs text-muted-foreground">{mias.items.length === 0 ? "0" : `1–${mias.items.length}`} de {mias.total}</p>
+        </section>
+        <section className="rounded-lg border border-[#1658B0] bg-white">
+          <header className="border-b border-border px-3 py-2 text-sm font-medium">Proyectos</header>
+          <ul className="divide-y divide-border">
+            {avances.slice(0, 6).map((proyecto) => (
+              <li key={proyecto.id} className="px-3 py-2 text-sm">
+                <Link href={`/proyectos/${proyecto.id}`} className="font-medium text-[#1658B0] hover:underline">{proyecto.name}</Link>
+                <p className="text-xs text-muted-foreground">Responsable de proyecto: {proyecto.leader.name}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <Link href={`/requerimientos?${new URLSearchParams({ ...(team ? { team } : {}), ...(brand ? { brand } : {}), ...(areaId ? { area: areaId } : {}) }).toString()}`} className="rounded-xl border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Abiertos</p>
@@ -119,7 +153,7 @@ export default async function DashboardPage({
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-muted-foreground">Vino: creados. Verde: resueltos. Últimas 8 semanas del periodo.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Azul: creados. Verde: resueltos. Últimas 8 semanas del periodo.</p>
         </section>
       </div>
       <section className="rounded-xl border border-border bg-card p-4">
