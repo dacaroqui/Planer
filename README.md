@@ -119,7 +119,7 @@ Ese comando es la demostración: levanta PostgreSQL y la mesa en [http://127.0.0
 | `EMAIL_PROVIDER` | `console` escribe el correo en la salida del proceso. `smtp` usa las variables SMTP. |
 | `EMAIL_FROM` | Remitente. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | Servidor de correo, solo si el proveedor es `smtp`. |
-| `UPLOAD_DIR` | Carpeta de adjuntos. |
+| `UPLOAD_DIR` | Carpeta de adjuntos. Use una ruta absoluta en el servidor. Si queda relativa, se resuelve desde la raíz del proyecto (no desde `.next/standalone`, que es el directorio de trabajo del proceso). La carpeta se crea al guardar o al descargar. |
 | `BUSINESS_WINDOWS` | Franjas hábiles, hora de Colombia. Por defecto `08:00-12:00,14:00-18:00`. |
 | `SLA_RISK_RATIO` | A partir de qué fracción del plazo el semáforo pasa a «en riesgo». Por defecto `0.75`. |
 | `CRON_SECRET` | Protege `POST /api/cron/sla`. En producción es obligatorio. Envíe `Authorization: Bearer <secreto>`. El aviso sale al 75 % del plazo y al vencer, una vez cada uno. Si no hay un programador externo, `SLA_SCHEDULER=true` revisa cada hora dentro del proceso. |

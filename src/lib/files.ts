@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs"
 import path from "node:path"
 
 const ALLOWED = new Set([
@@ -7,8 +8,22 @@ const ALLOWED = new Set([
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
+export function raizDelProyecto(cwd = process.cwd()) {
+  const normal = cwd.replace(/\\/g, "/")
+  if (normal.endsWith("/.next/standalone")) return path.resolve(cwd, "../..")
+  return cwd
+}
+
+export function resolverDirectorioAdjuntos(cwd = process.cwd(), configurado = process.env.UPLOAD_DIR) {
+  const raiz = raizDelProyecto(cwd)
+  if (!configurado) return path.join(raiz, "uploads")
+  return path.isAbsolute(configurado) ? configurado : path.resolve(raiz, configurado)
+}
+
 export function uploadDir() {
-  return process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
+  const dir = resolverDirectorioAdjuntos()
+  mkdirSync(dir, { recursive: true })
+  return dir
 }
 
 export function safeFilename(name: string) {

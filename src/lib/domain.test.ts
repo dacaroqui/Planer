@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest"
 import { DateTime } from "luxon"
 import { evaluarIngreso } from "@/lib/access"
 import { isInternalEmail } from "@/lib/time"
-import { safeFilename, assertAllowedFile } from "@/lib/files"
+import path from "node:path"
+import { safeFilename, assertAllowedFile, resolverDirectorioAdjuntos } from "@/lib/files"
 import { easterSunday, holidaysForYear } from "@/lib/holidays"
 import { ZONE } from "@/lib/time"
 import {
@@ -71,6 +72,9 @@ describe("RQ-10 nombres de archivo", () => {
     expect(assertAllowedFile("brief.pdf", 20)).toBe("pdf")
     expect(assertAllowedFile("notas.txt", 20)).toBe("txt")
     expect(assertAllowedFile("lista.csv", 20)).toBe("csv")
+    const standalone = "/app/.next/standalone"
+    expect(resolverDirectorioAdjuntos(standalone, "./uploads")).toBe(path.join("/app", "uploads"))
+    expect(resolverDirectorioAdjuntos(standalone, "/datos/adjuntos")).toBe("/datos/adjuntos")
   })
 })
 
