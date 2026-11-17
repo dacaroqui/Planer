@@ -1,12 +1,18 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { transicionarAction } from "@/server/actions"
+import { deshacerTransicionAction, transicionarAction } from "@/server/actions"
 import { SlaBadge } from "@/components/insignias"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
 
 export type Tarjeta = {
   code: string
@@ -18,33 +24,45 @@ export type Tarjeta = {
   status: string
   column: string
   sla: "A_TIEMPO" | "EN_RIESGO" | "VENCIDO" | "EN_PAUSA" | "CUMPLIDO" | "INCUMPLIDO" | "NO_APLICA"
-  moves: { name: string; column: string }[]
+  moves: MovimientoTablero[]
 }
 
 export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[]; tarjetas: Tarjeta[]; soloLectura: boolean }) {
   const router = useRouter()
+  const arrastrada = useRef<string | null>(null)
   const [marca, setMarca] = useState("TODAS")
   const [responsable, setResponsable] = useState("TODOS")
   const [tipo, setTipo] = useState("TODOS")
   const [error, setError] = useState<string | null>(null)
+  const [dialogo, setDialogo] = useState<{ code: string; moves: MovimientoTablero[]; elegido: string } | null>(null)
+  const [motivo, setMotivo] = useState("")
+  const [entrega, setEntrega] = useState("")
   const [pending, start] = useTransition()
   const responsables = [...new Set(tarjetas.map((item) => item.assignee))]
   const tipos = [...new Set(tarjetas.map((item) => item.tipo))]
   const visibles = tarjetas.filter((item) => (marca === "TODAS" || item.brand === marca) && (responsable === "TODOS" || item.assignee === responsable) && (tipo === "TODOS" || item.tipo === tipo))
+  const movimiento = dialogo?.moves.find((item) => item.name === dialogo.elegido) ?? dialogo?.moves[0]
 
-  function soltar(event: React.DragEvent<HTMLElement>, columna: string) {
-    event.preventDefault()
-    const code = event.dataTransfer.getData("text/plain")
-    const tarjeta = tarjetas.find((item) => item.code === code)
-    const move = tarjeta?.moves.find((item) => item.column === columna)
-    if (!tarjeta || !move) {
-      setError("Esa columna no es una transición permitida para su rol.")
+  function iniciarArrastre(event: React.DragEvent<HTMLElement>) {
+    const code = event.currentTarget.getAttribute("data-code") || ""
+    arrastrada.current = code
+    event.dataTransfer.setData("text/plain", code)
+    event.dataTransfer.effectAllowed = "move"
+  }
+
+  function ejecutar(code: string, move: MovimientoTablero, comment: string, deliveryUrl: string) {
+    const validacion = validarDatosMovimiento(move, comment, deliveryUrl)
+    if (validacion) {
+      setError(validacion)
+      toast.error(validacion)
       return
     }
-    setError(null)
     const data = new FormData()
     data.set("code", code)
     data.set("name", move.name)
+    data.set("comment", comment)
+    data.set("deliveryUrl", deliveryUrl)
+    setError(null)
     start(async () => {
       const result = await transicionarAction(data)
       if (!result.ok) {
@@ -52,9 +70,49 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
         toast.error(result.error)
         return
       }
-      toast.success(result.message || "Transición hecha.")
+      setDialogo(null)
+      toast.success(result.message || `${code} cambió de estado.`, {
+        duration: 10000,
+        action: {
+          label: "Deshacer",
+          onClick: () => {
+            const deshacer = new FormData()
+            deshacer.set("code", code)
+            start(async () => {
+              const vuelta = await deshacerTransicionAction(deshacer)
+              if (!vuelta.ok) {
+                toast.error(vuelta.error)
+                return
+              }
+              toast.success(vuelta.message || `Se deshizo el cambio de ${code}.`)
+              router.refresh()
+            })
+          },
+        },
+      })
       router.refresh()
     })
+  }
+
+  function soltar(event: React.DragEvent<HTMLElement>, columna: string) {
+    event.preventDefault()
+    event.stopPropagation()
+    const code = arrastrada.current || event.dataTransfer.getData("text/plain")
+    arrastrada.current = null
+    const decision = movimientoAlSoltar(tarjetas, code, columna)
+    if (!decision.ok) {
+      setError(decision.error)
+      toast.error(decision.error)
+      return
+    }
+    const move = decision.moves[0]
+    if (decision.moves.length > 1 || movimientoExigeDialogo(move) || move.requiresAssignee || move.requiresCommittedDate) {
+      setMotivo("")
+      setEntrega("")
+      setDialogo({ code: decision.code, moves: decision.moves, elegido: move.name })
+      return
+    }
+    ejecutar(decision.code, move, "", "")
   }
 
   return (
@@ -98,11 +156,12 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
               {visibles.filter((item) => item.column === columna).map((item) => (
                 <article
                   key={item.code}
+                  data-code={item.code}
                   draggable={!soloLectura && !pending}
-                  onDragStart={(event) => event.dataTransfer.setData("text/plain", item.code)}
+                  onDragStart={iniciarArrastre}
                   className="rounded-lg border border-border bg-card p-3 text-sm"
                 >
-                  <Link href={`/requerimientos/${item.code}`} className="font-medium hover:underline">{item.title}</Link>
+                  <Link href={`/requerimientos/${item.code}`} draggable={false} className="font-medium hover:underline">{item.title}</Link>
                   <p className="mt-1 text-xs text-muted-foreground">{item.code} · {item.brand} · {item.priority}</p>
                   <p className="text-xs text-muted-foreground">{item.assignee}</p>
                   <div className="mt-2"><SlaBadge state={item.sla} /></div>
@@ -112,6 +171,46 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
           </section>
         ))}
       </div>
+      <Dialog open={Boolean(dialogo)} onOpenChange={(open) => { if (!open) setDialogo(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mover {dialogo?.code}</DialogTitle>
+          </DialogHeader>
+          {dialogo && dialogo.moves.length > 1 ? (
+            <div className="grid gap-2">
+              {dialogo.moves.map((item) => (
+                <label key={item.name} className="flex items-center gap-2 text-sm">
+                  <input type="radio" name="movimiento" checked={dialogo.elegido === item.name} onChange={() => setDialogo({ ...dialogo, elegido: item.name })} />
+                  {item.name}
+                </label>
+              ))}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">{movimiento?.name}</p>}
+          {movimiento?.requiresComment ? (
+            <div className="grid gap-1">
+              <Label htmlFor="motivo-tablero">Motivo</Label>
+              <Textarea id="motivo-tablero" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={3} />
+            </div>
+          ) : null}
+          {movimiento?.requiresDelivery ? (
+            <div className="grid gap-1">
+              <Label htmlFor="entrega-tablero">Enlace de la entrega</Label>
+              <Input id="entrega-tablero" value={entrega} onChange={(event) => setEntrega(event.target.value)} placeholder="https://" />
+              <p className="text-xs text-muted-foreground">Si el requerimiento ya tiene un adjunto, puede dejar el enlace vacío.</p>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
+            <Button
+              type="button"
+              disabled={pending || !movimiento}
+              onClick={() => { if (dialogo && movimiento) ejecutar(dialogo.code, movimiento, motivo, entrega) }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -15,6 +15,7 @@ import {
   comentar,
   editarCampos,
   getDetalle,
+  deshacerTransicion,
   radicar,
   transicionar,
 } from "@/server/requests"
@@ -219,6 +220,82 @@ describe("RQ-03 RQ-13 adjunto y aprobación de la entrega", () => {
     detail = await getDetalle(ana, request.code)
     expect(detail?.request.status).toBe("CERRADO")
     expect(detail?.request.resolution).toBe("RESUELTO")
+  })
+})
+
+describe("tablero: transición, entrega y deshacer", () => {
+  it("mover un requerimiento no cambia otro", async () => {
+    const { incidencia, ana, helena } = await mundo()
+    const primero = await radicar(ana, {
+      ...base,
+      title: "Primer caso del tablero",
+      description: "El primero no debe cambiar cuando se mueve el segundo caso de prueba.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el primer caso y no tocarlo.",
+    })
+    const segundo = await radicar(ana, {
+      ...base,
+      title: "Segundo caso del tablero",
+      description: "Este es el caso que sí se mueve de Nuevo a análisis.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el segundo caso y pasarlo a análisis.",
+    })
+    await transicionar(helena, segundo.id, "Iniciar análisis", null)
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: primero.id } })).status).toBe("NUEVO")
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: segundo.id } })).status).toBe("EN_ANALISIS")
+  })
+
+  it("entregar para validación sin enlace ni adjunto responde el error y no cambia el estado", async () => {
+    const { incidencia, ana, helena } = await mundo()
+    const request = await radicar(ana, {
+      ...base,
+      title: "Caso listo para entregar",
+      description: "Falta el enlace de la entrega del ambiente de pruebas.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el ambiente de pruebas y no adjuntar nada.",
+    })
+    await prisma.request.update({ where: { id: request.id }, data: { status: "EN_PRUEBAS", assigneeId: helena.id } })
+    await expect(transicionar(helena, request.id, "Entregar para validación", "Listo para revisar.", {})).rejects.toThrow(/enlace o un adjunto/)
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: request.id } })).status).toBe("EN_PRUEBAS")
+  })
+
+  it("deshace el último movimiento y el líder reabre un cerrado con motivo", async () => {
+    const { incidencia, ana, helena, valentina } = await mundo()
+    const request = await radicar(ana, {
+      ...base,
+      title: "Caso para deshacer y reabrir",
+      description: "Se mueve a análisis, se deshace y luego se reabre tras cerrarlo.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Pasar a análisis y deshacer ese cambio.",
+    })
+    await transicionar(helena, request.id, "Iniciar análisis", null)
+    await deshacerTransicion(helena, request.id)
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: request.id } })).status).toBe("NUEVO")
+    const deshecho = await prisma.activity.findFirst({ where: { requestId: request.id, message: "Deshizo el cambio de estado." } })
+    expect(deshecho?.fromValue).toBe("EN_ANALISIS")
+    expect(deshecho?.toValue).toBe("NUEVO")
+
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { status: "CERRADO", resolution: "RESUELTO", resolvedAt: new Date(), closedAt: new Date(), assigneeId: valentina.id },
+    })
+    await expect(transicionar(valentina, request.id, "Reabrir", "No debí cerrarlo.")).rejects.toBeInstanceOf(DomainError)
+    await transicionar(helena, request.id, "Reabrir", "Se cerró por error en el tablero.")
+    const detail = await getDetalle(helena, request.code)
+    expect(detail?.request.status).toBe("EN_ANALISIS")
+    expect(detail?.request.activities.some((item) => item.message.includes("Se cerró por error en el tablero."))).toBe(true)
   })
 })
 

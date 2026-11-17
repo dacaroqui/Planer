@@ -80,7 +80,15 @@ export default async function TableroPage({
             requesterId: item.requesterId,
             assigneeId: item.assigneeId,
             resolvedAt: item.resolvedAt,
-          }, catalogo).map((move) => ({ name: move.name, column: columnaDe(move.to) }))
+          }, catalogo).map((move) => ({
+            name: move.name,
+            to: move.to,
+            column: columnaDe(move.to),
+            requiresComment: Boolean(move.requiresComment),
+            requiresDelivery: Boolean(move.requiresDelivery),
+            requiresAssignee: Boolean(move.requiresAssignee),
+            requiresCommittedDate: Boolean(move.requiresCommittedDate),
+          }))
           return {
             code: item.code,
             title: item.title,

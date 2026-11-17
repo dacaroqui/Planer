@@ -447,6 +447,52 @@ export async function transicionar(
   return updated
 }
 
+const VENTANA_DESHACER_MS = 20_000
+
+export async function deshacerTransicion(actor: Actor, requestId: string, deps?: Deps) {
+  const current = await prisma.request.findUnique({ where: { id: requestId } })
+  if (!current) throw new DomainError("El requerimiento no existe.")
+  if (!puedeVer(actor, current)) throw new DomainError("No puede ver este requerimiento.")
+  const last = await prisma.activity.findFirst({
+    where: { requestId, kind: "STATUS", field: "estado" },
+    orderBy: { createdAt: "desc" },
+  })
+  if (!last?.fromValue || !last.toValue) throw new DomainError("No hay un cambio de estado para deshacer.")
+  if (last.toValue !== current.status) throw new DomainError("Ese cambio ya no es el último.")
+  const ahora = clock(deps)
+  if (ahora.getTime() - last.createdAt.getTime() > VENTANA_DESHACER_MS) {
+    throw new DomainError("Ya pasó el tiempo para deshacer.")
+  }
+  const puede = esAdmin(actor) || rolEn(actor, current.team) === "LIDER" || last.actorId === actor.id
+  if (!puede) throw new DomainError("No puede deshacer ese cambio.")
+  const destino = last.fromValue
+  const origen = last.toValue
+  await prisma.$transaction(async (tx) => {
+    const data: Prisma.RequestUpdateInput = { status: destino, updatedAt: ahora }
+    if (TERMINAL_STATUSES.has(origen) && !TERMINAL_STATUSES.has(destino)) {
+      data.resolution = null
+      data.resolvedAt = null
+      data.closedAt = null
+    }
+    if (PAUSE_STATUSES.has(origen) && !PAUSE_STATUSES.has(destino)) {
+      await tx.slaPause.deleteMany({ where: { requestId, endedAt: null, reason: origen } })
+    }
+    await tx.request.update({ where: { id: requestId }, data })
+    await tx.activity.create({
+      data: {
+        requestId,
+        actorId: actor.id,
+        kind: "STATUS",
+        field: "estado",
+        message: "Deshizo el cambio de estado.",
+        fromValue: current.status,
+        toValue: destino,
+        createdAt: ahora,
+      },
+    })
+  })
+}
+
 export async function comentar(actor: Actor, requestId: string, body: string, internal: boolean, deps?: Deps) {
   const current = await prisma.request.findUnique({ where: { id: requestId } })
   if (!current) throw new DomainError("El requerimiento no existe.")

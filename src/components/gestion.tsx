@@ -7,11 +7,14 @@ import { adjuntarAction, asignarAction, comentarAction, transicionarAction, type
 import { SelectorArchivo } from "@/components/archivo"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { validarDatosMovimiento } from "@/lib/tablero-movimiento"
 
-type Transicion = { to: string; label: string; requiresComment: boolean }
+type Transicion = { to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean }
 type Agente = { id: string; name: string }
 
 export function Gestion({
@@ -38,6 +41,9 @@ export function Gestion({
   const [assigneeId, setAssigneeId] = useState(asignadoId ?? "")
   const [interna, setInterna] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dialogo, setDialogo] = useState<Transicion | null>(null)
+  const [motivo, setMotivo] = useState("")
+  const [entrega, setEntrega] = useState("")
   const [pending, start] = useTransition()
 
   function correr(action: (data: FormData) => Promise<ActionResult>, data: FormData) {
@@ -46,12 +52,35 @@ export function Gestion({
       const result = await action(data)
       if (!result.ok) {
         setError(result.error)
+        toast.error(result.error)
         return
       }
+      setDialogo(null)
       if (result.message) toast.success(result.message)
       setComment("")
       router.refresh()
     })
+  }
+
+  function transicionar(transicion: Transicion, note: string, deliveryUrl: string) {
+    const validacion = validarDatosMovimiento({
+      name: transicion.label,
+      column: "",
+      to: transicion.to,
+      requiresComment: transicion.requiresComment,
+      requiresDelivery: transicion.requiresDelivery,
+    }, note, deliveryUrl)
+    if (validacion) {
+      setError(validacion)
+      toast.error(validacion)
+      return
+    }
+    const data = new FormData()
+    data.set("code", code)
+    data.set("name", transicion.to)
+    data.set("comment", note)
+    data.set("deliveryUrl", deliveryUrl)
+    correr(transicionarAction, data)
   }
 
   return (
@@ -92,15 +121,14 @@ export function Gestion({
                 variant={transicion.to === "CANCELADO" || transicion.to === "DEVUELTO" ? "outline" : "default"}
                 disabled={pending}
                 onClick={() => {
-                  if (transicion.requiresComment && comment.trim().length < 2) {
-                    setError("Escriba un comentario para esta acción.")
+                  if (transicion.requiresComment || transicion.requiresDelivery) {
+                    setMotivo(comment)
+                    setEntrega("")
+                    setDialogo(transicion)
+                    setError(null)
                     return
                   }
-                  const data = new FormData()
-                  data.set("code", code)
-                  data.set("to", transicion.to)
-                  data.set("comment", comment)
-                  correr(transicionarAction, data)
+                  transicionar(transicion, comment, "")
                 }}
               >
                 {transicion.label}
@@ -155,6 +183,32 @@ export function Gestion({
       ) : null}
 
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">{error}</p> : null}
+      <Dialog open={Boolean(dialogo)} onOpenChange={(open) => { if (!open) setDialogo(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogo?.label}</DialogTitle>
+          </DialogHeader>
+          {dialogo?.requiresComment ? (
+            <div className="grid gap-1">
+              <Label htmlFor="motivo-gestion">Motivo</Label>
+              <Textarea id="motivo-gestion" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={3} placeholder="Queda en el historial." />
+            </div>
+          ) : null}
+          {dialogo?.requiresDelivery ? (
+            <div className="grid gap-1">
+              <Label htmlFor="entrega-gestion">Enlace de la entrega</Label>
+              <Input id="entrega-gestion" value={entrega} onChange={(event) => setEntrega(event.target.value)} placeholder="https://" />
+              <p className="text-xs text-muted-foreground">Si ya adjuntó el archivo, puede dejar el enlace vacío.</p>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
+            <Button type="button" disabled={pending || !dialogo} onClick={() => { if (dialogo) transicionar(dialogo, motivo, entrega) }}>
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

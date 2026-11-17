@@ -37,7 +37,7 @@ La mesa queda en [http://127.0.0.1:38471](http://127.0.0.1:38471).
 | ana.ejemplo@cifes.edu.co | Solicitante de Académico |
 | gerencia.ejemplo@cifes.edu.co | Observador, solo lectura |
 
-También están Julián (solicitante de Luvania), Camila (agente de Marketing), Mateo y Tomás. Ninguno corresponde a una persona real. La semilla trae CIFES y Luvania, cinco proyectos con distinto avance, veinte requerimientos y tareas con subtareas en Planner. Cada arranque de Docker vuelve a cargar esa semilla y reemplaza los datos de demostración.
+También están Julián (solicitante de Luvania), Camila (agente de Marketing), Mateo y Tomás. Ninguno corresponde a una persona real. La semilla trae CIFES y Luvania, cinco proyectos con distinto avance, veinte requerimientos y tareas con subtareas en Planner. Cada arranque de Docker vuelve a cargar esa semilla y reemplaza los datos de demostración. Para dejar de nuevo esa demostración en la base actual: `npm run seed:reset-demo`.
 
 ## Pruebas
 

@@ -33,6 +33,7 @@ import {
   guardarSla,
   guardarTransicion,
   marcarAvisosLeidos,
+  deshacerTransicion,
   transicionar,
   trasladar,
   vigilarSlas,
@@ -253,18 +254,34 @@ export async function transicionarAction(formData: FormData): Promise<ActionResu
     const { prisma } = await import("@/lib/prisma")
     const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
     if (!request) return { ok: false, error: "El requerimiento no existe." }
-    await transicionar(
+    const updated = await transicionar(
       actor,
       request.id,
       String(formData.get("name") || formData.get("to") || ""),
       String(formData.get("comment") || ""),
       { deliveryUrl: String(formData.get("deliveryUrl") || "") },
     )
+    refrescar(code)
+    const { statusLabel } = await import("@/lib/domain")
+    return { ok: true, message: `${code} pasó a ${statusLabel(updated.status)}.` }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function deshacerTransicionAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const code = String(formData.get("code") || "")
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
+    if (!request) return { ok: false, error: "El requerimiento no existe." }
+    await deshacerTransicion(actor, request.id)
   } catch (error) {
     return fallo(error)
   }
   refrescar(code)
-  return { ok: true, message: "El estado quedó actualizado." }
+  return { ok: true, message: `Se deshizo el cambio de ${code}.` }
 }
 
 export async function comentarAction(formData: FormData): Promise<ActionResult> {
