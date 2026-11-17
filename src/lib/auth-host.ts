@@ -15,6 +15,15 @@ export function ajustarRedireccion(requestHost: string, proto: string, location:
   return destino.toString()
 }
 
+export function urlDeLogin(hostHeader: string, protoHeader: string, path: string) {
+  const host = hostHeader.split(",")[0]?.trim()
+  if (!host) return "/login"
+  const proto = protoHeader.split(",")[0]?.trim() === "https" ? "https" : "http"
+  const destino = new URL("/login", `${proto}://${host}`)
+  if (path && path !== "/login") destino.searchParams.set("callbackUrl", path)
+  return destino.toString()
+}
+
 export function cookieSegura(proto: string) {
   return proto.split(",")[0]?.trim() === "https"
 }
