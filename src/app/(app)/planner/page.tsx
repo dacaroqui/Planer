@@ -1,6 +1,6 @@
 import { porcentajeTarea, tareaVencida } from "@/lib/avance"
 import { PlannerTablero } from "@/components/planner-tablero"
-import { equiposVisibles, esAdmin, puedeVerPlanner } from "@/lib/permissions"
+import { esAdmin, puedeVerPlanner } from "@/lib/permissions"
 import { formatDate } from "@/lib/format"
 import { puedeCrearProyecto, puedeGestionarTareas } from "@/server/proyectos"
 import { listarPlanner } from "@/server/planner"
@@ -29,11 +29,9 @@ export default async function PlannerPage({
     assigneeId: params.responsable,
   })
   const opciones = await opcionesVisibles(actor)
-  const equipos = equiposVisibles(actor)
+  const ids = [...new Set([...opciones.personas.map((item) => item.id), actor.id])]
   const responsables = await prisma.user.findMany({
-    where: esAdmin(actor)
-      ? { active: true }
-      : { active: true, areaRoles: { some: { team: { in: [...equipos] } } } },
+    where: { id: { in: ids }, active: true },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   })
