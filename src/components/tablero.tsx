@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { debePedirProyecto, movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { debePedirProyecto, debePedirResponsable, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 
 export type Tarjeta = {
   code: string
@@ -26,11 +27,14 @@ export type Tarjeta = {
   sla: "A_TIEMPO" | "EN_RIESGO" | "VENCIDO" | "EN_PAUSA" | "CUMPLIDO" | "INCUMPLIDO" | "NO_APLICA"
   exigeProyecto?: boolean
   projectId?: string | null
+  assigneeId?: string | null
+  committedDate?: string | null
   proyectos?: { id: string; name: string }[]
   moves: MovimientoTablero[]
 }
 
-export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[]; tarjetas: Tarjeta[]; soloLectura: boolean }) {
+export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { columnas: string[]; tarjetas: Tarjeta[]; soloLectura: boolean; agentes?: { id: string; name: string }[] }) {
+
   const router = useRouter()
   const arrastrada = useRef<string | null>(null)
   const [marca, setMarca] = useState("TODAS")
@@ -41,6 +45,9 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
   const [motivo, setMotivo] = useState("")
   const [entrega, setEntrega] = useState("")
   const [proyectoId, setProyectoId] = useState("")
+  const [responsableId, setResponsableId] = useState("")
+  const [fecha, setFecha] = useState("")
+  const [resolucion, setResolucion] = useState("RESUELTO")
   const [pending, start] = useTransition()
   const responsables = [...new Set(tarjetas.map((item) => item.assignee))]
   const tipos = [...new Set(tarjetas.map((item) => item.tipo))]
@@ -55,7 +62,11 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
   }
 
   function ejecutar(code: string, move: MovimientoTablero, comment: string, deliveryUrl: string) {
-    const validacion = validarDatosMovimiento(move, comment, deliveryUrl)
+    const origen = tarjetas.find((item) => item.code === code)
+    const validacion = validarDatosMovimiento(move, comment, deliveryUrl, {
+      assigneeId: origen?.assigneeId || responsableId,
+      committedDate: origen?.committedDate || fecha,
+    })
     if (validacion) {
       setError(validacion)
       toast.error(validacion)
@@ -67,6 +78,9 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
     data.set("comment", comment)
     data.set("deliveryUrl", deliveryUrl)
     if (proyectoId) data.set("projectId", proyectoId)
+    if (responsableId) data.set("assigneeId", responsableId)
+    if (fecha) data.set("committedDate", fecha)
+    if (movimientoCierra(move)) data.set("resolution", resolucion)
     setError(null)
     start(async () => {
       const result = await transicionarAction(data)
@@ -112,10 +126,15 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
     }
     const move = decision.moves[0]
     const tarjeta = tarjetas.find((item) => item.code === decision.code)
-    if (decision.moves.length > 1 || movimientoExigeDialogo(move) || move.requiresAssignee || move.requiresCommittedDate || (tarjeta && debePedirProyecto(tarjeta, move))) {
+    const pideResponsable = tarjeta ? debePedirResponsable(tarjeta, move) : Boolean(move.requiresAssignee)
+    const pideFecha = Boolean(move.requiresCommittedDate) && !tarjeta?.committedDate
+    if (decision.moves.length > 1 || movimientoExigeDialogo(move) || pideResponsable || pideFecha || (tarjeta && debePedirProyecto(tarjeta, move))) {
       setMotivo("")
       setEntrega("")
       setProyectoId(tarjeta?.projectId ?? "")
+      setResponsableId(tarjeta?.assigneeId ?? "")
+      setFecha(tarjeta?.committedDate ?? "")
+      setResolucion("RESUELTO")
       setDialogo({ code: decision.code, moves: decision.moves, elegido: move.name })
       return
     }
@@ -169,7 +188,7 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
                   className="rounded-lg border border-border bg-card p-3 text-sm"
                 >
                   <Link href={`/requerimientos/${item.code}`} draggable={false} className="font-medium hover:underline">{item.title}</Link>
-                  <p className="mt-1 text-xs text-muted-foreground">{item.code} · {item.brand} · {item.priority}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.code} · {BRAND_LABEL[item.brand as BrandName] ?? item.brand} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority}</p>
                   <p className="text-xs text-muted-foreground">{item.assignee}</p>
                   <div className="mt-2"><SlaBadge state={item.sla} /></div>
                 </article>
@@ -202,7 +221,33 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
               </select>
             </div>
           ) : null}
-          {movimiento?.requiresComment ? (
+          {dialogo && movimiento && debePedirResponsable(tarjetas.find((item) => item.code === dialogo.code) ?? {}, movimiento) ? (
+            <div className="grid gap-1">
+              <Label htmlFor="responsable-tablero">Responsable</Label>
+              <select id="responsable-tablero" className="h-9 rounded-lg border border-input px-2 text-sm" value={responsableId} onChange={(event) => setResponsableId(event.target.value)} aria-label="Responsable">
+                <option value="">Elija un responsable</option>
+                {agentes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+          ) : null}
+          {movimiento?.requiresCommittedDate && !tarjetas.find((item) => item.code === dialogo?.code)?.committedDate ? (
+            <div className="grid gap-1">
+              <Label htmlFor="fecha-tablero">Fecha comprometida</Label>
+              <Input id="fecha-tablero" type="date" lang="es-CO" value={fecha} onChange={(event) => setFecha(event.target.value)} />
+            </div>
+          ) : null}
+          {movimiento && movimientoCierra(movimiento) ? (
+            <div className="grid gap-1">
+              <Label htmlFor="resolucion-tablero">Resolución</Label>
+              <select id="resolucion-tablero" className="h-9 rounded-lg border border-input px-2 text-sm" value={resolucion} onChange={(event) => setResolucion(event.target.value)} aria-label="Resolución">
+                <option value="RESUELTO">Resuelto</option>
+                <option value="NO_SE_HARA">No se hará</option>
+                <option value="DUPLICADO">Duplicado</option>
+                <option value="CANCELADO_SOLICITANTE">Cancelado por el solicitante</option>
+              </select>
+            </div>
+          ) : null}
+          {movimiento && (movimiento.requiresComment || movimientoCierra(movimiento)) ? (
             <div className="grid gap-1">
               <Label htmlFor="motivo-tablero">Motivo</Label>
               <Textarea id="motivo-tablero" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={3} />

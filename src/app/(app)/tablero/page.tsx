@@ -30,11 +30,16 @@ export default async function TableroPage({
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
   ])
-  const columnas = [...new Set(estados.map((estado) => estado.boardColumn))]
+  const columnas = estados.map((estado) => estado.name)
   const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto })
   const transiciones = await prisma.workflowTransition.findMany({ where: { team, active: true } })
   const catalogo = catalogoTablero(transiciones.map((item) => ({ ...item, team })))
-  const columnaDe = (status: string) => estados.find((estado) => estado.key === status)?.boardColumn ?? nombreEstado(team, status)
+  const columnaDe = (status: string) => estados.find((estado) => estado.key === status)?.name ?? nombreEstado(team, status)
+  const agentes = await prisma.user.findMany({
+    where: { active: true, areaRoles: { some: { team, role: { in: ["AGENTE", "LIDER"] } } } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  })
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -66,6 +71,7 @@ export default async function TableroPage({
       <Tablero
         soloLectura={!esAdmin(actor) && rolEn(actor, team) === "OBSERVADOR"}
         columnas={columnas}
+        agentes={agentes}
         tarjetas={data.items.map((item) => {
           const moves = transicionesPara(actor, {
             id: item.id,
@@ -89,6 +95,8 @@ export default async function TableroPage({
             brand: item.brand,
             priority: item.priority,
             assignee: item.assignee?.name ?? "Sin responsable",
+            assigneeId: item.assigneeId,
+            committedDate: item.committedDate ? item.committedDate.toISOString().slice(0, 10) : null,
             tipo: item.type.name,
             status: item.status,
             column: columnaDe(item.status),

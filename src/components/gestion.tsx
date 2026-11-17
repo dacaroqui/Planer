@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { validarDatosMovimiento } from "@/lib/tablero-movimiento"
+import { movimientoCierra, validarDatosMovimiento } from "@/lib/tablero-movimiento"
 
 type Transicion = { to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean }
 type Agente = { id: string; name: string }
@@ -44,6 +44,7 @@ export function Gestion({
   const [dialogo, setDialogo] = useState<Transicion | null>(null)
   const [motivo, setMotivo] = useState("")
   const [entrega, setEntrega] = useState("")
+  const [resolucion, setResolucion] = useState("RESUELTO")
   const [pending, start] = useTransition()
 
   function correr(action: (data: FormData) => Promise<ActionResult>, data: FormData) {
@@ -80,6 +81,7 @@ export function Gestion({
     data.set("name", transicion.to)
     data.set("comment", note)
     data.set("deliveryUrl", deliveryUrl)
+    if (movimientoCierra(transicion)) data.set("resolution", resolucion)
     correr(transicionarAction, data)
   }
 
@@ -121,9 +123,10 @@ export function Gestion({
                 variant={transicion.to === "CANCELADO" || transicion.to === "DEVUELTO" ? "outline" : "default"}
                 disabled={pending}
                 onClick={() => {
-                  if (transicion.requiresComment || transicion.requiresDelivery) {
+                  if (transicion.requiresComment || transicion.requiresDelivery || movimientoCierra(transicion)) {
                     setMotivo(comment)
                     setEntrega("")
+                    setResolucion("RESUELTO")
                     setDialogo(transicion)
                     setError(null)
                     return
@@ -188,7 +191,18 @@ export function Gestion({
           <DialogHeader>
             <DialogTitle>{dialogo?.label}</DialogTitle>
           </DialogHeader>
-          {dialogo?.requiresComment ? (
+          {dialogo && movimientoCierra(dialogo) ? (
+            <div className="grid gap-1">
+              <Label htmlFor="resolucion-gestion">Resolución</Label>
+              <select id="resolucion-gestion" className="h-9 rounded-lg border border-input px-2 text-sm" value={resolucion} onChange={(event) => setResolucion(event.target.value)} aria-label="Resolución">
+                <option value="RESUELTO">Resuelto</option>
+                <option value="NO_SE_HARA">No se hará</option>
+                <option value="DUPLICADO">Duplicado</option>
+                <option value="CANCELADO_SOLICITANTE">Cancelado por el solicitante</option>
+              </select>
+            </div>
+          ) : null}
+          {dialogo && (dialogo.requiresComment || movimientoCierra(dialogo)) ? (
             <div className="grid gap-1">
               <Label htmlFor="motivo-gestion">Motivo</Label>
               <Textarea id="motivo-gestion" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={3} placeholder="Queda en el historial." />
