@@ -9,11 +9,14 @@ import { radicarDesdeFormulario } from "@/server/radicar-formulario"
 import { guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
 import {
   aceptarInvitacion,
+  actualizarPerfil,
   aplicarRestablecimiento,
+  cambiarClavePropia,
   crearInvitacion,
   crearUsuarioManual,
   generarRestablecimiento,
   registrarCuenta,
+  revocarInvitacion,
   solicitarRestablecimiento,
   sincronizarPerfil,
   type RolAsignable,
@@ -106,8 +109,11 @@ export async function aceptarInvitacionAction(formData: FormData): Promise<Actio
   const password = String(formData.get("password") || "")
   if (password !== String(formData.get("confirm") || "")) return { ok: false, error: "Las contraseñas no coinciden." }
   try {
-    const user = await aceptarInvitacion(token, String(formData.get("name") || ""), password)
-    await signIn("credenciales", { email: user.email, password, redirectTo: "/panel" })
+    await aceptarInvitacion(token, String(formData.get("name") || ""), password, {
+      cargo: String(formData.get("cargo") || ""),
+      avatar: String(formData.get("avatar") || ""),
+      aceptaPolitica: String(formData.get("politica") || "") === "1",
+    })
   } catch (error) {
     if (esRedireccion(error)) throw error
     if (error instanceof CredentialsSignin || error instanceof AuthError) {
@@ -116,6 +122,48 @@ export async function aceptarInvitacionAction(formData: FormData): Promise<Actio
     return fallo(error)
   }
   return { ok: true }
+}
+
+export async function actualizarPerfilAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await actualizarPerfil(actor, {
+      name: String(formData.get("name") || ""),
+      cargo: String(formData.get("cargo") || ""),
+      avatar: String(formData.get("avatar") || ""),
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Perfil actualizado." }
+}
+
+export async function cambiarClavePropiaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const nueva = String(formData.get("password") || "")
+  if (nueva !== String(formData.get("confirm") || "")) return { ok: false, error: "Las contraseñas no coinciden." }
+  try {
+    await cambiarClavePropia(actor, String(formData.get("actual") || ""), nueva)
+  } catch (error) {
+    return fallo(error)
+  }
+  return { ok: true, message: "Contraseña actualizada." }
+}
+
+export async function revocarInvitacionFormAction(formData: FormData): Promise<void> {
+  await revocarInvitacionAction(formData)
+}
+
+export async function revocarInvitacionAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await revocarInvitacion(actor, String(formData.get("id") || ""))
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Invitación revocada." }
 }
 
 export async function restablecerClaveAction(formData: FormData): Promise<ActionResult> {

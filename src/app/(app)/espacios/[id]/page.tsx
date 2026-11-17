@@ -3,10 +3,22 @@ import { notFound } from "next/navigation"
 import { NombreMiga } from "@/components/migas"
 import { PestanasEspacio } from "@/components/pestanas-espacio"
 import { Barra } from "@/components/barra"
+import { PRIORITY_LABEL, statusLabel, type PriorityName } from "@/lib/domain"
+import { formatDateTime } from "@/lib/format"
 import { prisma } from "@/lib/prisma"
 import { listarProyectos } from "@/server/proyectos"
 import { listar } from "@/server/requests"
 import { requireActor } from "@/server/session"
+
+function conteo(items: { key: string; label: string }[]) {
+  const mapa = new Map<string, { label: string; total: number }>()
+  for (const item of items) {
+    const actual = mapa.get(item.key) ?? { label: item.label, total: 0 }
+    actual.total += 1
+    mapa.set(item.key, actual)
+  }
+  return [...mapa.values()]
+}
 
 export default async function EspacioPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireActor()
@@ -15,8 +27,17 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
   if (!empresa) notFound()
   const [proyectos, casos] = await Promise.all([
     listarProyectos(actor, id),
-    listar(actor, { empresaId: id, openOnly: true, pageSize: 8 }),
+    listar(actor, { empresaId: id, pageSize: 200 }),
   ])
+  const actividad = await prisma.activity.findMany({
+    where: { requestId: { in: casos.items.map((item) => item.id) }, internal: false },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    include: { request: { select: { code: true } } },
+  })
+  const porEstado = conteo(casos.items.map((item) => ({ key: item.status, label: statusLabel(item.status) })))
+  const porPrioridad = conteo(casos.items.map((item) => ({ key: item.priority, label: PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority })))
+  const porArea = conteo(casos.items.map((item) => ({ key: item.areaId, label: item.area.name })))
   return (
     <div className="space-y-4">
       <NombreMiga nombre={empresa.name} />
@@ -25,6 +46,11 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-semibold">{empresa.name}</h1>
       </div>
       <PestanasEspacio id={id} actual="resumen" />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Conteo titulo="Por estado" filas={porEstado} />
+        <Conteo titulo="Por prioridad" filas={porPrioridad} />
+        <Conteo titulo="Por área" filas={porArea} />
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-border bg-white p-4">
           <h2 className="text-sm font-semibold">Proyectos</h2>
@@ -41,12 +67,25 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
         <section className="rounded-lg border border-border bg-white p-4">
           <h2 className="text-sm font-semibold">Trabajo reciente</h2>
           <ul className="mt-3 grid gap-2 text-sm">
-            {casos.items.length === 0 ? <li className="text-muted-foreground">No hay requerimientos abiertos en este espacio.</li> : casos.items.map((item) => (
-              <li key={item.code}><Link href={`/requerimientos/${item.code}`} className="text-[#1658B0] hover:underline">{item.code}</Link> · {item.title}</li>
+            {actividad.length === 0 ? <li className="text-muted-foreground">Todavía no hay actividad visible.</li> : actividad.map((item) => (
+              <li key={item.id}><Link href={`/requerimientos/${item.request.code}`} className="text-[#1658B0] hover:underline">{item.request.code}</Link> · {item.message} <span className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</span></li>
             ))}
           </ul>
         </section>
       </div>
     </div>
+  )
+}
+
+function Conteo({ titulo, filas }: { titulo: string; filas: { label: string; total: number }[] }) {
+  return (
+    <section className="rounded-lg border border-border bg-white p-4">
+      <h2 className="text-sm font-semibold">{titulo}</h2>
+      <ul className="mt-2 grid gap-1 text-sm">
+        {filas.length === 0 ? <li className="text-muted-foreground">Sin casos.</li> : filas.map((fila) => (
+          <li key={fila.label} className="flex justify-between"><span>{fila.label}</span><span>{fila.total}</span></li>
+        ))}
+      </ul>
+    </section>
   )
 }

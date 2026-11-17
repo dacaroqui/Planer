@@ -142,6 +142,24 @@ describe("RQ-52 RQ-54 autenticación e invitación", () => {
     const token = creada.enlace.split("/").pop() || ""
     await prisma.invitacion.updateMany({ data: { expiresAt: new Date("2020-01-01") } })
     expect(await leerInvitacion(token)).toBeNull()
-    await expect(aceptarInvitacion(token, "Vence Ejemplo", "clave-segura")).rejects.toBeInstanceOf(DomainError)
+    await expect(aceptarInvitacion(token, "Vence Ejemplo", "clave-segura")).rejects.toThrow(/venció/)
+  })
+
+  it("guarda el cargo y exige aceptar la política", async () => {
+    const { actor, area } = await admin()
+    const creada = await crearInvitacion(actor, {
+      email: "perfil.ejemplo@cifes.edu.co",
+      rol: "AGENTE",
+      areaId: area.id,
+      areaIds: [area.id],
+      empresaIds: [],
+      teams: ["DESARROLLO"],
+    })
+    const token = creada.enlace.split("/").pop() || ""
+    await expect(aceptarInvitacion(token, "Perfil Ejemplo", "clave-segura", { aceptaPolitica: false })).rejects.toThrow(/tratamiento de datos/)
+    await aceptarInvitacion(token, "Perfil Ejemplo", "clave-segura", { aceptaPolitica: true, cargo: "Coordinadora" })
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: "perfil.ejemplo@cifes.edu.co" } })
+    expect(user.cargo).toBe("Coordinadora")
+    expect(user.areaId).toBe(area.id)
   })
 })

@@ -17,6 +17,7 @@ import {
   type CodigoIngreso,
 } from "@/lib/cuentas"
 import { appBaseUrl, correoSmtpActivo, createEmailProvider } from "@/lib/email"
+import { estadoEnlace } from "@/lib/invitacion-estado"
 
 const ROLES_EQUIPO = new Set(["AGENTE", "LIDER", "OBSERVADOR"])
 
@@ -133,6 +134,7 @@ export async function crearInvitacion(
       empresaIds: empresaIds.join(","),
       memberships: JSON.stringify(memberships),
       expiresAt: venceEnDias(INVITACION_DIAS),
+      tokenPlain: token,
       createdById: actor.id,
     },
   })
@@ -154,15 +156,41 @@ export async function crearInvitacion(
 }
 
 export async function leerInvitacion(token: string) {
-  const row = await prisma.invitacion.findUnique({ where: { tokenHash: hashToken(token) } })
-  if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return null
-  return { email: row.email, role: row.role }
+  const detalle = await detalleInvitacion(token)
+  if (detalle.estado !== "pendiente") return null
+  return { email: detalle.email, role: detalle.role, area: detalle.area }
 }
 
-export async function aceptarInvitacion(token: string, name: string, password: string) {
+export async function detalleInvitacion(token: string) {
   const row = await prisma.invitacion.findUnique({ where: { tokenHash: hashToken(token) } })
-  if (!row || row.usedAt) throw new DomainError("El enlace no es válido o ya se usó.")
-  if (row.expiresAt.getTime() < Date.now()) throw new DomainError("El enlace venció. Pida una invitación nueva.")
+  const estado = estadoEnlace(row)
+  if (!row || estado !== "pendiente") {
+    return { estado, email: row?.email ?? "", role: row?.role ?? "SOLICITANTE", area: "" }
+  }
+  const area = row.areaId ? await prisma.area.findUnique({ where: { id: row.areaId } }) : null
+  return { estado, email: row.email, role: row.role, area: area?.name ?? "" }
+}
+
+export async function revocarInvitacion(actor: Actor, id: string) {
+  exigirAdmin(actor)
+  const row = await prisma.invitacion.findUnique({ where: { id } })
+  if (!row) throw new DomainError("La invitación no existe.")
+  if (row.usedAt) throw new DomainError("Esa invitación ya fue aceptada.")
+  await prisma.invitacion.update({ where: { id }, data: { revokedAt: new Date() } })
+}
+
+export async function aceptarInvitacion(
+  token: string,
+  name: string,
+  password: string,
+  extra: { cargo?: string; avatar?: string; aceptaPolitica?: boolean } = {},
+) {
+  const row = await prisma.invitacion.findUnique({ where: { tokenHash: hashToken(token) } })
+  if (!row) throw new DomainError("Este enlace no existe. Pida una invitación nueva al administrador.")
+  if (row.revokedAt) throw new DomainError("Esta invitación fue revocada. Pida una invitación nueva al administrador.")
+  if (row.usedAt) throw new DomainError("Esta invitación ya fue aceptada. Ingrese con su correo y contraseña.")
+  if (row.expiresAt.getTime() < Date.now()) throw new DomainError("Esta invitación venció. Pida una invitación nueva al administrador.")
+  if (extra.aceptaPolitica === false) throw new DomainError("Debe aceptar la nota de tratamiento de datos.")
   const limpio = name.trim()
   if (limpio.length < 3) throw new DomainError("Escriba su nombre.")
   const clave = validarClave(password, row.email)
@@ -177,9 +205,13 @@ export async function aceptarInvitacion(token: string, name: string, password: s
     await prisma.invitacion.update({ where: { id: row.id }, data: { usedAt: new Date() } })
     throw new DomainError("Esa cuenta ya está activa. Ingrese o pida un enlace de restablecimiento.")
   }
+  if (extra.avatar && !extra.avatar.startsWith("data:image/")) throw new DomainError("La foto debe ser una imagen.")
+  if (extra.avatar && extra.avatar.length > 180_000) throw new DomainError("La foto supera el tamaño permitido.")
   const isAdmin = row.role === "ADMINISTRADOR"
   const data = {
     name: limpio,
+    cargo: (extra.cargo || "").trim().slice(0, 80),
+    avatar: extra.avatar || "",
     passwordHash,
     role: (isAdmin ? "ADMINISTRADOR" : "SOLICITANTE") as Role,
     areaId,
@@ -325,6 +357,31 @@ export async function aplicarRestablecimiento(token: string, password: string) {
       data: { action: "CLAVE_RESTABLECIDA", entity: "User", entityId: row.userId, toValue: row.user.email },
     }),
   ])
+}
+
+export async function actualizarPerfil(actor: Actor, input: { name: string; cargo: string; avatar: string }) {
+  const name = input.name.trim()
+  if (name.length < 3) throw new DomainError("Escriba su nombre.")
+  if (input.avatar && !input.avatar.startsWith("data:image/")) throw new DomainError("La foto debe ser una imagen.")
+  if (input.avatar.length > 180_000) throw new DomainError("La foto supera el tamaño permitido.")
+  await prisma.user.update({
+    where: { id: actor.id },
+    data: { name, cargo: input.cargo.trim().slice(0, 80), avatar: input.avatar },
+  })
+  await auditar(actor.id, "PERFIL", actor.email, name)
+}
+
+export async function cambiarClavePropia(actor: Actor, actual: string, nueva: string) {
+  const user = await prisma.user.findUnique({ where: { id: actor.id } })
+  if (!user?.passwordHash) throw new DomainError("Esta cuenta no tiene contraseña. Pida un enlace de restablecimiento.")
+  if (!(await verificarClave(actual, user.passwordHash))) throw new DomainError("La contraseña actual no coincide.")
+  const clave = validarClave(nueva, user.email)
+  if (clave) throw new DomainError(clave)
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashClave(nueva), failedAttempts: 0, lockedUntil: null },
+  })
+  await auditar(actor.id, "CLAVE_PROPIA", user.email, "")
 }
 
 export async function registrarCuenta(input: { name: string; email: string; password: string }) {

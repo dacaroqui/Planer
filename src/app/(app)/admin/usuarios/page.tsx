@@ -1,17 +1,22 @@
 import { redirect } from "next/navigation"
 import { FormularioInvitacion, FormularioUsuarioManual } from "@/components/acceso-admin"
 import { EditorUsuario } from "@/components/admin-forms"
+import { CopiarEnlace } from "@/components/copiar-enlace"
+import { estadoEnlace } from "@/lib/invitacion-estado"
+import { appBaseUrl } from "@/lib/email"
 import { puedeAdministrar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
+import { revocarInvitacionFormAction } from "@/server/actions"
 import { requireActor } from "@/server/session"
 import { catalogos } from "@/server/requests"
 
 export default async function UsuariosPage() {
   const actor = await requireActor()
   if (!puedeAdministrar(actor)) redirect("/panel")
-  const [data, empresas] = await Promise.all([
+  const [data, empresas, invitaciones] = await Promise.all([
     catalogos(),
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.invitacion.findMany({ orderBy: { createdAt: "desc" }, take: 30, include: { } }),
   ])
   const areas = data.areas.filter((area) => area.active).map((area) => ({ id: area.id, name: area.name }))
   return (
@@ -26,6 +31,29 @@ export default async function UsuariosPage() {
         <FormularioInvitacion areas={areas} empresas={empresas} />
         <FormularioUsuarioManual areas={areas} empresas={empresas} />
       </div>
+      <section className="rounded-lg border border-border bg-white">
+        <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">Invitaciones</h2>
+        <ul className="divide-y divide-border">
+          {invitaciones.length === 0 ? <li className="px-4 py-3 text-sm text-muted-foreground">Todavía no hay invitaciones.</li> : invitaciones.map((item) => {
+            const estado = estadoEnlace(item)
+            const enlace = item.tokenPlain ? `${appBaseUrl()}/invitar/${item.tokenPlain}` : ""
+            return (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <span>{item.email} · {item.role} · <span className="font-medium">{estado}</span></span>
+                <span className="flex items-center gap-2">
+                  {estado === "pendiente" && enlace ? <CopiarEnlace enlace={enlace} /> : null}
+                  {estado === "pendiente" ? (
+                    <form action={revocarInvitacionFormAction}>
+                      <input type="hidden" name="id" value={item.id} />
+                      <button className="text-sm underline" type="submit">Revocar</button>
+                    </form>
+                  ) : null}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
       <div className="grid gap-3">
         {data.users.map((user) => (
           <EditorUsuario

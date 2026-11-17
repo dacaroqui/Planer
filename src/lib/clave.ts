@@ -13,6 +13,15 @@ export function verificarClave(password: string, hash: string) {
   return bcrypt.compare(password, hash)
 }
 
+export function pistasClave(password: string, email = "") {
+  const distinta = password.length > 0 && password.toLowerCase() !== email.trim().toLowerCase()
+  return [
+    { ok: password.length >= 8, texto: "Al menos 8 caracteres" },
+    { ok: distinta, texto: "Distinta del correo" },
+    { ok: /[A-Za-zÁÉÍÓÚáéíóú]/.test(password) && /\d/.test(password), texto: "Letras y un número" },
+  ]
+}
+
 export function validarClave(password: string, email = "") {
   if (password.length < 8) return "La contraseña debe tener al menos 8 caracteres."
   if (password.length > 200) return "La contraseña es demasiado larga."

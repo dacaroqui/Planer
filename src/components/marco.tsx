@@ -192,6 +192,9 @@ function Usuario({ actor }: { actor: Actor }) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
+          <Link href="/perfil">Mi perfil</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <form action={salir} className="w-full">
             <button type="submit" className="w-full text-left">Cerrar sesión</button>
           </form>
