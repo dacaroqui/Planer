@@ -8,13 +8,13 @@ import { SelectorArchivo } from "@/components/archivo"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { detalleExigeDialogo, movimientoCierra, validarDatosMovimiento } from "@/lib/tablero-movimiento"
+import { CamposMovimiento } from "@/components/campos-movimiento"
+import { detalleExigeDialogo, debePedirResponsable, VENTANA_DESHACER_MS, validarDatosMovimiento } from "@/lib/tablero-movimiento"
 
-type Transicion = { name: string; to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean }
+type Transicion = { name: string; to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean; requiresAssignee?: boolean; requiresCommittedDate?: boolean }
 type Agente = { id: string; name: string }
 
 export function Gestion({
@@ -23,6 +23,7 @@ export function Gestion({
   puedeAsignar,
   agentes,
   asignadoId,
+  fechaComprometida,
   puedeComentar,
   puedeNota,
   puedeAdjuntar,
@@ -32,6 +33,7 @@ export function Gestion({
   puedeAsignar: boolean
   agentes: Agente[]
   asignadoId: string | null
+  fechaComprometida: string | null
   puedeComentar: boolean
   puedeNota: boolean
   puedeAdjuntar: boolean
@@ -45,6 +47,8 @@ export function Gestion({
   const [motivo, setMotivo] = useState("")
   const [entrega, setEntrega] = useState("")
   const [resolucion, setResolucion] = useState("RESUELTO")
+  const [responsableId, setResponsableId] = useState(asignadoId ?? "")
+  const [fecha, setFecha] = useState(fechaComprometida ?? "")
   const [pending, start] = useTransition()
 
   function correr(action: (data: FormData) => Promise<ActionResult>, data: FormData, deshacer = false) {
@@ -59,7 +63,7 @@ export function Gestion({
       setDialogo(null)
       if (deshacer) {
         toast.success(result.message || "Cambio guardado.", {
-          duration: 10000,
+          duration: VENTANA_DESHACER_MS,
           action: {
             label: "Deshacer",
             onClick: () => {
@@ -91,7 +95,12 @@ export function Gestion({
       to: transicion.to,
       requiresComment: transicion.requiresComment,
       requiresDelivery: transicion.requiresDelivery,
-    }, note, deliveryUrl)
+      requiresAssignee: transicion.requiresAssignee,
+      requiresCommittedDate: transicion.requiresCommittedDate,
+    }, note, deliveryUrl, {
+      assigneeId: asignadoId || responsableId,
+      committedDate: fechaComprometida || fecha,
+    })
     if (validacion) {
       setError(validacion)
       toast.error(validacion)
@@ -103,6 +112,8 @@ export function Gestion({
     data.set("comment", note)
     data.set("deliveryUrl", deliveryUrl)
     if (transicion.to === "CERRADO") data.set("resolution", resolucion)
+    if (responsableId) data.set("assigneeId", responsableId)
+    if (fecha) data.set("committedDate", fecha)
     correr(transicionarAction, data, true)
   }
 
@@ -144,10 +155,12 @@ export function Gestion({
                 variant={transicion.to === "CANCELADO" || transicion.to === "DEVUELTO" ? "outline" : "default"}
                 disabled={pending}
                 onClick={() => {
-                  if (detalleExigeDialogo(transicion)) {
+                  if (detalleExigeDialogo(transicion, { assigneeId: asignadoId, committedDate: fechaComprometida })) {
                     setMotivo(comment)
                     setEntrega("")
                     setResolucion("RESUELTO")
+                    setResponsableId(asignadoId ?? "")
+                    setFecha(fechaComprometida ?? "")
                     setDialogo(transicion)
                     setError(null)
                     return
@@ -212,30 +225,23 @@ export function Gestion({
           <DialogHeader>
             <DialogTitle>{dialogo?.label}</DialogTitle>
           </DialogHeader>
-          {dialogo?.to === "CERRADO" ? (
-            <div className="grid gap-1">
-              <Label htmlFor="resolucion-gestion">Resolución</Label>
-              <select id="resolucion-gestion" className="h-9 rounded-lg border border-input px-2 text-sm" value={resolucion} onChange={(event) => setResolucion(event.target.value)} aria-label="Resolución">
-                <option value="RESUELTO">Resuelto</option>
-                <option value="NO_SE_HARA">No se hará</option>
-                <option value="DUPLICADO">Duplicado</option>
-                <option value="CANCELADO_SOLICITANTE">Cancelado por el solicitante</option>
-              </select>
-            </div>
-          ) : null}
-          {dialogo && (dialogo.requiresComment || movimientoCierra(dialogo)) ? (
-            <div className="grid gap-1">
-              <Label htmlFor="motivo-gestion">Motivo</Label>
-              <Textarea id="motivo-gestion" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={3} placeholder="Queda en el historial." />
-            </div>
-          ) : null}
-          {dialogo?.requiresDelivery ? (
-            <div className="grid gap-1">
-              <Label htmlFor="entrega-gestion">Enlace de la entrega</Label>
-              <Input id="entrega-gestion" value={entrega} onChange={(event) => setEntrega(event.target.value)} placeholder="https://" />
-              <p className="text-xs text-muted-foreground">Si ya adjuntó el archivo, puede dejar el enlace vacío.</p>
-            </div>
-          ) : null}
+          <CamposMovimiento
+            prefijo="detalle"
+            movimiento={dialogo ? { name: dialogo.name, column: "", to: dialogo.to, requiresComment: dialogo.requiresComment, requiresDelivery: dialogo.requiresDelivery, requiresAssignee: dialogo.requiresAssignee, requiresCommittedDate: dialogo.requiresCommittedDate } : null}
+            pideResponsable={Boolean(dialogo && debePedirResponsable({ assigneeId: asignadoId }, dialogo))}
+            pideFecha={Boolean(dialogo?.requiresCommittedDate && !fechaComprometida)}
+            agentes={agentes}
+            responsableId={responsableId}
+            onResponsable={setResponsableId}
+            fecha={fecha}
+            onFecha={setFecha}
+            resolucion={resolucion}
+            onResolucion={setResolucion}
+            motivo={motivo}
+            onMotivo={setMotivo}
+            entrega={entrega}
+            onEntrega={setEntrega}
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
             <Button type="button" disabled={pending || !dialogo} onClick={() => { if (dialogo) transicionar(dialogo, motivo, entrega) }}>

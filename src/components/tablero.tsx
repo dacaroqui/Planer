@@ -8,11 +8,10 @@ import { deshacerTransicionAction, transicionarAction } from "@/server/actions"
 import { SlaBadge } from "@/components/insignias"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { CamposMovimiento } from "@/components/campos-movimiento"
+import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, movimientoAlSoltar, movimientoExigeDialogo, VENTANA_DESHACER_MS, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
 import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 
 export type Tarjeta = {
@@ -80,7 +79,7 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
     if (proyectoId) data.set("projectId", proyectoId)
     if (responsableId) data.set("assigneeId", responsableId)
     if (fecha) data.set("committedDate", fecha)
-    if (movimientoCierra(move)) data.set("resolution", resolucion)
+    if (move.to === "CERRADO") data.set("resolution", resolucion)
     setError(null)
     start(async () => {
       const result = await transicionarAction(data)
@@ -92,7 +91,7 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
     setError(avisoTrasMovimiento(true, null))
     setDialogo(null)
       toast.success(result.message || `${code} cambió de estado.`, {
-        duration: 10000,
+        duration: VENTANA_DESHACER_MS,
         action: {
           label: "Deshacer",
           onClick: () => {
@@ -227,45 +226,23 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
               </select>
             </div>
           ) : null}
-          {dialogo && movimiento && debePedirResponsable(tarjetas.find((item) => item.code === dialogo.code) ?? {}, movimiento) ? (
-            <div className="grid gap-1">
-              <Label htmlFor="responsable-tablero">Responsable</Label>
-              <select id="responsable-tablero" className="h-9 rounded-lg border border-input px-2 text-sm" value={responsableId} onChange={(event) => setResponsableId(event.target.value)} aria-label="Responsable">
-                <option value="">Elija un responsable</option>
-                {agentes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            </div>
-          ) : null}
-          {movimiento?.requiresCommittedDate && !tarjetas.find((item) => item.code === dialogo?.code)?.committedDate ? (
-            <div className="grid gap-1">
-              <Label htmlFor="fecha-tablero">{marcaObligatoria("Fecha comprometida").etiqueta}</Label>
-              <Input id="fecha-tablero" type="date" lang="es-CO" aria-required={marcaObligatoria("Fecha comprometida").ariaRequired} value={fecha} onChange={(event) => setFecha(event.target.value)} />
-            </div>
-          ) : null}
-          {movimiento && movimientoCierra(movimiento) ? (
-            <div className="grid gap-1">
-              <Label htmlFor="resolucion-tablero">Resolución</Label>
-              <select id="resolucion-tablero" className="h-9 rounded-lg border border-input px-2 text-sm" value={resolucion} onChange={(event) => setResolucion(event.target.value)} aria-label="Resolución">
-                <option value="RESUELTO">Resuelto</option>
-                <option value="NO_SE_HARA">No se hará</option>
-                <option value="DUPLICADO">Duplicado</option>
-                <option value="CANCELADO_SOLICITANTE">Cancelado por el solicitante</option>
-              </select>
-            </div>
-          ) : null}
-          {movimiento && (movimiento.requiresComment || movimientoCierra(movimiento)) ? (
-            <div className="grid gap-1">
-              <Label htmlFor="motivo-tablero">Motivo</Label>
-              <Textarea id="motivo-tablero" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={3} />
-            </div>
-          ) : null}
-          {movimiento?.requiresDelivery ? (
-            <div className="grid gap-1">
-              <Label htmlFor="entrega-tablero">Enlace de la entrega</Label>
-              <Input id="entrega-tablero" value={entrega} onChange={(event) => setEntrega(event.target.value)} placeholder="https://" />
-              <p className="text-xs text-muted-foreground">Si el requerimiento ya tiene un adjunto, puede dejar el enlace vacío.</p>
-            </div>
-          ) : null}
+          <CamposMovimiento
+            prefijo="tablero"
+            movimiento={movimiento ?? null}
+            pideResponsable={Boolean(dialogo && movimiento && debePedirResponsable(tarjetas.find((item) => item.code === dialogo.code) ?? {}, movimiento))}
+            pideFecha={Boolean(movimiento?.requiresCommittedDate && !tarjetas.find((item) => item.code === dialogo?.code)?.committedDate)}
+            agentes={agentes}
+            responsableId={responsableId}
+            onResponsable={setResponsableId}
+            fecha={fecha}
+            onFecha={setFecha}
+            resolucion={resolucion}
+            onResolucion={setResolucion}
+            motivo={motivo}
+            onMotivo={setMotivo}
+            entrega={entrega}
+            onEntrega={setEntrega}
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>
             <Button

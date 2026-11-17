@@ -213,6 +213,7 @@ export default async function DetallePage({
                 puedeAsignar={detail.canAssign}
                 agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name }))}
                 asignadoId={request.assigneeId}
+                fechaComprometida={request.committedDate ? request.committedDate.toISOString().slice(0, 10) : null}
                 puedeComentar={detail.canCommentPublic}
                 puedeNota={detail.canCommentInternal}
                 puedeAdjuntar={detail.canAttach}
