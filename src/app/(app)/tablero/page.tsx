@@ -3,7 +3,7 @@ import { equiposVisibles, esAdmin, rolEn, transicionesPara } from "@/lib/permiss
 import { nombreEstado } from "@/lib/flujo-oficial"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
 import { requireActor } from "@/server/session"
-import { listar } from "@/server/requests"
+import { listar, opcionesTablero } from "@/server/requests"
 import { prisma } from "@/lib/prisma"
 
 export default async function TableroPage({
@@ -25,11 +25,12 @@ export default async function TableroPage({
       </div>
     )
   }
-  const [estados, empresas, proyectos] = await Promise.all([
+  const [estados, opciones] = await Promise.all([
     prisma.workflowState.findMany({ where: { team, active: true, hiddenOnBoard: false }, orderBy: { sortOrder: "asc" } }),
-    prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
-    prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
+    opcionesTablero(actor, team),
   ])
+  const empresas = opciones.empresas
+  const proyectos = opciones.proyectos
   const columnas = estados.map((estado) => estado.name)
   const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto })
   const transiciones = await prisma.workflowTransition.findMany({ where: { team, active: true } })

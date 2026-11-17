@@ -5,7 +5,7 @@ import { asegurarCatalogo } from "@/server/semilla"
 import { toActor } from "@/lib/actor"
 import { puedeRadicar, puedeVerPlanner, equiposVisibles } from "@/lib/permissions"
 import { detalleProyecto } from "@/server/proyectos"
-import { getDetalle, opcionesVisibles, radicar, transicionar } from "@/server/requests"
+import { getDetalle, opcionesTablero, opcionesVisibles, radicar, transicionar } from "@/server/requests"
 import { listarPlanner } from "@/server/planner"
 
 async function reset() {
@@ -21,6 +21,7 @@ async function reset() {
   await prisma.invitacion.deleteMany()
   await prisma.restablecimiento.deleteMany()
   await prisma.usuarioEmpresa.deleteMany()
+  await prisma.empresa.deleteMany({ where: { name: { notIn: ["CIFES", "Luvania"] } } })
   await prisma.usuarioArea.deleteMany()
   await prisma.areaRole.deleteMany()
   await prisma.codeSequence.deleteMany()
@@ -144,6 +145,15 @@ describe("H-02 H-03 H-05 H-17 visibilidad", () => {
     })
     const planner = await listarPlanner(agente, {})
     expect(planner.map((item) => item.title)).not.toContain("Tarea de marketing")
+    const ajena = await prisma.empresa.create({ data: { name: "QA-DEMO Empresa" } })
+    const labios = await prisma.proyecto.create({
+      data: { empresaId: ajena.id, name: "Protocolo de labios", leaderId: ajeno.id, startsAt: new Date("2026-01-01"), targetAt: new Date("2026-12-01") },
+    })
+    await prisma.request.update({ where: { code: "MKT-0099" }, data: { empresaId: ajena.id, projectId: labios.id } })
+    const tablero = await opcionesTablero(agente, "DESARROLLO")
+    expect(tablero.empresas.map((item) => item.name)).toContain("CIFES")
+    expect(tablero.empresas.map((item) => item.name)).not.toContain("QA-DEMO Empresa")
+    expect(tablero.proyectos.map((item) => item.name)).not.toContain("Protocolo de labios")
   })
 
   it("el canal es obligatorio y no se sale de Nuevo sin proyecto si la empresa lo exige", async () => {

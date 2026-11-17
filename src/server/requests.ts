@@ -856,6 +856,21 @@ export async function opcionesVisibles(actor: Actor) {
   }
 }
 
+export async function opcionesTablero(actor: Actor, team: "DESARROLLO" | "MARKETING") {
+  const rows = await prisma.request.findMany({
+    where: { AND: [visibilidad(actor), { team }] },
+    select: {
+      empresa: { select: { id: true, name: true } },
+      project: { select: { id: true, name: true, empresaId: true } },
+    },
+  })
+  const porId = <T extends { id: string }>(items: Array<T | null | undefined>) => [...new Map(items.filter((item): item is T => Boolean(item)).map((item) => [item.id, item])).values()]
+  return {
+    empresas: porId(rows.map((row) => row.empresa)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    proyectos: porId(rows.map((row) => row.project)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+  }
+}
+
 function visibilidad(actor: Actor): Prisma.RequestWhereInput {
   if (esAdmin(actor)) return {}
   const teams = [...new Set(actor.memberships.map((item) => item.team))]
