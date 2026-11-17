@@ -4,8 +4,10 @@ export type Avance = {
   hechas: number
   total: number
   porcentaje: number
-  fuente: "tareas" | "requerimientos" | "estado" | "vacio"
+  fuente: "tareas" | "requerimientos" | "mixto" | "estado" | "vacio"
 }
+
+export const TEXTO_AVANCE = "El porcentaje del proyecto es el promedio del avance de sus tareas y del porcentaje de requerimientos cerrados. Solo entra lo que exista. Si queda algún requerimiento abierto, el proyecto no llega a 100 %."
 
 export type TareaConSubtareas = { status: string; subtareas?: { status: string }[] }
 
@@ -74,24 +76,19 @@ export function avanceProyecto(input: {
   tareas: TareaConSubtareas[]
   requerimientos: { status: string }[]
 }): Avance {
+  const partes: number[] = []
   if (input.tareas.length > 0) {
     const porcentajes = input.tareas.map((tarea) => porcentajeTarea(tarea))
-    return {
-      hechas: porcentajes.filter((valor) => valor === 100).length,
-      total: input.tareas.length,
-      porcentaje: Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length),
-      fuente: "tareas",
-    }
+    partes.push(Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length))
   }
-  const total = input.requerimientos.length
-  if (total === 0) return { hechas: 0, total: 0, porcentaje: 0, fuente: "vacio" }
-  const hechas = input.requerimientos.filter((item) => CERRADOS.has(item.status)).length
-  return {
-    hechas,
-    total,
-    porcentaje: Math.round((hechas / total) * 100),
-    fuente: "requerimientos",
-  }
+  const totalReq = input.requerimientos.length
+  const cerrados = input.requerimientos.filter((item) => CERRADOS.has(item.status)).length
+  if (totalReq > 0) partes.push(Math.round((cerrados / totalReq) * 100))
+  if (partes.length === 0) return { hechas: 0, total: 0, porcentaje: 0, fuente: "vacio" }
+  let porcentaje = Math.round(partes.reduce((suma, valor) => suma + valor, 0) / partes.length)
+  if (totalReq > cerrados && porcentaje >= 100) porcentaje = 99
+  const fuente = input.tareas.length > 0 && totalReq > 0 ? "mixto" : input.tareas.length > 0 ? "tareas" : "requerimientos"
+  return { hechas: cerrados, total: totalReq || input.tareas.length, porcentaje, fuente }
 }
 
 export function tareaVencida(tarea: { status: string; dueDate: Date | null }, ahora = new Date()) {

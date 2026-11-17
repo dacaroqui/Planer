@@ -28,4 +28,18 @@ describe("RQ-48 RQ-49 RQ-51 avance", () => {
     expect(avance.porcentaje).toBe(50)
     expect(avance.fuente).toBe("requerimientos")
   })
+
+  it("promedia tareas y requerimientos y no llega a 100 si hay abiertos", () => {
+    const avance = avanceProyecto({
+      tareas: [{ status: "HECHA", subtareas: [] }],
+      requerimientos: [{ status: "CERRADO" }, { status: "NUEVO" }],
+    })
+    expect(avance.porcentaje).toBe(75)
+    expect(avance.fuente).toBe("mixto")
+    const tope = avanceProyecto({
+      tareas: [{ status: "HECHA", subtareas: [] }],
+      requerimientos: [{ status: "NUEVO" }],
+    })
+    expect(tope.porcentaje).toBeLessThan(100)
+  })
 })

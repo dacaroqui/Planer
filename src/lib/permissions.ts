@@ -48,6 +48,18 @@ export function puedeVerPlanner(actor: Actor) {
   return actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")
 }
 
+export function etiquetaDeAutor(
+  author: { role: string; areaRoles?: { team: TeamName; role: string }[] },
+  team: TeamName,
+) {
+  if (author.role === "ADMINISTRADOR") return "Administrador"
+  const roles = (author.areaRoles ?? []).filter((item) => item.team === team).map((item) => item.role)
+  if (roles.includes("LIDER")) return "Líder de área"
+  if (roles.includes("AGENTE")) return "Agente"
+  if (roles.includes("OBSERVADOR")) return "Observador"
+  return "Solicitante"
+}
+
 export function equiposVisibles(actor: Actor) {
   if (esAdmin(actor)) return ["DESARROLLO", "MARKETING"] as const
   return [...new Set(actor.memberships.map((item) => item.team))]

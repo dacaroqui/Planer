@@ -6,6 +6,12 @@ export async function register() {
   try {
     await asegurarCatalogo()
     await asegurarAdminInicial()
+    if (process.env.SLA_SCHEDULER === "true" && process.env.CRON_SECRET) {
+      const { vigilarSlas } = await import("@/server/requests")
+      setInterval(() => {
+        vigilarSlas().catch((error) => console.error("No se pudo revisar el SLA", error))
+      }, 60 * 60 * 1000)
+    }
   } catch (error) {
     console.error("No se pudo preparar el catálogo o el administrador inicial.", error)
   }

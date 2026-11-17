@@ -34,7 +34,7 @@ export default async function DashboardPage({
   if (!puede) {
     return (
       <div className="max-w-xl">
-        <h1 className="font-heading text-4xl">Dashboard</h1>
+        <h1 className="font-heading text-4xl">Panel de gestión</h1>
         <p className="mt-3 text-sm text-muted-foreground">El dashboard es para los equipos y para gerencia. Como solicitante, el seguimiento está en Mis solicitudes.</p>
       </div>
     )
@@ -43,7 +43,7 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-4xl">Dashboard</h1>
+        <h1 className="font-heading text-4xl">Panel de gestión</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Abiertos por estado, creados frente a resueltos y cumplimiento de SLA. {soloLectura ? "Está en modo solo lectura." : ""}
         </p>

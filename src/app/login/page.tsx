@@ -62,7 +62,7 @@ export default async function LoginPage({
             <p className="mt-2 text-sm text-muted-foreground">Use el correo y la contraseña de la mesa. Si todavía no tiene cuenta, pida una invitación al administrador.</p>
           </div>
           {error ? (
-            <p className={`rounded-lg px-3 py-2 text-sm ${aviso ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>{error}</p>
+            <p role="alert" className={`rounded-lg px-3 py-2 text-sm ${aviso ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>{error}</p>
           ) : null}
           <form action={entrarConClave} className="grid gap-3">
             <div className="grid gap-1">
@@ -87,11 +87,9 @@ export default async function LoginPage({
           {registroPublicoHabilitado() ? <Link href="/registro" className="text-sm underline">Solicitar una cuenta</Link> : null}
           {modo.entra ? (
             <form action={entrarConMicrosoft}>
-              <Button type="submit" size="lg" className="w-full">Ingresar con Microsoft 365</Button>
+              <Button type="submit" variant="outline" className="w-full">Entrar con la cuenta institucional</Button>
             </form>
-          ) : (
-            null
-          )}
+          ) : null}
           {modo.dev && usuarios.length > 0 ? (
             <Card>
               <CardHeader>

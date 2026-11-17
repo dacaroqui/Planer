@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
-import { eliminarEstadoAction, guardarEstadoAction, guardarSlaAction, guardarTransicionAction } from "@/server/actions"
+import { guardarEstadoAction, guardarSlaAction, guardarTransicionAction } from "@/server/actions"
+import { EliminarEstado } from "@/components/eliminar-estado"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { puedeAdministrar } from "@/lib/permissions"
@@ -21,12 +22,7 @@ export default async function FlujosPage() {
       <section className="grid gap-3">
         <h2 className="font-heading text-2xl">Estados</h2>
         {data.estados.map((estado) => (
-          <form key={estado.id} action={eliminarEstadoAction} className="flex flex-wrap items-center gap-2 text-sm">
-            <input type="hidden" name="id" value={estado.id} />
-            <span>{estado.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {estado.name} · {estado.category} · columna {estado.boardColumn}</span>
-            <Input name="moveTo" placeholder="Mover a (clave)" className="h-8 w-40" />
-            <Button type="submit" size="sm" variant="outline">Eliminar</Button>
-          </form>
+          <EliminarEstado key={estado.id} id={estado.id} nombre={`${estado.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · ${estado.name}`} />
         ))}
         <form action={guardarEstadoAction} className="grid gap-2 rounded-xl border border-border bg-card p-4 md:grid-cols-4">
           <select name="team" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Área">

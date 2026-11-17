@@ -15,7 +15,7 @@ import {
   slaSnapshot,
 } from "@/lib/sla"
 import { ESTADOS_OFICIALES, TRANSICIONES_OFICIALES } from "@/lib/flujo-oficial"
-import { encontrarTransicion, puedeComentar, puedeVer } from "@/lib/permissions"
+import { encontrarTransicion, etiquetaDeAutor, puedeComentar, puedeRadicar, puedeVer } from "@/lib/permissions"
 import type { Actor } from "@/lib/domain"
 
 const bogota = (iso: string) => DateTime.fromISO(iso, { zone: ZONE }).toJSDate()
@@ -38,6 +38,15 @@ function actor(partial: Partial<Actor> & Pick<Actor, "role">): Actor {
     memberships,
   }
 }
+
+describe("H-02 y H-20 rol visible", () => {
+  it("el observador no radica y el líder no se etiqueta como solicitante", () => {
+    expect(puedeRadicar(actor({ role: "OBSERVADOR", team: "DESARROLLO" }))).toBe(false)
+    expect(puedeRadicar(actor({ role: "SOLICITANTE" }))).toBe(true)
+    expect(etiquetaDeAutor({ role: "SOLICITANTE", areaRoles: [{ team: "DESARROLLO", role: "LIDER" }] }, "DESARROLLO")).toBe("Líder de área")
+    expect(etiquetaDeAutor({ role: "ADMINISTRADOR" }, "DESARROLLO")).toBe("Administrador")
+  })
+})
 
 describe("RQ-02 dominio institucional", () => {
   it("acepta cuentas del dominio y rechaza externas o disfrazadas", () => {

@@ -49,8 +49,8 @@ const detailInclude = {
   empresa: true,
   project: true,
   tasks: { include: { assignee: true }, orderBy: { createdAt: "asc" as const } },
-  comments: { include: { author: true }, orderBy: { createdAt: "asc" as const } },
-  activities: { include: { actor: true }, orderBy: { createdAt: "asc" as const } },
+  comments: { include: { author: { include: { areaRoles: true } } }, orderBy: { createdAt: "asc" as const } },
+  activities: { include: { actor: { include: { areaRoles: true } } }, orderBy: { createdAt: "asc" as const } },
   attachments: { include: { uploadedBy: true }, orderBy: { createdAt: "asc" as const } },
   pauses: { orderBy: { startedAt: "asc" as const } },
 } satisfies Prisma.RequestInclude
@@ -89,7 +89,7 @@ export function evaluarSla(request: {
       now,
       resolvedAt: request.resolvedAt,
       cancelled: request.status === "CANCELADO" || request.status === "RECHAZADO",
-      riskRatio: 0.5,
+      riskRatio: Number(process.env.SLA_RISK_RATIO || 0.75),
     },
     windowsFromEnv(),
   )
@@ -1019,15 +1019,18 @@ export async function vigilarSlas(deps?: Deps) {
   let sent = 0
   for (const request of open) {
     const sla = evaluarSla(request, now)
-    if (sla.state !== "VENCIDO") continue
+    if (sla.state !== "VENCIDO" && sla.state !== "EN_RIESGO") continue
+    const clave = sla.state === "VENCIDO" ? "VENCIDO" : "RIESGO"
     const messages: EmailMessage[] = []
     const leaders = (await prisma.areaRole.findMany({ where: { team: request.team, role: "LIDER" }, select: { userId: true } })).map((item) => item.userId)
     await prisma.$transaction(async (tx) => {
       await fanout(tx, [request.assigneeId, ...leaders], {
         requestId: request.id,
-        subject: `${request.code} · SLA de solución vencido`,
-        body: `${request.code} venció el SLA de solución.\n${link(request.code)}`,
-        dedupeKey: `sla-VENCIDO-${request.id}`,
+        subject: `${request.code} · ${clave === "VENCIDO" ? "SLA de solución vencido" : "SLA de solución por vencer"}`,
+        body: clave === "VENCIDO"
+          ? `${request.code} venció el SLA de solución.\n${link(request.code)}`
+          : `${request.code} ya consumió al menos el 75 % del SLA de solución.\n${link(request.code)}`,
+        dedupeKey: `sla-${clave}-${request.id}`,
       }, messages)
     })
     await deliver(email, messages)
@@ -1051,6 +1054,10 @@ export async function listarAvisos(actor: Actor) {
 
 export async function marcarAvisosLeidos(actor: Actor) {
   await prisma.notification.updateMany({ where: { userId: actor.id, readAt: null }, data: { readAt: new Date() } })
+}
+
+export async function marcarAvisoLeido(actor: Actor, id: string) {
+  await prisma.notification.updateMany({ where: { id, userId: actor.id, readAt: null }, data: { readAt: new Date() } })
 }
 
 export async function guardarRoles(
@@ -1163,16 +1170,30 @@ export async function guardarEstado(
   })
 }
 
+export async function cambiarPrioridadMasiva(actor: Actor, codes: string[], priority: string) {
+  if (!["BAJA", "MEDIA", "ALTA", "CRITICA"].includes(priority)) throw new DomainError("Elija una prioridad.")
+  if (!esAdmin(actor) && !actor.memberships.some((item) => item.role === "LIDER")) {
+    throw new DomainError("Solo un líder o el administrador cambia la prioridad de varios requerimientos.")
+  }
+  let cambiados = 0
+  for (const code of codes) {
+    const request = await prisma.request.findUnique({ where: { code } })
+    if (!request || !puedeVer(actor, request)) continue
+    if (!esAdmin(actor) && !puedeCambiarPrioridad(actor, request.team)) continue
+    await prisma.request.update({ where: { id: request.id }, data: { priority } })
+    cambiados += 1
+  }
+  return cambiados
+}
+
 export async function eliminarEstado(actor: Actor, id: string, moveToKey?: string) {
+  void moveToKey
   if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador configura flujos.")
   const state = await prisma.workflowState.findUnique({ where: { id } })
   if (!state) throw new DomainError("El estado no existe.")
   const usados = await prisma.request.count({ where: { team: state.team, status: state.key } })
   if (usados > 0) {
-    if (!moveToKey || moveToKey === state.key) throw new DomainError("Ese estado tiene requerimientos. Indique a cuál moverlos antes de eliminarlo.")
-    const destino = await prisma.workflowState.findFirst({ where: { team: state.team, key: moveToKey, active: true } })
-    if (!destino) throw new DomainError("El estado de destino no existe.")
-    await prisma.request.updateMany({ where: { team: state.team, status: state.key }, data: { status: moveToKey } })
+    throw new DomainError(`El estado «${state.name}» tiene ${usados} requerimientos. Muévalos a otro estado antes de eliminarlo.`)
   }
   await prisma.workflowState.delete({ where: { id } })
 }
