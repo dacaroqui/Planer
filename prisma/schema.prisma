@@ -1,0 +1,420 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SOLICITANTE
+  AGENTE
+  LIDER
+  ADMINISTRADOR
+  OBSERVADOR
+}
+
+enum Team {
+  DESARROLLO
+  MARKETING
+}
+
+model Area {
+  id               String        @id @default(cuid())
+  name             String        @unique
+  active           Boolean       @default(true)
+  allowSelfAssign  Boolean       @default(true)
+  users            User[]
+  miembros         UsuarioArea[]
+  requests         Request[]
+  createdAt        DateTime      @default(now())
+}
+
+model RequestType {
+  id          String    @id @default(cuid())
+  team        Team
+  name        String
+  description String
+  extra       String    @default("")
+  active      Boolean   @default(true)
+  requests    Request[]
+  policies    SlaPolicy[]
+  createdAt   DateTime  @default(now())
+
+  @@unique([team, name])
+}
+
+model CatalogItem {
+  id        String   @id @default(cuid())
+  kind      String
+  key       String
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  @@unique([kind, key])
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String
+  cargo         String         @default("")
+  avatar        String         @default("")
+  role          Role           @default(SOLICITANTE)
+  team          Team?
+  areaId        String
+  area          Area           @relation(fields: [areaId], references: [id])
+  active         Boolean          @default(true)
+  pendiente      Boolean          @default(false)
+  passwordHash   String?
+  failedAttempts Int              @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  areaRoles      AreaRole[]
+  empresas       UsuarioEmpresa[]
+  areasExtra     UsuarioArea[]
+  invitaciones   Invitacion[]
+  restablecimientos Restablecimiento[]
+  requested     Request[]      @relation("Requester")
+  assigned      Request[]      @relation("Assignee")
+  comments      Comment[]
+  activities    Activity[]
+  attachments   Attachment[]
+  notifications Notification[]
+  audits        AuditLog[]
+  ledProjects   Proyecto[]     @relation("ProjectLeader")
+  assignedTasks Tarea[]        @relation("TaskAssignee")
+  createdTasks  Tarea[]        @relation("TaskCreator")
+}
+
+model Empresa {
+  id                           String     @id @default(cuid())
+  name                         String     @unique
+  active                       Boolean    @default(true)
+  exigirProyectoAlClasificar   Boolean    @default(false)
+  projects                     Proyecto[]
+  requests                     Request[]
+  usuarios                     UsuarioEmpresa[]
+  createdAt                    DateTime   @default(now())
+}
+
+model UsuarioEmpresa {
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, empresaId])
+}
+
+model UsuarioArea {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, areaId])
+}
+
+model Invitacion {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  email        String
+  role         Role      @default(SOLICITANTE)
+  areaId       String?
+  areaIds      String    @default("")
+  empresaIds   String    @default("")
+  memberships  String    @default("")
+  expiresAt    DateTime
+  usedAt       DateTime?
+  revokedAt    DateTime?
+  tokenPlain   String?
+  createdById  String
+  createdBy    User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+
+  @@index([email])
+}
+
+model Restablecimiento {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+}
+
+enum EstadoProyecto {
+  PLANIFICADO
+  EN_CURSO
+  EN_PAUSA
+  CERRADO
+}
+
+enum EstadoTarea {
+  PENDIENTE
+  EN_CURSO
+  HECHA
+}
+
+model Proyecto {
+  id          String         @id @default(cuid())
+  empresaId   String
+  empresa     Empresa        @relation(fields: [empresaId], references: [id])
+  name        String
+  description String         @default("")
+  leaderId    String
+  leader      User           @relation("ProjectLeader", fields: [leaderId], references: [id])
+  startsAt    DateTime
+  targetAt    DateTime
+  status      EstadoProyecto @default(PLANIFICADO)
+  requests    Request[]
+  tasks       Tarea[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([empresaId])
+}
+
+model Tarea {
+  id          String      @id @default(cuid())
+  title       String
+  assigneeId  String?
+  assignee    User?       @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  dueDate     DateTime?
+  status      EstadoTarea @default(PENDIENTE)
+  requestId   String?
+  request     Request?    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Proyecto?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Tarea?      @relation("Subtareas", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Tarea[]     @relation("Subtareas")
+  createdById String
+  createdBy   User        @relation("TaskCreator", fields: [createdById], references: [id])
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([requestId])
+  @@index([projectId])
+}
+
+model AreaRole {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team   Team
+  role   Role
+
+  @@unique([userId, team, role])
+}
+
+model CodeSequence {
+  prefix String @id
+  last   Int    @default(0)
+}
+
+model WorkflowState {
+  id            String  @id @default(cuid())
+  team          Team
+  key           String
+  name          String
+  category      String
+  sortOrder     Int
+  boardColumn   String
+  hiddenOnBoard Boolean @default(false)
+  active        Boolean @default(true)
+
+  @@unique([team, key])
+}
+
+model WorkflowTransition {
+  id                     String  @id @default(cuid())
+  team                   Team
+  name                   String
+  fromKeys               String
+  toKey                  String
+  allowedRoles           String
+  requiresComment        Boolean @default(false)
+  requiresAssignee       Boolean @default(false)
+  requiresCommittedDate  Boolean @default(false)
+  requiresDelivery       Boolean @default(false)
+  slaEffect              String  @default("NONE")
+  resolution             String  @default("")
+  clearResolution        Boolean @default(false)
+  incrementRounds        Boolean @default(false)
+  toPrevious             Boolean @default(false)
+  reopenWithinDays       Int     @default(0)
+  active                 Boolean @default(true)
+
+  @@unique([team, name, fromKeys, toKey])
+}
+
+model SlaPolicy {
+  id                     String       @id @default(cuid())
+  team                   Team
+  typeId                 String?
+  type                   RequestType? @relation(fields: [typeId], references: [id])
+  priority               String
+  firstResponseMinutes   Int
+  resolutionMinutes      Int
+  active                 Boolean      @default(true)
+
+  @@unique([team, typeId, priority])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  fromValue String?
+  toValue   String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, createdAt])
+}
+
+model Request {
+  id                     String       @id @default(cuid())
+  code                   String       @unique
+  title                  String
+  description            String
+  expectedResult         String       @default("")
+  justification          String       @default("")
+  brand                  String
+  empresaId              String
+  empresa                Empresa      @relation(fields: [empresaId], references: [id])
+  projectId              String?
+  project                Proyecto?    @relation(fields: [projectId], references: [id])
+  priority               String
+  prioritySuggested      String
+  team                   Team
+  status                 String
+  previousStatus         String?
+  desiredDate            DateTime?
+  committedDate          DateTime?
+  typeId                 String
+  type                   RequestType  @relation(fields: [typeId], references: [id])
+  areaId                 String
+  area                   Area         @relation(fields: [areaId], references: [id])
+  requesterId            String
+  requester              User         @relation("Requester", fields: [requesterId], references: [id])
+  assigneeId             String?
+  assignee               User?        @relation("Assignee", fields: [assigneeId], references: [id])
+  resolution             String?
+  deliveryUrl            String       @default("")
+  channels               String       @default("")
+  publishAt              DateTime?
+  adjustmentRounds       Int          @default(0)
+  stepsToReproduce       String       @default("")
+  moduleName             String       @default("")
+  declaresNoPersonalData Boolean      @default(false)
+  slaStartedAt           DateTime
+  slaTargetMinutes       Int
+  firstResponseMinutes   Int          @default(240)
+  resolutionMinutes      Int          @default(1440)
+  firstResponseDueAt     DateTime?
+  firstResponseStoppedAt DateTime?
+  firstResponseMet       Boolean?
+  resolvedAt             DateTime?
+  closedAt               DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  comments               Comment[]
+  tasks                  Tarea[]
+  activities             Activity[]
+  attachments            Attachment[]
+  pauses                 SlaPause[]
+  notifications          Notification[]
+
+  @@index([status, team])
+  @@index([requesterId])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([empresaId])
+  @@index([projectId])
+  @@index([updatedAt])
+  @@index([areaId])
+  @@index([resolvedAt])
+  @@index([team, status, updatedAt])
+}
+
+model SlaPause {
+  id        String    @id @default(cuid())
+  requestId String
+  request   Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  startedAt DateTime
+  endedAt   DateTime?
+  reason    String
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  internal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  requestId    String
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  filename     String
+  storedName   String
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime @default(now())
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  kind      String
+  message   String
+  field     String?
+  fromValue String?
+  toValue   String?
+  internal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId String?
+  request   Request?  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  subject   String
+  body      String
+  dedupeKey String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt])
+}

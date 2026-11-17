@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: requerimientos
+      POSTGRES_PASSWORD: requerimientos
+      POSTGRES_DB: requerimientos
+    ports:
+      - "5432:5432"
+    volumes:
+      - mesa_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U requerimientos -d requerimientos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://requerimientos:requerimientos@db:5432/requerimientos
+      DIRECT_URL: postgresql://requerimientos:requerimientos@db:5432/requerimientos
+      APP_URL: http://127.0.0.1:3000
+      AUTH_URL: http://127.0.0.1:3000
+      AUTH_SECRET: demo-mesa-cifes-luvania-cambie-esto
+      AUTH_ALLOWED_EMAIL_DOMAIN: cifes.edu.co
+      DEV_AUTH_ENABLED: "true"
+      SEED_DEMO: "true"
+      AUTH_ENTRA_ENABLED: "false"
+      REGISTRO_PUBLICO: "false"
+      EMAIL_PROVIDER: console
+      PORT: "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - mesa_uploads:/app/uploads
+
+volumes:
+  mesa_pg:
+  mesa_uploads:

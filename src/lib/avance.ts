@@ -1,0 +1,103 @@
+const CERRADOS = new Set(["CERRADO", "RECHAZADO", "CANCELADO"])
+
+export type Avance = {
+  hechas: number
+  total: number
+  porcentaje: number
+  fuente: "tareas" | "requerimientos" | "mixto" | "estado" | "vacio"
+}
+
+export const TEXTO_AVANCE = "El porcentaje del proyecto es el promedio del avance de sus tareas y del porcentaje de requerimientos cerrados. Solo entra lo que exista. Si queda algún requerimiento abierto, el proyecto no llega a 100 %."
+
+export const TEXTO_AVANCE_REQUERIMIENTO = "Un requerimiento abierto no llega a 100 %. El 100 % queda al cerrarlo."
+
+function topeSiAbierto(porcentaje: number, status: string) {
+  if (!CERRADOS.has(status) && porcentaje >= 100) return 99
+  return porcentaje
+}
+
+export type TareaConSubtareas = { status: string; subtareas?: { status: string }[] }
+
+export function porcentajeTarea(tarea: TareaConSubtareas) {
+  const subtareas = tarea.subtareas ?? []
+  if (subtareas.length > 0) {
+    const hechas = subtareas.filter((item) => item.status === "HECHA").length
+    return Math.round((hechas / subtareas.length) * 100)
+  }
+  return tarea.status === "HECHA" ? 100 : 0
+}
+
+export function avanceDeTareas(tareas: { status: string }[]): Avance | null {
+  if (tareas.length === 0) return null
+  const hechas = tareas.filter((tarea) => tarea.status === "HECHA").length
+  return {
+    hechas,
+    total: tareas.length,
+    porcentaje: Math.round((hechas / tareas.length) * 100),
+    fuente: "tareas",
+  }
+}
+
+export function avanceRequerimiento(tareas: { id?: string; status: string; parentId?: string | null }[], status: string): Avance {
+  if (tareas.every((tarea) => typeof tarea.id === "string")) {
+    return avanceDesdeLista(tareas as { id: string; status: string; parentId?: string | null }[], status)
+  }
+  const raices = tareas.filter((tarea) => !tarea.parentId)
+  if (raices.length > 0) {
+    const porcentajes = raices.map((tarea) => porcentajeTarea(tarea))
+    return {
+      hechas: porcentajes.filter((valor) => valor === 100).length,
+      total: raices.length,
+      porcentaje: topeSiAbierto(Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length), status),
+      fuente: "tareas",
+    }
+  }
+  const cerrado = CERRADOS.has(status)
+  return { hechas: cerrado ? 1 : 0, total: 1, porcentaje: cerrado ? 100 : 0, fuente: "estado" }
+}
+
+export function agruparTareas<T extends { id: string; status: string; parentId?: string | null }>(tareas: T[]) {
+  const raices = tareas.filter((tarea) => !tarea.parentId)
+  return raices.map((tarea) => ({
+    ...tarea,
+    subtareas: tareas.filter((item) => item.parentId === tarea.id),
+  }))
+}
+
+export function avanceDesdeLista(tareas: { id: string; status: string; parentId?: string | null }[], status: string): Avance {
+  const grupos = agruparTareas(tareas)
+  if (grupos.length === 0) {
+    const cerrado = CERRADOS.has(status)
+    return { hechas: cerrado ? 1 : 0, total: 1, porcentaje: cerrado ? 100 : 0, fuente: "estado" }
+  }
+  const porcentajes = grupos.map((tarea) => porcentajeTarea(tarea))
+  return {
+    hechas: porcentajes.filter((valor) => valor === 100).length,
+    total: grupos.length,
+    porcentaje: topeSiAbierto(Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length), status),
+    fuente: "tareas",
+  }
+}
+
+export function avanceProyecto(input: {
+  tareas: TareaConSubtareas[]
+  requerimientos: { status: string }[]
+}): Avance {
+  const partes: number[] = []
+  if (input.tareas.length > 0) {
+    const porcentajes = input.tareas.map((tarea) => porcentajeTarea(tarea))
+    partes.push(Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length))
+  }
+  const totalReq = input.requerimientos.length
+  const cerrados = input.requerimientos.filter((item) => CERRADOS.has(item.status)).length
+  if (totalReq > 0) partes.push(Math.round((cerrados / totalReq) * 100))
+  if (partes.length === 0) return { hechas: 0, total: 0, porcentaje: 0, fuente: "vacio" }
+  let porcentaje = Math.round(partes.reduce((suma, valor) => suma + valor, 0) / partes.length)
+  if (totalReq > cerrados && porcentaje >= 100) porcentaje = 99
+  const fuente = input.tareas.length > 0 && totalReq > 0 ? "mixto" : input.tareas.length > 0 ? "tareas" : "requerimientos"
+  return { hechas: cerrados, total: totalReq || input.tareas.length, porcentaje, fuente }
+}
+
+export function tareaVencida(tarea: { status: string; dueDate: Date | null }, ahora = new Date()) {
+  return tarea.status !== "HECHA" && tarea.dueDate !== null && tarea.dueDate.getTime() < ahora.getTime()
+}

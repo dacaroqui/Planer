@@ -1,0 +1,10 @@
+[build]
+  command = "npm run vercel-build"
+
+[functions]
+  directory = "netlify/functions"
+
+# Una vez al día, 08:00 en Colombia. El plan gratuito de Vercel no admite más frecuencia.
+# La función llama a POST /api/cron/sla con CRON_SECRET.
+[functions."sla"]
+  schedule = "0 13 * * *"
