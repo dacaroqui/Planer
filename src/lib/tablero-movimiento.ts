@@ -26,17 +26,42 @@ export function movimientoCierra(move: { to: string }) {
   return move.to === "CERRADO" || move.to === "RECHAZADO" || move.to === "CANCELADO"
 }
 
-export function transicionDeDetalle(item: { name: string; to: string; requiresComment?: boolean; requiresDelivery?: boolean }) {
+export const VENTANA_DESHACER_MS = 20_000
+
+export function dentroDeVentanaDeshacer(creadoEnMs: number, ahoraMs: number) {
+  return ahoraMs - creadoEnMs <= VENTANA_DESHACER_MS
+}
+
+export function transicionDeDetalle(item: {
+  name: string
+  to: string
+  requiresComment?: boolean
+  requiresDelivery?: boolean
+  requiresAssignee?: boolean
+  requiresCommittedDate?: boolean
+}) {
   return {
     name: item.name,
     label: item.name,
     to: item.to,
     requiresComment: Boolean(item.requiresComment),
     requiresDelivery: Boolean(item.requiresDelivery),
+    requiresAssignee: Boolean(item.requiresAssignee),
+    requiresCommittedDate: Boolean(item.requiresCommittedDate),
   }
 }
 
-export function detalleExigeDialogo(item: { name: string; to: string; requiresComment?: boolean; requiresDelivery?: boolean }) {
+export function detalleExigeDialogo(
+  item: {
+    name: string
+    to: string
+    requiresComment?: boolean
+    requiresDelivery?: boolean
+    requiresAssignee?: boolean
+    requiresCommittedDate?: boolean
+  },
+  caso: { assigneeId?: string | null; committedDate?: string | null } = {},
+) {
   const transicion = transicionDeDetalle(item)
   return movimientoExigeDialogo({
     name: transicion.name,
@@ -44,7 +69,9 @@ export function detalleExigeDialogo(item: { name: string; to: string; requiresCo
     to: transicion.to,
     requiresComment: transicion.requiresComment,
     requiresDelivery: transicion.requiresDelivery,
-  })
+    requiresAssignee: transicion.requiresAssignee,
+    requiresCommittedDate: transicion.requiresCommittedDate,
+  }) || debePedirResponsable(caso, transicion) || (transicion.requiresCommittedDate && !caso.committedDate)
 }
 
 export function avisoTrasMovimiento(ok: boolean, error: string | null) {

@@ -4,6 +4,7 @@ import { Prisma, type Team } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { appBaseUrl, createEmailProvider, type EmailMessage, type EmailProvider } from "@/lib/email"
 import { obtenerAlmacen } from "@/lib/almacen"
+import { dentroDeVentanaDeshacer } from "@/lib/tablero-movimiento"
 import { assertAllowedFile, safeFilename } from "@/lib/files"
 import { pareceDatoPersonal } from "@/lib/datos-personales"
 import {
@@ -469,8 +470,6 @@ export async function transicionar(
   return updated
 }
 
-const VENTANA_DESHACER_MS = 20_000
-
 export async function deshacerTransicion(actor: Actor, requestId: string, deps?: Deps) {
   const current = await prisma.request.findUnique({ where: { id: requestId } })
   if (!current) throw new DomainError("El requerimiento no existe.")
@@ -482,7 +481,7 @@ export async function deshacerTransicion(actor: Actor, requestId: string, deps?:
   if (!last?.fromValue || !last.toValue) throw new DomainError("No hay un cambio de estado para deshacer.")
   if (last.toValue !== current.status) throw new DomainError("Ese cambio ya no es el último.")
   const ahora = clock(deps)
-  if (ahora.getTime() - last.createdAt.getTime() > VENTANA_DESHACER_MS) {
+  if (!dentroDeVentanaDeshacer(last.createdAt.getTime(), ahora.getTime())) {
     throw new DomainError("Ya pasó el tiempo para deshacer.")
   }
   const puede = esAdmin(actor) || rolEn(actor, current.team) === "LIDER" || last.actorId === actor.id

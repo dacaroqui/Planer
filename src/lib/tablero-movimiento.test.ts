@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
-import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, transicionDeDetalle, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, dentroDeVentanaDeshacer, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, transicionDeDetalle, VENTANA_DESHACER_MS, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
 
 const tarjetas: TarjetaMovible[] = [
   {
@@ -72,6 +72,9 @@ describe("tablero: la tarjeta arrastrada", () => {
     expect(detalleExigeDialogo({ name: "Cerrar", to: "CERRADO", requiresDelivery: true })).toBe(true)
     expect(detalleExigeDialogo({ name: "Aprobar sin publicación", to: "CERRADO" })).toBe(true)
     expect(detalleExigeDialogo({ name: "Iniciar desarrollo", to: "EN_DESARROLLO" })).toBe(false)
+    expect(detalleExigeDialogo({ name: "Aprobar", to: "APROBADO", requiresCommittedDate: true }, { committedDate: null })).toBe(true)
+    expect(detalleExigeDialogo({ name: "Aprobar", to: "APROBADO", requiresAssignee: true }, { assigneeId: null })).toBe(true)
+    expect(detalleExigeDialogo({ name: "Aprobar", to: "APROBADO", requiresAssignee: true, requiresCommittedDate: true }, { assigneeId: "agente", committedDate: "2026-11-20" })).toBe(false)
     expect(transicionDeDetalle({ name: "Aprobar entrega", to: "CERRADO" }).name).toBe("Aprobar entrega")
     expect(transicionDeDetalle({ name: "Aprobar entrega", to: "CERRADO" }).to).toBe("CERRADO")
   })
@@ -80,5 +83,8 @@ describe("tablero: la tarjeta arrastrada", () => {
     expect(avisoTrasMovimiento(true, "No se pudo")).toBeNull()
     expect(avisoTrasMovimiento(false, "Escriba el motivo.")).toBe("Escriba el motivo.")
     expect(marcaObligatoria("Fecha comprometida")).toEqual({ etiqueta: "Fecha comprometida *", ariaRequired: true })
+    expect(VENTANA_DESHACER_MS).toBe(20_000)
+    expect(dentroDeVentanaDeshacer(1_000, 21_000)).toBe(true)
+    expect(dentroDeVentanaDeshacer(1_000, 21_001)).toBe(false)
   })
 })
