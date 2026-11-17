@@ -1,6 +1,7 @@
 import { Tablero } from "@/components/tablero"
 import { equiposVisibles, esAdmin, rolEn, transicionesPara } from "@/lib/permissions"
 import { nombreEstado } from "@/lib/flujo-oficial"
+import { catalogoTablero } from "@/lib/catalogo-tablero"
 import { requireActor } from "@/server/session"
 import { listar } from "@/server/requests"
 import { prisma } from "@/lib/prisma"
@@ -32,14 +33,7 @@ export default async function TableroPage({
   const columnas = [...new Set(estados.map((estado) => estado.boardColumn))]
   const data = await listar(actor, { team, openOnly: true, pageSize: 100, empresaId: params.empresa, projectId: params.proyecto })
   const transiciones = await prisma.workflowTransition.findMany({ where: { team, active: true } })
-  const catalogo = transiciones.map((item) => ({
-    team,
-    name: item.name,
-    from: item.fromKeys.split(","),
-    to: item.toKey,
-    roles: item.allowedRoles.split(",") as Array<"LIDER" | "RESPONSABLE" | "SOLICITANTE" | "QA">,
-    slaEffect: item.slaEffect as "NONE",
-  }))
+  const catalogo = catalogoTablero(transiciones.map((item) => ({ ...item, team })))
   const columnaDe = (status: string) => estados.find((estado) => estado.key === status)?.boardColumn ?? nombreEstado(team, status)
   return (
     <div className="space-y-4">
@@ -99,6 +93,9 @@ export default async function TableroPage({
             status: item.status,
             column: columnaDe(item.status),
             sla: item.sla.state,
+            exigeProyecto: Boolean(item.empresa.exigirProyectoAlClasificar),
+            projectId: item.projectId,
+            proyectos: proyectos.filter((proyecto) => proyecto.empresaId === item.empresaId).map((proyecto) => ({ id: proyecto.id, name: proyecto.name })),
             moves,
           }
         })}

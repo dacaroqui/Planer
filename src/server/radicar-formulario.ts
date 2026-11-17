@@ -21,6 +21,10 @@ export async function radicarDesdeFormulario(actor: Actor, formData: FormData): 
     priority: formData.get("priority"),
     brand: formData.get("brand"),
     desiredDate: String(formData.get("desiredDate") || "") || undefined,
+    justification: String(formData.get("justification") || "") || undefined,
+    stepsToReproduce: String(formData.get("stepsToReproduce") || "") || undefined,
+    channels: String(formData.get("channels") || "") || undefined,
+    publishAt: String(formData.get("publishAt") || "") || undefined,
     declares: formData.get("declares"),
   })
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
@@ -40,6 +44,10 @@ export async function radicarDesdeFormulario(actor: Actor, formData: FormData): 
   try {
     const request = await radicar(actor, {
       ...parsed.data,
+      justification: parsed.data.justification,
+      stepsToReproduce: parsed.data.stepsToReproduce,
+      channels: parsed.data.channels,
+      publishAt: parsed.data.publishAt,
       declares: parsed.data.declares === "1",
       reviewedPersonalData: parsed.data.reviewedPersonalData === "1",
       empresaId: String(formData.get("empresaId") || "") || undefined,

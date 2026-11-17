@@ -39,7 +39,7 @@ import {
   vigilarSlas,
 } from "@/server/requests"
 
-export type ActionResult = { ok: true; message?: string; enlace?: string } | { ok: false; error: string }
+export type ActionResult = { ok: true; message?: string; enlace?: string; resumen?: string } | { ok: false; error: string }
 
 function esRedireccion(error: unknown) {
   return typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
@@ -165,6 +165,7 @@ export async function crearInvitacionAction(formData: FormData): Promise<ActionR
     return {
       ok: true,
       enlace: result.enlace,
+      resumen: result.resumen,
       message: result.enviado ? "Invitación creada y enviada por correo. También puede copiar el enlace." : "Invitación creada. Copie el enlace: no hay correo configurado.",
     }
   } catch (error) {
@@ -259,7 +260,7 @@ export async function transicionarAction(formData: FormData): Promise<ActionResu
       request.id,
       String(formData.get("name") || formData.get("to") || ""),
       String(formData.get("comment") || ""),
-      { deliveryUrl: String(formData.get("deliveryUrl") || "") },
+      { deliveryUrl: String(formData.get("deliveryUrl") || ""), projectId: String(formData.get("projectId") || "") || null },
     )
     refrescar(code)
     const { statusLabel } = await import("@/lib/domain")

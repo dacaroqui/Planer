@@ -26,6 +26,13 @@ export function movimientoExigeDialogo(move: MovimientoTablero) {
   return Boolean(move.requiresComment || move.requiresDelivery)
 }
 
+export function debePedirProyecto(
+  tarjeta: { status: string; exigeProyecto?: boolean; projectId?: string | null },
+  move: { to: string },
+) {
+  return tarjeta.status === "NUEVO" && Boolean(tarjeta.exigeProyecto) && !tarjeta.projectId && move.to !== "NUEVO" && move.to !== "RECHAZADO" && move.to !== "CANCELADO"
+}
+
 export function validarDatosMovimiento(move: MovimientoTablero, comment: string, deliveryUrl: string) {
   if (move.requiresAssignee) return "Asigne un responsable en el requerimiento antes de mover la tarjeta."
   if (move.requiresCommittedDate) return "Defina la fecha comprometida en el requerimiento antes de mover la tarjeta."

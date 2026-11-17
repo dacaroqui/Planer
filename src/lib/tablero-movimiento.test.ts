@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
+import { catalogoTablero } from "@/lib/catalogo-tablero"
+import { debePedirProyecto, movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
 
 const tarjetas: TarjetaMovible[] = [
   {
@@ -37,5 +38,21 @@ describe("tablero: la tarjeta arrastrada", () => {
     expect(validarDatosMovimiento(entregar, "", "")).toMatch(/motivo/)
     expect(validarDatosMovimiento(entregar, "Listo para revisar.", "")).toBeNull()
     expect(validarDatosMovimiento(tarjetas[1].moves[0], "", "")).toBeNull()
+  })
+
+  it("Enviar a pruebas y Entregar para validación conservan los datos obligatorios", () => {
+    const catalogo = catalogoTablero([
+      { team: "DESARROLLO", name: "Enviar a pruebas", fromKeys: "EN_DESARROLLO", toKey: "EN_PRUEBAS", allowedRoles: "RESPONSABLE", slaEffect: "NONE", requiresComment: true, requiresDelivery: false, requiresAssignee: false, requiresCommittedDate: false },
+      { team: "DESARROLLO", name: "Entregar para validación", fromKeys: "EN_PRUEBAS", toKey: "EN_VALIDACION", allowedRoles: "QA,LIDER", slaEffect: "PAUSE", requiresComment: true, requiresDelivery: true, requiresAssignee: false, requiresCommittedDate: false },
+    ])
+    expect(catalogo[0].requiresComment).toBe(true)
+    expect(catalogo[1].requiresDelivery).toBe(true)
+    expect(movimientoExigeDialogo({ name: catalogo[1].name, column: "En validación", to: catalogo[1].to, requiresComment: catalogo[1].requiresComment, requiresDelivery: catalogo[1].requiresDelivery })).toBe(true)
+  })
+
+  it("si la empresa exige proyecto, salir de Nuevo abre el diálogo", () => {
+    expect(debePedirProyecto({ status: "NUEVO", exigeProyecto: true, projectId: null }, { to: "EN_ANALISIS" })).toBe(true)
+    expect(debePedirProyecto({ status: "NUEVO", exigeProyecto: true, projectId: "p1" }, { to: "EN_ANALISIS" })).toBe(false)
+    expect(debePedirProyecto({ status: "NUEVO", exigeProyecto: false, projectId: null }, { to: "EN_ANALISIS" })).toBe(false)
   })
 })

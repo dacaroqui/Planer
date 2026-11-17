@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { debePedirProyecto, movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
 
 export type Tarjeta = {
   code: string
@@ -24,6 +24,9 @@ export type Tarjeta = {
   status: string
   column: string
   sla: "A_TIEMPO" | "EN_RIESGO" | "VENCIDO" | "EN_PAUSA" | "CUMPLIDO" | "INCUMPLIDO" | "NO_APLICA"
+  exigeProyecto?: boolean
+  projectId?: string | null
+  proyectos?: { id: string; name: string }[]
   moves: MovimientoTablero[]
 }
 
@@ -37,6 +40,7 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
   const [dialogo, setDialogo] = useState<{ code: string; moves: MovimientoTablero[]; elegido: string } | null>(null)
   const [motivo, setMotivo] = useState("")
   const [entrega, setEntrega] = useState("")
+  const [proyectoId, setProyectoId] = useState("")
   const [pending, start] = useTransition()
   const responsables = [...new Set(tarjetas.map((item) => item.assignee))]
   const tipos = [...new Set(tarjetas.map((item) => item.tipo))]
@@ -62,6 +66,7 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
     data.set("name", move.name)
     data.set("comment", comment)
     data.set("deliveryUrl", deliveryUrl)
+    if (proyectoId) data.set("projectId", proyectoId)
     setError(null)
     start(async () => {
       const result = await transicionarAction(data)
@@ -106,9 +111,11 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
       return
     }
     const move = decision.moves[0]
-    if (decision.moves.length > 1 || movimientoExigeDialogo(move) || move.requiresAssignee || move.requiresCommittedDate) {
+    const tarjeta = tarjetas.find((item) => item.code === decision.code)
+    if (decision.moves.length > 1 || movimientoExigeDialogo(move) || move.requiresAssignee || move.requiresCommittedDate || (tarjeta && debePedirProyecto(tarjeta, move))) {
       setMotivo("")
       setEntrega("")
+      setProyectoId(tarjeta?.projectId ?? "")
       setDialogo({ code: decision.code, moves: decision.moves, elegido: move.name })
       return
     }
@@ -186,6 +193,15 @@ export function Tablero({ columnas, tarjetas, soloLectura }: { columnas: string[
               ))}
             </div>
           ) : <p className="text-sm text-muted-foreground">{movimiento?.name}</p>}
+          {dialogo && debePedirProyecto(tarjetas.find((item) => item.code === dialogo.code) ?? { status: "NUEVO" }, movimiento ?? { to: "EN_ANALISIS" }) ? (
+            <div className="grid gap-1">
+              <Label htmlFor="proyecto-tablero">Proyecto</Label>
+              <select id="proyecto-tablero" className="h-9 rounded-lg border border-input px-2 text-sm" value={proyectoId} onChange={(event) => setProyectoId(event.target.value)} aria-label="Proyecto">
+                <option value="">Elija un proyecto</option>
+                {(tarjetas.find((item) => item.code === dialogo.code)?.proyectos ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+          ) : null}
           {movimiento?.requiresComment ? (
             <div className="grid gap-1">
               <Label htmlFor="motivo-tablero">Motivo</Label>

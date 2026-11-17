@@ -2,8 +2,7 @@ import path from "node:path"
 
 const ALLOWED = new Set([
   "pdf", "png", "jpg", "jpeg", "webp", "gif", "txt", "csv",
-  "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip",
-  "mp4", "webm", "mov",
+  "doc", "docx", "xls", "xlsx", "ppt", "pptx",
 ])
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024

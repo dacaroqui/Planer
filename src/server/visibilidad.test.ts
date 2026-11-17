@@ -5,7 +5,7 @@ import { asegurarCatalogo } from "@/server/semilla"
 import { toActor } from "@/lib/actor"
 import { puedeRadicar, puedeVerPlanner, equiposVisibles } from "@/lib/permissions"
 import { detalleProyecto } from "@/server/proyectos"
-import { getDetalle, opcionesVisibles, radicar } from "@/server/requests"
+import { getDetalle, opcionesVisibles, radicar, transicionar } from "@/server/requests"
 
 async function reset() {
   await prisma.notification.deleteMany()
@@ -126,5 +126,60 @@ describe("H-02 H-03 H-05 H-17 visibilidad", () => {
     const opciones = await opcionesVisibles(ana)
     expect(opciones.personas.map((item) => item.name)).toEqual(["Ana"])
     expect(opciones.personas.map((item) => item.name)).not.toContain("Julián Secreto")
+  })
+
+  it("el canal es obligatorio y no se sale de Nuevo sin proyecto si la empresa lo exige", async () => {
+    const area = await prisma.area.create({ data: { name: "Mercadeo" } })
+    const pieza = await prisma.requestType.findFirstOrThrow({ where: { team: "MARKETING", name: "Pieza gráfica" } })
+    const evento = await prisma.requestType.findFirstOrThrow({ where: { team: "MARKETING", name: "Evento o activación" } })
+    const sara = toActor(await prisma.user.create({
+      data: { name: "Sara", email: "sara.ejemplo@cifes.edu.co", areaId: area.id, areaRoles: { create: { team: "MARKETING", role: "LIDER" } } },
+      include: { areaRoles: true },
+    }))
+    await expect(radicar(sara, {
+      title: "Pieza sin canal",
+      description: "Falta el canal y la fecha de publicación de esta pieza de prueba.",
+      team: "MARKETING",
+      typeId: pieza.id,
+      priority: "MEDIA",
+      brand: "LUVANIA",
+      declares: true,
+    })).rejects.toThrow(/canal y la fecha/)
+    const eventoReq = await radicar(sara, {
+      title: "Activación de prueba",
+      description: "Un evento no exige canal ni fecha de publicación en el formulario.",
+      team: "MARKETING",
+      typeId: evento.id,
+      priority: "MEDIA",
+      brand: "LUVANIA",
+      declares: true,
+    })
+    expect(eventoReq.status).toBe("NUEVO")
+    const empresa = await prisma.empresa.update({ where: { name: "CIFES" }, data: { exigirProyectoAlClasificar: true } })
+    const tipo = await prisma.requestType.findFirstOrThrow({ where: { team: "DESARROLLO", name: "Soporte o acceso" } })
+    const helena = toActor(await prisma.user.create({
+      data: { name: "Helena", email: "helena.ejemplo@cifes.edu.co", areaId: area.id, areaRoles: { create: { team: "DESARROLLO", role: "LIDER" } } },
+      include: { areaRoles: true },
+    }))
+    const ana = toActor(await prisma.user.create({
+      data: { name: "Ana", email: "ana.ejemplo@cifes.edu.co", areaId: area.id },
+      include: { areaRoles: true },
+    }))
+    const caso = await radicar(ana, {
+      title: "Caso sin proyecto",
+      description: "La empresa exige proyecto antes de salir de Nuevo en este caso.",
+      team: "DESARROLLO",
+      typeId: tipo.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      empresaId: empresa.id,
+      declares: true,
+    })
+    await expect(transicionar(helena, caso.id, "Iniciar análisis", null)).rejects.toThrow(/proyecto/)
+    const proyecto = await prisma.proyecto.create({
+      data: { empresaId: empresa.id, name: "Aula", leaderId: helena.id, startsAt: new Date(), targetAt: new Date("2026-12-01") },
+    })
+    await transicionar(helena, caso.id, "Iniciar análisis", null, { projectId: proyecto.id })
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: caso.id } })).status).toBe("EN_ANALISIS")
   })
 })

@@ -256,6 +256,9 @@ export async function radicar(
   if (type.extra === "pasos" && (input.stepsToReproduce ?? "").trim().length < 8) {
     throw new DomainError("Describa los pasos para reproducir el error, con datos de prueba.")
   }
+  if (type.extra === "canal" && ((input.channels ?? "").trim().length < 2 || !(input.publishAt ?? "").trim())) {
+    throw new DomainError("Indique el canal y la fecha de publicación.")
+  }
   const area = await prisma.area.findFirst({ where: { id: actor.areaId, active: true } })
   if (!area) throw new DomainError("Su usuario no tiene un área activa.")
   const empresa = input.empresaId
@@ -352,7 +355,7 @@ export async function transicionar(
   requestId: string,
   name: string,
   comment: string | null,
-  extra?: { deliveryUrl?: string },
+  extra?: { deliveryUrl?: string; projectId?: string | null },
   deps?: Deps,
 ) {
   const current = await prisma.request.findUnique({
@@ -369,21 +372,28 @@ export async function transicionar(
   if (transition.requiresComment && note.length < 2) throw new DomainError("Escriba el motivo o la pregunta. Queda visible para el solicitante.")
   if (transition.requiresAssignee && !current.assigneeId) throw new DomainError("Asigne un responsable antes de aprobar.")
   if (transition.requiresCommittedDate && !current.committedDate) throw new DomainError("Defina la fecha comprometida antes de aprobar.")
-  if ((name === "Aprobar" || name === "Aprobar y programar") && !current.projectId) {
+  let projectId = current.projectId
+  if (extra?.projectId) {
+    const proyecto = await prisma.proyecto.findFirst({ where: { id: extra.projectId, empresaId: current.empresaId } })
+    if (!proyecto) throw new DomainError("El proyecto no pertenece a la empresa del requerimiento.")
+    projectId = proyecto.id
+  }
+  const destinoPrevisto = transition.toPrevious ? (current.previousStatus || "NUEVO") : transition.to
+  if (current.status === "NUEVO" && destinoPrevisto !== "NUEVO" && !projectId) {
     const empresa = await prisma.empresa.findUnique({ where: { id: current.empresaId } })
     if (empresa?.exigirProyectoAlClasificar) {
-      throw new DomainError("Esta empresa exige asociar un proyecto antes de clasificar el requerimiento.")
+      throw new DomainError("Esta empresa exige un proyecto antes de salir de Nuevo.")
     }
   }
   const delivery = (extra?.deliveryUrl || current.deliveryUrl || "").trim()
   if (transition.requiresDelivery && !delivery && current.attachments.length === 0) {
     throw new DomainError("Agregue un enlace o un adjunto de la entrega.")
   }
-  const destino = transition.toPrevious ? (current.previousStatus || "NUEVO") : transition.to
+    const destino = destinoPrevisto
   const email = mailer(deps)
   const messages: EmailMessage[] = []
   const updated = await prisma.$transaction(async (tx) => {
-    const data: Prisma.RequestUpdateInput = { status: destino, updatedAt: now }
+    const data: Prisma.RequestUpdateInput = { status: destino, updatedAt: now, ...(projectId && projectId !== current.projectId ? { project: { connect: { id: projectId } } } : {}) }
     if (destino === "EN_ESPERA") data.previousStatus = current.status
     if (transition.toPrevious) data.previousStatus = null
     const entraPausa = !PAUSE_STATUSES.has(current.status) && PAUSE_STATUSES.has(destino)

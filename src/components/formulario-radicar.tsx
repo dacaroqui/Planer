@@ -159,10 +159,10 @@ export function FormularioRadicar({
       {elegido?.extra === "canal" ? (
         <div className="grid gap-4 md:grid-cols-2">
           <Campo etiqueta="Canal">
-            <Input name="channels" placeholder="Instagram, sitio web, WhatsApp…" />
+            <Input name="channels" required minLength={2} aria-label="Canal" placeholder="Instagram, sitio web, WhatsApp…" />
           </Campo>
           <Campo etiqueta="Fecha de publicación">
-            <Input name="publishAt" type="datetime-local" lang="es-CO" />
+            <Input name="publishAt" type="datetime-local" lang="es-CO" required aria-label="Fecha de publicación" />
           </Campo>
         </div>
       ) : null}
