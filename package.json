@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0 -p 38471",
     "build": "next build",
-    "start": "next start -H 0.0.0.0",
+    "start": "sh scripts/start.sh",
     "create-admin": "tsx scripts/create-admin.ts",
     "lint": "eslint",
     "test": "DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test prisma migrate deploy && vitest run",

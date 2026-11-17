@@ -80,7 +80,9 @@ export PORT=3000
 npm start
 ```
 
-`npm start` escucha en `0.0.0.0` y en el puerto `PORT` (3000 si no se define). Al arrancar crea el catálogo y, si `ADMIN_EMAIL` no existe todavía, el administrador inicial. También puede crearlo antes, con la base ya migrada:
+Defina `APP_URL`, `AUTH_URL` y, si hace falta, `ALLOWED_ORIGINS` antes de `npm run build`. Next guarda esos hosts en el build y con ellos acepta las server actions cuando el túnel cambia el `Origin` respecto del host interno. `ALLOWED_ORIGINS` es una lista separada por comas y admite comodines, por ejemplo `*.trycloudflare.com`.
+
+`npm start` copia `public` y `.next/static` al paquete standalone y arranca `node .next/standalone/server.js` en `0.0.0.0` y en el puerto `PORT` (3000 si no se define). Al arrancar crea el catálogo y, si `ADMIN_EMAIL` no existe todavía, el administrador inicial. También puede crearlo antes, con la base ya migrada:
 
 ```bash
 ADMIN_EMAIL=admin@cifes.edu.co ADMIN_PASSWORD='una-clave-de-8-o-mas' npm run create-admin
@@ -113,6 +115,7 @@ Ese comando es la demostración: levanta PostgreSQL y la mesa en [http://127.0.0
 | `SEED_DEMO` | `true` borra la base y carga la demostración. |
 | `REGISTRO_PUBLICO` | `true` abre `/registro`. Por defecto está apagado. |
 | `PORT` | Puerto de `npm start`. Por defecto 3000. |
+| `ALLOWED_ORIGINS` | Hosts extra, separados por coma, para las server actions detrás de un proxy. Admite comodines (`*.trycloudflare.com`). Se suma a los hosts de `APP_URL` y `AUTH_URL`. Defínalo antes de `npm run build`. |
 | `EMAIL_PROVIDER` | `console` escribe el correo en la salida del proceso. `smtp` usa las variables SMTP. |
 | `EMAIL_FROM` | Remitente. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | Servidor de correo, solo si el proveedor es `smtp`. |

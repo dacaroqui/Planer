@@ -5,8 +5,7 @@ import { redirect } from "next/navigation"
 import { AuthError, CredentialsSignin } from "next-auth"
 import { signIn, signOut } from "@/auth"
 import { DomainError, type TeamName } from "@/lib/domain"
-import { assertAllowedFile } from "@/lib/files"
-import { firstIssue, radicarSchema } from "@/lib/schemas"
+import { radicarDesdeFormulario } from "@/server/radicar-formulario"
 import { guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
 import {
   aceptarInvitacion,
@@ -34,7 +33,6 @@ import {
   guardarSla,
   guardarTransicion,
   marcarAvisosLeidos,
-  radicar,
   transicionar,
   trasladar,
   vigilarSlas,
@@ -242,46 +240,10 @@ export async function salir() {
 
 export async function radicarAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
-  const parsed = radicarSchema.safeParse({
-    title: formData.get("title"),
-    description: formData.get("description"),
-    expectedResult: formData.get("expectedResult"),
-    team: formData.get("team"),
-    typeId: formData.get("typeId"),
-    priority: formData.get("priority"),
-    brand: formData.get("brand"),
-    desiredDate: String(formData.get("desiredDate") || "") || undefined,
-  })
-  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
-
-  const uploaded = formData.get("archivo")
-  let file: { name: string; type: string; bytes: Buffer } | null = null
-  if (uploaded instanceof File && uploaded.size > 0) {
-    const bytes = Buffer.from(await uploaded.arrayBuffer())
-    try {
-      assertAllowedFile(uploaded.name, bytes.length)
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "Archivo inválido." }
-    }
-    file = { name: uploaded.name, type: uploaded.type, bytes }
-  }
-
-  let code = ""
-  try {
-    const request = await radicar(actor, {
-      ...parsed.data,
-      declares: true,
-      reviewedPersonalData: parsed.data.reviewedPersonalData === "1",
-      empresaId: String(formData.get("empresaId") || "") || undefined,
-      projectId: String(formData.get("projectId") || "") || null,
-    })
-    code = request.code
-    if (file) await adjuntar(actor, request.id, file)
-  } catch (error) {
-    return fallo(error)
-  }
-  refrescar(code)
-  redirect(`/requerimientos/${code}?confirmado=1`)
+  const result = await radicarDesdeFormulario(actor, formData)
+  if (!result.ok) return result
+  refrescar(result.code)
+  redirect(`/requerimientos/${result.code}?confirmado=1`)
 }
 
 export async function transicionarAction(formData: FormData): Promise<ActionResult> {

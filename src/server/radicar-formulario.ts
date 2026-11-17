@@ -1,0 +1,53 @@
+import { assertAllowedFile } from "@/lib/files"
+import { firstIssue, radicarSchema } from "@/lib/schemas"
+import { DomainError, type Actor } from "@/lib/domain"
+import { adjuntar, radicar } from "@/server/requests"
+
+export type ResultadoRadicacion = { ok: true; code: string } | { ok: false; error: string }
+
+function fallo(error: unknown): ResultadoRadicacion {
+  if (error instanceof DomainError) return { ok: false, error: error.message }
+  console.error(error)
+  return { ok: false, error: "No se pudo completar la acción." }
+}
+
+export async function radicarDesdeFormulario(actor: Actor, formData: FormData): Promise<ResultadoRadicacion> {
+  const parsed = radicarSchema.safeParse({
+    title: formData.get("title"),
+    description: formData.get("description"),
+    expectedResult: formData.get("expectedResult"),
+    team: formData.get("team"),
+    typeId: formData.get("typeId"),
+    priority: formData.get("priority"),
+    brand: formData.get("brand"),
+    desiredDate: String(formData.get("desiredDate") || "") || undefined,
+    declares: formData.get("declares"),
+  })
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
+
+  const uploaded = formData.get("archivo")
+  let file: { name: string; type: string; bytes: Buffer } | null = null
+  if (uploaded instanceof File && uploaded.size > 0) {
+    const bytes = Buffer.from(await uploaded.arrayBuffer())
+    try {
+      assertAllowedFile(uploaded.name, bytes.length)
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "Archivo inválido." }
+    }
+    file = { name: uploaded.name, type: uploaded.type, bytes }
+  }
+
+  try {
+    const request = await radicar(actor, {
+      ...parsed.data,
+      declares: parsed.data.declares === "1",
+      reviewedPersonalData: parsed.data.reviewedPersonalData === "1",
+      empresaId: String(formData.get("empresaId") || "") || undefined,
+      projectId: String(formData.get("projectId") || "") || null,
+    })
+    if (file) await adjuntar(actor, request.id, file)
+    return { ok: true, code: request.code }
+  } catch (error) {
+    return fallo(error)
+  }
+}
