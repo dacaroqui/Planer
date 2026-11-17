@@ -1,6 +1,6 @@
 # Criterios del MVP oficial
 
-Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 27 historias cuyo Release es MVP. El detalle Dado/Cuando/Entonces está en el archivo. El estado de implementación está en `docs/HU_STATUS.md`.
+Fuente: `HUs_Plataforma_Requerimientos.xlsx`. La columna Release dice si la historia es MVP. RQ-38 queda en Fase 2 en todos los documentos. El detalle Dado/Cuando/Entonces está en el archivo. El estado de implementación está en `docs/HU_STATUS.md`.
 
 | HU | Título | Release |
 | --- | --- | --- |
