@@ -42,7 +42,7 @@ Códigos y títulos oficiales de `HUs_Plataforma_Requerimientos.xlsx`. El PM hac
 | RQ-54 | Invitar por enlace | Hecho | Enlace de un solo uso, 7 días, rol preasignado. Se copia en pantalla y, si hay SMTP, también se envía. |
 | RQ-55 | Registro propio con aprobación | Hecho | Página `/registro` apagada salvo `REGISTRO_PUBLICO=true`. El alta queda pendiente, con rol Solicitante, hasta que un administrador la apruebe. |
 | RQ-56 | Recuperar contraseña | Hecho | Con SMTP el enlace sale por correo. Sin SMTP, el administrador lo genera para copiarlo. Vence a las 24 horas y es de un solo uso. |
-| RQ-57 | Búsqueda global y atajos de teclado | Hecho | Buscar DES- o MKT- desde la barra. Atajos: c radicar, / buscar, g luego b tablero, g luego l lista, ? ayuda. |
+| RQ-57 | Búsqueda global y atajos de teclado | Hecho | Buscar DES- o MKT- desde la barra. `?` abre la lista de atajos. `g` luego `i`, `l`, `b`, `p` o `h` cambia de pantalla. Hay migas en todas las pantallas. |
 | RQ-58 | Acciones masivas y vistas guardadas | Hecho | Un líder o el administrador cambia la prioridad de varios casos de la lista. Cada persona guarda vistas de filtros en su navegador. |
 | RQ-59 | Ayuda contextual por rol | Hecho | El icono ? abre /ayuda con atajos y lo que puede hacer el rol de la sesión. |
 | RQ-60 | Autorización por recurso en API | Hecho | Un adjunto sin sesión responde 401 y, sin permiso sobre el requerimiento, 404. El detalle de proyecto y los filtros no exponen casos ajenos. |

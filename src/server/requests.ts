@@ -239,6 +239,7 @@ export async function radicar(
     moduleName?: string
     declares: boolean
     reviewedPersonalData?: boolean
+    areaId?: string
   },
   deps?: Deps,
 ) {
@@ -259,8 +260,9 @@ export async function radicar(
   if (type.extra === "canal" && ((input.channels ?? "").trim().length < 2 || !(input.publishAt ?? "").trim())) {
     throw new DomainError("Indique el canal y la fecha de publicación.")
   }
-  const area = await prisma.area.findFirst({ where: { id: actor.areaId, active: true } })
-  if (!area) throw new DomainError("Su usuario no tiene un área activa.")
+  const areaElegida = actor.isAdmin && input.areaId ? input.areaId : actor.areaId
+  const area = await prisma.area.findFirst({ where: { id: areaElegida, active: true } })
+  if (!area) throw new DomainError("Elija un área activa. El administrador no radica en Académico por defecto.")
   const empresa = input.empresaId
     ? await prisma.empresa.findFirst({ where: { id: input.empresaId, active: true } })
     : await prisma.empresa.findFirst({

@@ -26,6 +26,7 @@ export function FormularioRadicar({
   prioridades,
   empresas,
   proyectos,
+  areas = [],
 }: {
   tipos: TipoOpcion[]
   area: string
@@ -33,6 +34,7 @@ export function FormularioRadicar({
   prioridades: { key: string; name: string }[]
   empresas: { id: string; name: string }[]
   proyectos: { id: string; empresaId: string; name: string }[]
+  areas?: { id: string; name: string }[]
 }) {
   const [team, setTeam] = useState<TeamName | "">("")
   const [typeId, setTypeId] = useState("")
@@ -42,6 +44,8 @@ export function FormularioRadicar({
   const [projectId, setProjectId] = useState("")
   const [declares, setDeclares] = useState(false)
   const [reviewed, setReviewed] = useState(false)
+  const areaInicial = areas.find((item) => item.name === "Dirección") ?? areas.find((item) => item.name !== "Académico") ?? areas[0]
+  const [areaId, setAreaId] = useState(areaInicial?.id ?? "")
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const visibles = useMemo(() => tipos.filter((tipo) => tipo.team === team), [tipos, team])
@@ -78,6 +82,7 @@ export function FormularioRadicar({
         data.set("priority", priority)
         data.set("brand", brand)
         data.set("empresaId", empresaId)
+        if (areaId) data.set("areaId", areaId)
         if (projectId) data.set("projectId", projectId)
         data.set("declares", "1")
         data.set("reviewedPersonalData", reviewed ? "1" : "0")
@@ -181,7 +186,15 @@ export function FormularioRadicar({
         <Checkbox checked={reviewed} onCheckedChange={(value) => setReviewed(value === true)} />
         <span>Si el sistema detecta algo parecido a una cédula o un celular, confirmo que ya lo revisé.</span>
       </label>
-      <p className="text-sm text-muted-foreground">Se radica desde {area}. La prioridad sugerida no define el SLA: el líder puede ajustarla.</p>
+      {areas.length > 0 ? (
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Área de quien pide el trabajo</span>
+          <select name="areaId" aria-label="Área de quien pide el trabajo" className="h-9 rounded-lg border border-input bg-card px-2" value={areaId} onChange={(event) => setAreaId(event.target.value)}>
+            {areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">Como administrador, elija el área. No queda radicado en Académico por defecto.</span>
+        </label>
+      ) : <p className="text-sm text-muted-foreground">Se radica desde {area}. La prioridad sugerida no define el SLA: el líder puede ajustarla.</p>}
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">{error}</p> : null}
       <div>
         <Button type="submit" size="lg" disabled={pending || !typeId || !declares}>{pending ? "Enviando…" : "Enviar"}</Button>

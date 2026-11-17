@@ -13,10 +13,11 @@ export default async function AyudaPage() {
       <section className="rounded-xl border border-border bg-card p-4 text-sm">
         <h2 className="font-heading text-2xl">Atajos</h2>
         <ul className="mt-2 grid gap-1">
-          <li><kbd>c</kbd> radicar, si su rol puede.</li>
+          <li><kbd>?</kbd> abre la lista de atajos en cualquier pantalla.</li>
           <li><kbd>/</kbd> buscar por código o título.</li>
-          <li><kbd>g</kbd> luego <kbd>b</kbd> tablero. <kbd>g</kbd> luego <kbd>l</kbd> lista.</li>
-          <li><kbd>?</kbd> esta ayuda.</li>
+          <li><kbd>c</kbd> radicar, si su rol puede.</li>
+          <li><kbd>g</kbd> luego <kbd>i</kbd> panel, <kbd>l</kbd> lista, <kbd>b</kbd> tablero, <kbd>p</kbd> Planner, <kbd>h</kbd> ayuda.</li>
+          <li><kbd>Esc</kbd> cierra la lista de atajos.</li>
         </ul>
       </section>
       <section className="rounded-xl border border-border bg-card p-4 text-sm">

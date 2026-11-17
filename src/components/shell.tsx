@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Atajos } from "@/components/atajos"
+import { Migas } from "@/components/migas"
 import { salir } from "@/server/actions"
 import { MenuMovil, Navegacion, type NavItem } from "@/components/navegacion"
 import {
@@ -55,6 +56,7 @@ export function Shell({
           </form>
           <Link href="/ayuda" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-sm" aria-label="Ayuda">?</Link>
         </div>
+        <Migas />
         <Atajos />
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
         <footer className="mx-auto w-full max-w-6xl px-4 pb-8 text-xs text-muted-foreground md:px-8">

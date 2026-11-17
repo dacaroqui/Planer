@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Gestion } from "@/components/gestion"
 import { TareasPanel } from "@/components/tareas-panel"
@@ -53,17 +52,33 @@ export default async function DetallePage({
             Quedó radicado con el código {request.code}. También enviamos la confirmación al correo de los líderes del área. <a className="underline" href={`/requerimientos/${request.code}`}>Abrir este detalle</a>.
           </p>
         ) : null}
-        <Link href="/requerimientos" className="text-sm text-muted-foreground hover:underline">Volver al listado</Link>
+        <p className="text-sm text-muted-foreground">{request.code}</p>
+        <h1 className="mt-1 font-heading text-4xl leading-tight">{request.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <EstadoBadge status={request.status} />
           <SlaBadge state={sla.state} />
           <EquipoBadge team={request.team} />
         </div>
-        <h1 className="mt-3 font-heading text-4xl leading-tight">{request.title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{request.code} · radicado {formatDateTime(request.createdAt)} por {request.requester.name}</p>
+        <p className="mt-2 text-sm text-muted-foreground">Radicado {formatDateTime(request.createdAt)} por {request.requester.name}.</p>
+        <p className="mt-2 text-sm">Siguiente paso: {detail.transitions[0]?.name ?? "No hay acciones pendientes para su rol."}</p>
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+        <div className="space-y-8">
+          <section aria-labelledby="pedido" className="space-y-3">
+            <h2 id="pedido" className="font-heading text-2xl">Lo pedido</h2>
+            <Card>
+              <CardContent className="space-y-4 pt-6 text-sm leading-relaxed">
+                <p className="whitespace-pre-wrap">{request.description}</p>
+                {request.justification ? <p className="whitespace-pre-wrap"><span className="font-medium">Justificación. </span>{request.justification}</p> : null}
+                {request.stepsToReproduce ? <p className="whitespace-pre-wrap"><span className="font-medium">Pasos. </span>{request.stepsToReproduce}</p> : null}
+                {request.channels ? <p><span className="font-medium">Canal. </span>{request.channels}</p> : null}
+                {request.expectedResult ? <p className="whitespace-pre-wrap"><span className="font-medium">Resultado esperado. </span>{request.expectedResult}</p> : null}
+                <p className="text-xs text-muted-foreground">Empresa es la entidad del caso ({request.empresa.name}). Marca es la línea de comunicación ({request.brand === "AMBAS" ? "Ambas/Transversal" : request.brand}).</p>
+              </CardContent>
+            </Card>
+          </section>
+          <section aria-labelledby="seguimiento" className="space-y-3">
+          <h2 id="seguimiento" className="font-heading text-2xl">Seguimiento</h2>
           <Card>
             <CardHeader><CardTitle>Tareas · {avance.porcentaje}%</CardTitle></CardHeader>
             <CardContent>
@@ -82,25 +97,6 @@ export default async function DetallePage({
                   vencida: tareaVencida(tarea),
                 }))}
               />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Qué se pidió</CardTitle></CardHeader>
-            <CardContent className="space-y-4 text-sm leading-relaxed">
-              <p className="whitespace-pre-wrap">{request.description}</p>
-              {request.expectedResult ? (
-                <div>
-                  <p className="text-xs tracking-wide text-muted-foreground uppercase">Resultado esperado</p>
-                  <p className="mt-1 whitespace-pre-wrap">{request.expectedResult}</p>
-                </div>
-              ) : null}
-              <p className="text-xs text-muted-foreground">La empresa es la entidad del caso. La marca es la línea de comunicación (CIFES, Luvania o ambas).</p>
-              {request.resolution ? (
-                <div>
-                  <p className="text-xs tracking-wide text-muted-foreground uppercase">Resolución</p>
-                  <p className="mt-1 whitespace-pre-wrap">{request.resolution}</p>
-                </div>
-              ) : null}
             </CardContent>
           </Card>
           {request.attachments.length > 0 ? (
@@ -147,8 +143,10 @@ export default async function DetallePage({
               ))}
             </TabsContent>
           </Tabs>
+          </section>
         </div>
         <div className="space-y-4">
+          <h2 id="gestion" className="font-heading text-2xl">Gestión</h2>
           <Card>
             <CardHeader><CardTitle>SLA</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
@@ -166,7 +164,7 @@ export default async function DetallePage({
             <CardContent className="grid gap-2 text-sm">
               <Fila etiqueta="Tipo" valor={request.type.name} />
               <Fila etiqueta="Prioridad" valor={request.priority} />
-              <Fila etiqueta="Prioridad sugerida" valor={request.prioritySuggested} />
+              {request.priority !== request.prioritySuggested ? <Fila etiqueta="Prioridad sugerida" valor={request.prioritySuggested} /> : null}
               <Fila etiqueta="Empresa" valor={request.empresa.name} />
               <Fila etiqueta="Proyecto" valor={request.project?.name ?? "Sin proyecto"} />
               <Fila etiqueta="Marca" valor={request.brand === "AMBAS" ? "Ambas/Transversal" : request.brand} />
@@ -242,6 +240,7 @@ export default async function DetallePage({
 }
 
 function Fila({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) {
+  if (valor === null || valor === undefined || valor === "" || valor === "—" || valor === "Sin asignar" || valor === "Sin proyecto") return null
   return (
     <div className="flex items-start justify-between gap-3">
       <span className="text-muted-foreground">{etiqueta}</span>

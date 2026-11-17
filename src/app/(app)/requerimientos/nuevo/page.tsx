@@ -16,13 +16,14 @@ export default async function NuevoPage() {
     )
   }
   await asegurarCatalogo()
-  const [tipos, area, marcas, prioridades, empresas, proyectos] = await Promise.all([
+  const [tipos, area, marcas, prioridades, empresas, proyectos, areas] = await Promise.all([
     prisma.requestType.findMany({ where: { active: true }, orderBy: [{ team: "asc" }, { name: "asc" }] }),
     prisma.area.findUnique({ where: { id: actor.areaId } }),
     prisma.catalogItem.findMany({ where: { kind: "MARCA", active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.catalogItem.findMany({ where: { kind: "PRIORIDAD", active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, empresaId: true, name: true } }),
+    actor.isAdmin ? prisma.area.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : Promise.resolve([]),
   ])
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -48,6 +49,7 @@ export default async function NuevoPage() {
             prioridades={prioridades.map((item) => ({ key: item.key, name: item.name }))}
             empresas={empresas.map((item) => ({ id: item.id, name: item.name }))}
             proyectos={proyectos}
+            areas={areas}
           />
         </CardContent>
       </Card>
