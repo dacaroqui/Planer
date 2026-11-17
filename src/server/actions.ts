@@ -2,11 +2,23 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { AuthError, CredentialsSignin } from "next-auth"
 import { signIn, signOut } from "@/auth"
 import { DomainError, type TeamName } from "@/lib/domain"
 import { assertAllowedFile } from "@/lib/files"
 import { firstIssue, radicarSchema } from "@/lib/schemas"
 import { guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
+import {
+  aceptarInvitacion,
+  aplicarRestablecimiento,
+  crearInvitacion,
+  crearUsuarioManual,
+  generarRestablecimiento,
+  registrarCuenta,
+  solicitarRestablecimiento,
+  sincronizarPerfil,
+  type RolAsignable,
+} from "@/server/cuentas"
 import { requireActor } from "@/server/session"
 import {
   actualizarTipo,
@@ -28,7 +40,11 @@ import {
   vigilarSlas,
 } from "@/server/requests"
 
-export type ActionResult = { ok: true; message?: string } | { ok: false; error: string }
+export type ActionResult = { ok: true; message?: string; enlace?: string } | { ok: false; error: string }
+
+function esRedireccion(error: unknown) {
+  return typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
+}
 
 function fallo(error: unknown): ActionResult {
   if (error instanceof DomainError) return { ok: false, error: error.message }
@@ -45,6 +61,168 @@ function refrescar(code?: string) {
   revalidatePath("/admin/usuarios")
   revalidatePath("/admin/catalogos")
   if (code) revalidatePath(`/requerimientos/${code}`)
+}
+
+function equiposDe(formData: FormData) {
+  const teams: Array<"DESARROLLO" | "MARKETING"> = []
+  if (formData.get("team:DESARROLLO") === "1") teams.push("DESARROLLO")
+  if (formData.get("team:MARKETING") === "1") teams.push("MARKETING")
+  return teams
+}
+
+function rolDe(value: string): RolAsignable | null {
+  if (value === "SOLICITANTE" || value === "AGENTE" || value === "LIDER" || value === "OBSERVADOR" || value === "ADMINISTRADOR") return value
+  return null
+}
+
+function lista(formData: FormData, key: string) {
+  return formData.getAll(key).map((item) => String(item)).filter(Boolean)
+}
+
+export async function entrarConClave(formData: FormData) {
+  try {
+    await signIn("credenciales", {
+      email: String(formData.get("email") || ""),
+      password: String(formData.get("password") || ""),
+      redirectTo: "/panel",
+    })
+  } catch (error) {
+    if (esRedireccion(error)) throw error
+    if (error instanceof CredentialsSignin) {
+      redirect(`/login?code=${error.code}`)
+    }
+    if (error instanceof AuthError) {
+      redirect("/login?code=credenciales")
+    }
+    throw error
+  }
+}
+
+export async function aceptarInvitacionAction(formData: FormData): Promise<ActionResult> {
+  const token = String(formData.get("token") || "")
+  const password = String(formData.get("password") || "")
+  if (password !== String(formData.get("confirm") || "")) return { ok: false, error: "Las contraseñas no coinciden." }
+  try {
+    const user = await aceptarInvitacion(token, String(formData.get("name") || ""), password)
+    await signIn("credenciales", { email: user.email, password, redirectTo: "/panel" })
+  } catch (error) {
+    if (esRedireccion(error)) throw error
+    if (error instanceof CredentialsSignin || error instanceof AuthError) {
+      return { ok: true, message: "Cuenta lista. Ingrese con su correo y contraseña." }
+    }
+    return fallo(error)
+  }
+  return { ok: true }
+}
+
+export async function restablecerClaveAction(formData: FormData): Promise<ActionResult> {
+  const password = String(formData.get("password") || "")
+  if (password !== String(formData.get("confirm") || "")) return { ok: false, error: "Las contraseñas no coinciden." }
+  try {
+    await aplicarRestablecimiento(String(formData.get("token") || ""), password)
+  } catch (error) {
+    return fallo(error)
+  }
+  redirect("/login?code=restablecida")
+}
+
+export async function solicitarRestablecimientoAction(formData: FormData) {
+  try {
+    await solicitarRestablecimiento(String(formData.get("email") || ""))
+  } catch {
+    redirect("/login?code=smtp")
+  }
+  redirect("/login?code=enviado")
+}
+
+export async function registrarCuentaAction(formData: FormData): Promise<ActionResult> {
+  const password = String(formData.get("password") || "")
+  if (password !== String(formData.get("confirm") || "")) return { ok: false, error: "Las contraseñas no coinciden." }
+  try {
+    await registrarCuenta({
+      name: String(formData.get("name") || ""),
+      email: String(formData.get("email") || ""),
+      password,
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  return { ok: true, message: "Quedó pendiente de aprobación. Un administrador debe activar la cuenta." }
+}
+
+export async function crearInvitacionAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const rol = rolDe(String(formData.get("rol") || ""))
+  if (!rol) return { ok: false, error: "Elija el rol." }
+  try {
+    const result = await crearInvitacion(actor, {
+      email: String(formData.get("email") || ""),
+      rol,
+      areaId: String(formData.get("areaId") || ""),
+      areaIds: lista(formData, "areaIds"),
+      empresaIds: lista(formData, "empresaIds"),
+      teams: equiposDe(formData),
+    })
+    return {
+      ok: true,
+      enlace: result.enlace,
+      message: result.enviado ? "Invitación creada y enviada por correo. También puede copiar el enlace." : "Invitación creada. Copie el enlace: no hay correo configurado.",
+    }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function crearUsuarioManualAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const rol = rolDe(String(formData.get("rol") || ""))
+  if (!rol) return { ok: false, error: "Elija el rol." }
+  try {
+    await crearUsuarioManual(actor, {
+      name: String(formData.get("name") || ""),
+      email: String(formData.get("email") || ""),
+      password: String(formData.get("password") || ""),
+      rol,
+      areaId: String(formData.get("areaId") || ""),
+      areaIds: lista(formData, "areaIds"),
+      empresaIds: lista(formData, "empresaIds"),
+      teams: equiposDe(formData),
+      active: formData.get("active") !== "0",
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Usuario creado." }
+}
+
+export async function generarRestablecimientoAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    const result = await generarRestablecimiento(actor, String(formData.get("userId") || ""))
+    return {
+      ok: true,
+      enlace: result.enlace,
+      message: result.enviado ? "Enlace creado y enviado por correo." : "Enlace creado. Cópielo: no hay correo configurado.",
+    }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function sincronizarPerfilAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await sincronizarPerfil(actor, String(formData.get("userId") || ""), {
+      empresaIds: lista(formData, "empresaIds"),
+      areaIds: lista(formData, "areaIds"),
+      pendiente: formData.get("pendiente") === "1",
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: formData.get("pendiente") === "1" ? "La cuenta quedó pendiente." : "Cuenta actualizada." }
 }
 
 export async function entrarComo(formData: FormData) {
@@ -207,11 +385,17 @@ export async function actualizarUsuarioAction(formData: FormData): Promise<Actio
     }
   }
   try {
-    await guardarRoles(actor, String(formData.get("userId") || ""), {
+    const userId = String(formData.get("userId") || "")
+    await guardarRoles(actor, userId, {
       isAdmin: formData.get("isAdmin") === "1",
       active: formData.get("active") === "1",
       areaId: String(formData.get("areaId") || ""),
       memberships,
+    })
+    await sincronizarPerfil(actor, userId, {
+      empresaIds: lista(formData, "empresaIds"),
+      areaIds: lista(formData, "areaIds"),
+      pendiente: formData.get("pendiente") === "1",
     })
   } catch (error) {
     return fallo(error)

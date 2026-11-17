@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0 -p 38471",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 38471",
+    "start": "next start -H 0.0.0.0",
+    "create-admin": "tsx scripts/create-admin.ts",
     "lint": "eslint",
     "test": "DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test prisma migrate deploy && vitest run",
     "db:deploy": "prisma migrate deploy",
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "lucide-react": "^1.72.0",
@@ -38,6 +40,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/luxon": "^3.7.6",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",

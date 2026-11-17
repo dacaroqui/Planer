@@ -26,7 +26,7 @@ npm run dev
 
 La mesa queda en [http://127.0.0.1:38471](http://127.0.0.1:38471).
 
-`db:setup` aplica las migraciones y carga usuarios ficticios. No hay contraseñas: en la pantalla de ingreso elija un perfil de ejemplo.
+`db:setup` aplica las migraciones. Los usuarios ficticios solo se cargan si `SEED_DEMO=true`. En desarrollo, con `DEV_AUTH_ENABLED=true`, la pantalla de ingreso también ofrece esos perfiles sin contraseña. En producción el ingreso es correo y contraseña.
 
 | Correo | Rol |
 | --- | --- |
@@ -50,26 +50,69 @@ npm test
 
 Cubren radicar, el consecutivo, la transición según el rol, el comentario, la nota interna, aprobar, devolver, el adjunto y el cálculo del SLA con festivos.
 
+## Producción sin Docker
+
+Hace falta un PostgreSQL accesible por `DATABASE_URL`. Detrás de un proxy o un túnel HTTPS, `APP_URL` y `AUTH_URL` deben ser la URL pública, con `https://`. La cookie de sesión sale `Secure` cuando esa URL es https. Auth.js confía en `X-Forwarded-Proto` y en el host (`trustHost`).
+
+```bash
+npm ci
+npx prisma migrate deploy
+npm run build
+```
+
+Variables mínimas antes de arrancar:
+
+```bash
+export DATABASE_URL=postgresql://usuario:clave@host:5432/requerimientos
+export APP_URL=https://mesa.ejemplo.com
+export AUTH_URL=https://mesa.ejemplo.com
+export AUTH_SECRET=$(openssl rand -base64 32)
+export ADMIN_EMAIL=admin@cifes.edu.co
+export ADMIN_PASSWORD='una-clave-de-8-o-mas'
+export DEV_AUTH_ENABLED=false
+export AUTH_ENTRA_ENABLED=false
+export SEED_DEMO=false
+export REGISTRO_PUBLICO=false
+export PORT=3000
+```
+
+```bash
+npm start
+```
+
+`npm start` escucha en `0.0.0.0` y en el puerto `PORT` (3000 si no se define). Al arrancar crea el catálogo y, si `ADMIN_EMAIL` no existe todavía, el administrador inicial. También puede crearlo antes, con la base ya migrada:
+
+```bash
+ADMIN_EMAIL=admin@cifes.edu.co ADMIN_PASSWORD='una-clave-de-8-o-mas' npm run create-admin
+```
+
+El primer ingreso es ese administrador. En Usuarios genera una invitación, copia el enlace y se lo entrega a la persona. El enlace vence en 7 días y solo sirve una vez. Microsoft 365 queda apagado salvo `AUTH_ENTRA_ENABLED=true`. El registro en `/registro` queda apagado salvo `REGISTRO_PUBLICO=true`.
+
 ## Docker
 
 ```bash
 docker compose up --build
 ```
 
-Ese único comando levanta PostgreSQL y la mesa en [http://127.0.0.1:3000](http://127.0.0.1:3000), aplica las migraciones y carga la semilla. No hace falta un archivo `.env`: Compose define `DEV_AUTH_ENABLED=true` y un secreto de demostración. Cambie `AUTH_SECRET` antes de salir de la máquina local. El desarrollo con `npm run dev` sigue en el puerto 38471.
+Ese comando es la demostración: levanta PostgreSQL y la mesa en [http://127.0.0.1:3000](http://127.0.0.1:3000), aplica las migraciones y, porque Compose define `SEED_DEMO=true`, carga los datos ficticios. También deja `DEV_AUTH_ENABLED=true`. Cada arranque reemplaza esa demostración. El desarrollo con `npm run dev` sigue en el puerto 38471. Para una base limpia no use este Compose: siga «Producción sin Docker» y deje `SEED_DEMO` sin definir.
 
 ## Variables de entorno
 
 | Variable | Uso |
 | --- | --- |
 | `DATABASE_URL` | Conexión de PostgreSQL. |
-| `APP_URL` y `AUTH_URL` | Dirección pública. Los correos arman el enlace con `APP_URL`. |
+| `APP_URL` y `AUTH_URL` | URL pública, la misma. Los enlaces salen de `APP_URL`. Si empieza por `https://`, la cookie de sesión es `Secure`. |
 | `AUTH_SECRET` | Firma de la sesión. Cámbielo fuera de su máquina. |
-| `AUTH_MICROSOFT_ENTRA_ID_ID` | Id de aplicación (cliente) en Entra ID. |
+| `ADMIN_EMAIL` y `ADMIN_PASSWORD` | Crean el primer administrador si ese correo no existe. |
+| `AUTH_ENTRA_ENABLED` | `true` activa Microsoft 365. Por defecto queda apagado. |
+| `AUTH_MICROSOFT_ENTRA_ID_ID` | Id de aplicación en Entra ID. Solo si Entra está activo. |
 | `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Secreto de esa aplicación. |
-| `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Id de directorio del tenant cifes.edu.co. El issuer queda en `https://login.microsoftonline.com/<tenant>/v2.0` y no acepta otras organizaciones. |
-| `AUTH_ALLOWED_EMAIL_DOMAIN` | Dominio permitido. Por defecto `cifes.edu.co`. |
-| `DEV_AUTH_ENABLED` | `true` solo en desarrollo. Habilita el ingreso sin contraseña. En producción déjelo en `false`. |
+| `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Id de directorio. El issuer queda en `https://login.microsoftonline.com/<tenant>/v2.0`. |
+| `AUTH_ALLOWED_EMAIL_DOMAIN` | Dominios permitidos, separados por coma. Por defecto `cifes.edu.co`. |
+| `DEV_AUTH_ENABLED` | `true` solo en desarrollo. En producción déjelo en `false`. |
+| `SEED_DEMO` | `true` borra la base y carga la demostración. |
+| `REGISTRO_PUBLICO` | `true` abre `/registro`. Por defecto está apagado. |
+| `PORT` | Puerto de `npm start`. Por defecto 3000. |
 | `EMAIL_PROVIDER` | `console` escribe el correo en la salida del proceso. `smtp` usa las variables SMTP. |
 | `EMAIL_FROM` | Remitente. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | Servidor de correo, solo si el proveedor es `smtp`. |
@@ -78,9 +121,9 @@ Ese único comando levanta PostgreSQL y la mesa en [http://127.0.0.1:3000](http:
 | `SLA_RISK_RATIO` | A partir de qué fracción del plazo el semáforo pasa a «en riesgo». Por defecto `0.75`. |
 | `CRON_SECRET` | Protege `POST /api/cron/sla`. En producción es obligatorio. Envíe `Authorization: Bearer <secreto>`. |
 
-La URL de retorno de Microsoft es `{AUTH_URL}/api/auth/callback/microsoft-entra-id`.
+La URL de retorno de Microsoft, solo si `AUTH_ENTRA_ENABLED=true`, es `{AUTH_URL}/api/auth/callback/microsoft-entra-id`.
 
-Quien entra por primera vez con una cuenta válida del dominio queda como solicitante, en el área Académico si existe. El administrador cambia el rol después.
+El administrador inicial entra con `ADMIN_EMAIL`. Las demás personas entran por una invitación. El registro propio y Microsoft 365 no se usan mientras sus flags estén apagados.
 
 ## SLA y festivos
 

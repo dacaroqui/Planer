@@ -1,11 +1,20 @@
-import NextAuth from "next-auth"
+import NextAuth, { CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
 import type { Provider } from "next-auth/providers"
 import { authConfig } from "@/auth.config"
 import { evaluarIngreso } from "@/lib/access"
+import { entraHabilitado } from "@/lib/cuentas"
 import { prisma } from "@/lib/prisma"
 import { isInternalEmail } from "@/lib/time"
+import { intentarIngreso } from "@/server/cuentas"
+
+class IngresoDenegado extends CredentialsSignin {
+  constructor(code: string) {
+    super()
+    this.code = code
+  }
+}
 
 export function modoAuth() {
   const id = Boolean(process.env.AUTH_MICROSOFT_ENTRA_ID_ID)
@@ -13,8 +22,8 @@ export function modoAuth() {
   const tenant = Boolean(process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID)
   return {
     dev: process.env.DEV_AUTH_ENABLED === "true",
-    entra: id && secret && tenant,
-    entraIncompleto: (id || secret || tenant) && !(id && secret && tenant),
+    entra: entraHabilitado() && id && secret && tenant,
+    entraIncompleto: entraHabilitado() && (id || secret || tenant) && !(id && secret && tenant),
   }
 }
 
@@ -32,6 +41,20 @@ async function areaInicial() {
 
 const providers: Provider[] = []
 const modo = modoAuth()
+
+providers.push(Credentials({
+  id: "credenciales",
+  name: "Correo y contraseña",
+  credentials: {
+    email: { label: "Correo", type: "email" },
+    password: { label: "Contraseña", type: "password" },
+  },
+  authorize: async (credentials) => {
+    const result = await intentarIngreso(String(credentials?.email || ""), String(credentials?.password || ""))
+    if (!result.ok) throw new IngresoDenegado(result.code)
+    return { id: result.id, email: result.email, name: result.name }
+  },
+}))
 
 if (modo.entra) {
   providers.push(MicrosoftEntraID({
@@ -69,6 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const entra = account?.provider === "microsoft-entra-id"
       const decision = evaluarIngreso(email, existing, { aprovisionar: entra })
       if (!decision.ok) return false
+      if (existing?.pendiente) return false
       if (entra && !existing) {
         const area = await areaInicial()
         if (!area) return false

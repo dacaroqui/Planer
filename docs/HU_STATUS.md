@@ -29,7 +29,7 @@ Códigos y títulos oficiales de `HUs_Plataforma_Requerimientos.xlsx`. El PM hac
 | RQ-32 | Consultar un dashboard de gestión | Hecho | Abiertos por estado, creadas contra resueltas, cumplimiento y vencidos. El clic abre la lista. |
 | RQ-35 | Configurar estados y transiciones por área | Hecho | Tabla en Flujos y SLA. Borrar un estado con casos exige moverlos antes. |
 | RQ-36 | Administrar áreas, tipos, prioridades, marcas y campos | Hecho | Tipos nuevos aparecen en el formulario. Desactivar los oculta sin borrarlos de lo ya radicado. Marcas: CIFES, Luvania y Ambas/Transversal. |
-| RQ-38 | Iniciar sesión con la cuenta de Microsoft 365 | Hecho | Entra ID del tenant y rechazo de otro dominio. Una cuenta deshabilitada en Microsoft no obtiene token. |
+| RQ-38 | Iniciar sesión con la cuenta de Microsoft 365 | Fase 2 | Queda detrás de `AUTH_ENTRA_ENABLED`, desactivado por defecto. El ingreso de producción es correo y contraseña. |
 | RQ-44 | Respaldar y restaurar la información | Hecho | `scripts/respaldo.sh` cifra base y adjuntos, guarda 30 diarios y 12 mensuales. `scripts/restaurar.sh` recupera. |
 | RQ-46 | Gestionar empresas | Hecho | CIFES y Luvania son la semilla. Un líder o el administrador crea empresas y puede exigir proyecto al clasificar. La marca se conserva. |
 | RQ-47 | Gestionar proyectos por empresa | Hecho | Nombre, descripción, responsable, fechas y estado. El proyecto es opcional al radicar y obligatorio al clasificar si la empresa lo exige. |
@@ -37,6 +37,11 @@ Códigos y títulos oficiales de `HUs_Plataforma_Requerimientos.xlsx`. El PM hac
 | RQ-49 | Gestionar tareas del requerimiento/proyecto | Hecho | Título, responsable, fecha límite y estado Pendiente, En curso o Hecha. Marcar hecha queda en el historial y mueve el avance. |
 | RQ-50 | Segmentar lista, tablero y dashboard por empresa y proyecto | Hecho | Los tres filtros existen. El dashboard muestra el avance de cada proyecto del corte. |
 | RQ-51 | Gestionar subtareas en Planner | Hecho | Planner es un tablero Pendiente / En curso / Hecha, agrupado por proyecto. Cada tarea tiene una lista de subtareas con responsable, fecha y estado. El % de la tarea sale de esas subtareas. |
+| RQ-52 | Ingreso con correo y contraseña | Hecho | Contraseña con bcrypt, cookie httpOnly y SameSite, Secure si la URL es https. Tras 5 fallos la cuenta queda bloqueada 15 minutos. Hay cierre de sesión. |
+| RQ-53 | Crear usuarios y asignar roles manualmente | Hecho | El administrador crea nombre, correo, contraseña, empresas, áreas y rol. Puede activar, desactivar y aprobar. Queda en auditoría. |
+| RQ-54 | Invitar por enlace | Hecho | Enlace de un solo uso, 7 días, rol preasignado. Se copia en pantalla y, si hay SMTP, también se envía. |
+| RQ-55 | Registro propio con aprobación | Hecho | Página `/registro` apagada salvo `REGISTRO_PUBLICO=true`. El alta queda pendiente, con rol Solicitante, hasta que un administrador la apruebe. |
+| RQ-56 | Recuperar contraseña | Hecho | Con SMTP el enlace sale por correo. Sin SMTP, el administrador lo genera para copiarlo. Vence a las 24 horas y es de un solo uso. |
 
 ## Adelantado (Fase 2)
 

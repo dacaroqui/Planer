@@ -17,12 +17,23 @@ async function limpiar() {
   await prisma.request.deleteMany()
   await prisma.proyecto.deleteMany()
   await prisma.codeSequence.deleteMany()
+  await prisma.invitacion.deleteMany()
+  await prisma.restablecimiento.deleteMany()
+  await prisma.usuarioEmpresa.deleteMany()
+  await prisma.usuarioArea.deleteMany()
   await prisma.areaRole.deleteMany()
   await prisma.user.deleteMany()
   await prisma.area.deleteMany()
 }
 
 async function main() {
+  if (process.env.SEED_DEMO !== "true") {
+    await asegurarCatalogo(prisma)
+    const { asegurarAdminInicial } = await import("../src/server/admin-inicial")
+    await asegurarAdminInicial()
+    console.log("Catálogo listo. SEED_DEMO no está activo: no se cargan datos de demostración.")
+    return
+  }
   await limpiar()
   await asegurarCatalogo(prisma)
   const nombres = ["Académico", "Admisiones", "Clínica Luvania", "Tecnología", "Mercadeo", "Dirección"]

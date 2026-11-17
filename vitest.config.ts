@@ -12,6 +12,7 @@ export default defineConfig({
       AUTH_SECRET: "test-secret-test-secret-test-secret-32",
       AUTH_ALLOWED_EMAIL_DOMAIN: "cifes.edu.co",
       DEV_AUTH_ENABLED: "true",
+      BCRYPT_ROUNDS: "4",
       EMAIL_PROVIDER: "console",
     },
   },

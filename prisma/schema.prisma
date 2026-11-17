@@ -21,13 +21,14 @@ enum Team {
 }
 
 model Area {
-  id               String    @id @default(cuid())
-  name             String    @unique
-  active           Boolean   @default(true)
-  allowSelfAssign  Boolean   @default(true)
+  id               String        @id @default(cuid())
+  name             String        @unique
+  active           Boolean       @default(true)
+  allowSelfAssign  Boolean       @default(true)
   users            User[]
+  miembros         UsuarioArea[]
   requests         Request[]
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime      @default(now())
 }
 
 model RequestType {
@@ -63,10 +64,18 @@ model User {
   team          Team?
   areaId        String
   area          Area           @relation(fields: [areaId], references: [id])
-  active        Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  areaRoles     AreaRole[]
+  active         Boolean          @default(true)
+  pendiente      Boolean          @default(false)
+  passwordHash   String?
+  failedAttempts Int              @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  areaRoles      AreaRole[]
+  empresas       UsuarioEmpresa[]
+  areasExtra     UsuarioArea[]
+  invitaciones   Invitacion[]
+  restablecimientos Restablecimiento[]
   requested     Request[]      @relation("Requester")
   assigned      Request[]      @relation("Assignee")
   comments      Comment[]
@@ -86,7 +95,55 @@ model Empresa {
   exigirProyectoAlClasificar   Boolean    @default(false)
   projects                     Proyecto[]
   requests                     Request[]
+  usuarios                     UsuarioEmpresa[]
   createdAt                    DateTime   @default(now())
+}
+
+model UsuarioEmpresa {
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, empresaId])
+}
+
+model UsuarioArea {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, areaId])
+}
+
+model Invitacion {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  email        String
+  role         Role      @default(SOLICITANTE)
+  areaId       String?
+  areaIds      String    @default("")
+  empresaIds   String    @default("")
+  memberships  String    @default("")
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdById  String
+  createdBy    User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+
+  @@index([email])
+}
+
+model Restablecimiento {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
 }
 
 enum EstadoProyecto {

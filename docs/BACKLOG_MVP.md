@@ -37,6 +37,11 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 2
 | RQ-49 | Gestionar tareas del requerimiento/proyecto | Pedido del dueño |
 | RQ-50 | Segmentar lista, tablero y dashboard por empresa y proyecto | Pedido del dueño |
 | RQ-51 | Gestionar subtareas en Planner | Pedido del dueño |
+| RQ-52 | Ingreso con correo y contraseña | Pedido del dueño |
+| RQ-53 | Crear usuarios y asignar roles manualmente | Pedido del dueño |
+| RQ-54 | Invitar por enlace | Pedido del dueño |
+| RQ-55 | Registro propio con aprobación | Pedido del dueño |
+| RQ-56 | Recuperar contraseña | Pedido del dueño |
 
 ## Criterios de RQ-46 a RQ-51
 
@@ -51,5 +56,17 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 2
 **RQ-50.** Dado la lista, el tablero y el dashboard, cuando filtro por empresa o proyecto, entonces solo queda ese corte. Dado el dashboard, cuando elijo una empresa, entonces veo el avance de cada proyecto.
 
 **RQ-51.** Dado Planner, cuando lo abro, entonces veo columnas Pendiente, En curso y Hecha, agrupadas por proyecto, y puedo filtrar por empresa, proyecto y responsable. Dado una tarea, cuando agrego subtareas con responsable, fecha y estado, entonces el porcentaje de la tarea es subtareas hechas sobre el total.
+
+## Criterios de RQ-52 a RQ-56
+
+**RQ-52.** Dado un usuario activo con contraseña, cuando escribe correo y contraseña correctos, entonces entra y la cookie de sesión es httpOnly. Dado cinco contraseñas incorrectas, cuando intenta de nuevo, entonces la cuenta queda bloqueada 15 minutos. Dado que cierra sesión, cuando vuelve, entonces debe identificarse otra vez.
+
+**RQ-53.** Dado el administrador, cuando crea un usuario, entonces indica nombre, correo, empresas, áreas y rol, y el cambio queda en auditoría. Dado que lo desactiva, cuando esa persona intenta entrar, entonces la mesa no abre la sesión.
+
+**RQ-54.** Dado el administrador, cuando invita, entonces recibe un enlace para copiar, de un solo uso y con vencimiento a los 7 días, con el rol ya elegido. Dado el invitado, cuando abre el enlace y define nombre y contraseña, entonces la cuenta queda activa con ese rol. Si SMTP está configurado, el mismo enlace también sale por correo.
+
+**RQ-55.** Dado que `REGISTRO_PUBLICO` no es `true`, cuando alguien abre `/registro`, entonces no puede crear una cuenta. Dado que el flag está activo y el dominio está permitido, cuando se registra, entonces queda pendiente de aprobación con rol Solicitante hasta que un administrador lo apruebe.
+
+**RQ-56.** Dado SMTP configurado, cuando la persona pide recuperar la contraseña, entonces recibe un enlace. Dado que no hay SMTP, cuando el administrador genera el restablecimiento, entonces puede copiar el enlace. El enlace vence a las 24 horas y no sirve una segunda vez.
 
 RQ-07, RQ-15, RQ-16, RQ-18, RQ-19, RQ-23, RQ-24, RQ-27, RQ-31, RQ-33, RQ-34, RQ-37, RQ-39, RQ-40, RQ-41, RQ-42, RQ-43 y RQ-45 no son MVP.

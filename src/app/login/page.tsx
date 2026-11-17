@@ -1,15 +1,27 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { auth, modoAuth } from "@/auth"
-import { entrarComo, entrarConMicrosoft } from "@/server/actions"
+import { entrarComo, entrarConClave, entrarConMicrosoft, solicitarRestablecimientoAction } from "@/server/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ROLE_LABEL, type RoleName } from "@/lib/domain"
+import { registroPublicoHabilitado } from "@/lib/cuentas"
+import { correoSmtpActivo } from "@/lib/email"
 import { prisma } from "@/lib/prisma"
 
 const ERRORES: Record<string, string> = {
-  AccessDenied: "Esa cuenta no puede entrar. Debe ser un usuario activo de @cifes.edu.co.",
-  Configuration: "El ingreso institucional no está configurado.",
-  CredentialsSignin: "No encontramos ese usuario de prueba.",
+  AccessDenied: "Esa cuenta no puede entrar. Debe estar activa y aprobada.",
+  Configuration: "El ingreso no está configurado.",
+  CredentialsSignin: "Correo o contraseña incorrectos.",
+  credenciales: "Correo o contraseña incorrectos.",
+  bloqueado: "Demasiados intentos. La cuenta queda bloqueada 15 minutos.",
+  inactivo: "La cuenta está inactiva. Pida al administrador que la reactive.",
+  pendiente: "La cuenta está pendiente de aprobación.",
+  restablecida: "Contraseña actualizada. Ya puede ingresar.",
+  enviado: "Si el correo está registrado, enviamos un enlace para restablecer la contraseña.",
+  smtp: "El correo no está configurado. Pida el enlace al administrador.",
   OAuthSignin: "Microsoft no completó el ingreso. Intente de nuevo.",
   OAuthCallback: "Microsoft no completó el ingreso. Intente de nuevo.",
   Default: "No se pudo iniciar sesión.",
@@ -18,13 +30,15 @@ const ERRORES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; code?: string }>
 }) {
   const session = await auth()
   if (session?.user?.email) redirect("/panel")
   const params = await searchParams
   const modo = modoAuth()
-  const error = params.error ? ERRORES[params.error] ?? ERRORES.Default : null
+  const codigo = params.code || params.error
+  const error = codigo ? ERRORES[codigo] ?? ERRORES.Default : null
+  const aviso = codigo === "restablecida" || codigo === "enviado"
   const usuarios = modo.dev
     ? await prisma.user.findMany({ where: { active: true }, orderBy: [{ role: "asc" }, { name: "asc" }] })
     : []
@@ -45,19 +59,38 @@ export default async function LoginPage({
         <div className="mx-auto w-full max-w-md space-y-6">
           <div>
             <h2 className="font-heading text-3xl">Ingresar</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Use la cuenta institucional. En desarrollo puede entrar con un usuario de ejemplo, sin contraseña.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Use el correo y la contraseña de la mesa. Si todavía no tiene cuenta, pida una invitación al administrador.</p>
           </div>
-          {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">{error}</p> : null}
+          {error ? (
+            <p className={`rounded-lg px-3 py-2 text-sm ${aviso ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>{error}</p>
+          ) : null}
+          <form action={entrarConClave} className="grid gap-3">
+            <div className="grid gap-1">
+              <Label htmlFor="email">Correo</Label>
+              <Input id="email" name="email" type="email" autoComplete="username" required />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input id="password" name="password" type="password" autoComplete="current-password" required />
+            </div>
+            <Button type="submit" size="lg">Ingresar</Button>
+          </form>
+          {correoSmtpActivo() ? (
+            <form action={solicitarRestablecimientoAction} className="grid gap-2">
+              <Label htmlFor="recuperar">Olvidó la contraseña</Label>
+              <Input id="recuperar" name="email" type="email" required placeholder="Su correo" />
+              <Button type="submit" variant="outline">Enviar enlace</Button>
+            </form>
+          ) : (
+            <p className="text-sm text-muted-foreground">Si olvidó la contraseña, pida al administrador un enlace de restablecimiento.</p>
+          )}
+          {registroPublicoHabilitado() ? <Link href="/registro" className="text-sm underline">Solicitar una cuenta</Link> : null}
           {modo.entra ? (
             <form action={entrarConMicrosoft}>
               <Button type="submit" size="lg" className="w-full">Ingresar con Microsoft 365</Button>
             </form>
           ) : (
-            <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-              {modo.entraIncompleto
-                ? "Faltan variables de Entra ID. Revise el identificador, el secreto y el tenant."
-                : "El ingreso con Microsoft no está configurado en este entorno."}
-            </p>
+            null
           )}
           {modo.dev && usuarios.length > 0 ? (
             <Card>

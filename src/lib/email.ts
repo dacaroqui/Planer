@@ -38,6 +38,10 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 }
 
+export function correoSmtpActivo() {
+  return process.env.EMAIL_PROVIDER === "smtp" && Boolean(process.env.SMTP_HOST)
+}
+
 export function createEmailProvider(): EmailProvider {
   if (process.env.EMAIL_PROVIDER === "smtp") return new SmtpEmailProvider()
   if (process.env.EMAIL_PROVIDER === "memory") return new MemoryEmailProvider()

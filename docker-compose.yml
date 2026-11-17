@@ -26,6 +26,9 @@ services:
       AUTH_SECRET: demo-mesa-cifes-luvania-cambie-esto
       AUTH_ALLOWED_EMAIL_DOMAIN: cifes.edu.co
       DEV_AUTH_ENABLED: "true"
+      SEED_DEMO: "true"
+      AUTH_ENTRA_ENABLED: "false"
+      REGISTRO_PUBLICO: "false"
       EMAIL_PROVIDER: console
       PORT: "3000"
     depends_on:

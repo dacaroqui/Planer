@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
+import { BotonRestablecer } from "@/components/acceso-admin"
 import { actualizarTipoAction, actualizarUsuarioAction, crearAreaAction, crearTipoAction } from "@/server/actions"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -15,6 +16,7 @@ const ROLES_AREA = ["AGENTE", "LIDER", "OBSERVADOR"] as const
 export function EditorUsuario({
   user,
   areas,
+  empresas,
 }: {
   user: {
     id: string
@@ -22,14 +24,21 @@ export function EditorUsuario({
     email: string
     areaId: string
     active: boolean
+    pendiente: boolean
     isAdmin: boolean
+    empresaIds: string[]
+    areaIds: string[]
     memberships: { team: TeamName; role: "AGENTE" | "LIDER" | "OBSERVADOR" }[]
   }
   areas: { id: string; name: string }[]
+  empresas: { id: string; name: string }[]
 }) {
   const [areaId, setAreaId] = useState(user.areaId)
   const [active, setActive] = useState(user.active)
+  const [pendiente, setPendiente] = useState(user.pendiente)
   const [isAdmin, setIsAdmin] = useState(user.isAdmin)
+  const [empresaIds, setEmpresaIds] = useState<string[]>(user.empresaIds)
+  const [areaIds, setAreaIds] = useState<string[]>(user.areaIds)
   const [marks, setMarks] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {}
     for (const item of user.memberships) initial[`${item.role}:${item.team}`] = true
@@ -47,7 +56,10 @@ export function EditorUsuario({
         data.set("userId", user.id)
         data.set("areaId", areaId)
         data.set("active", active ? "1" : "0")
+        data.set("pendiente", pendiente ? "1" : "0")
         data.set("isAdmin", isAdmin ? "1" : "0")
+        for (const id of empresaIds) data.append("empresaIds", id)
+        for (const id of areaIds) data.append("areaIds", id)
         for (const [key, value] of Object.entries(marks)) if (value) data.set(key, "1")
         start(async () => {
           const result = await actualizarUsuarioAction(data)
@@ -61,7 +73,7 @@ export function EditorUsuario({
     >
       <div>
         <p className="font-medium">{user.name}</p>
-        <p className="text-xs text-muted-foreground">{user.email}</p>
+        <p className="text-xs text-muted-foreground">{user.email}{user.pendiente ? " · Pendiente de aprobación" : ""}</p>
       </div>
       <Select value={areaId} onValueChange={setAreaId}>
         <SelectTrigger className="w-full" aria-label="Área del perfil"><SelectValue /></SelectTrigger>
@@ -86,7 +98,27 @@ export function EditorUsuario({
         ))}
       </div>
       <label className="flex items-center gap-2 text-sm"><Checkbox checked={isAdmin} onCheckedChange={(value) => setIsAdmin(value === true)} />Administrador</label>
+      <fieldset className="grid gap-1">
+        <legend className="text-xs text-muted-foreground">Empresas</legend>
+        {empresas.map((empresa) => (
+          <label key={empresa.id} className="flex items-center gap-2 text-sm">
+            <Checkbox checked={empresaIds.includes(empresa.id)} onCheckedChange={(value) => setEmpresaIds((prev) => value === true ? [...prev, empresa.id] : prev.filter((id) => id !== empresa.id))} />
+            {empresa.name}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset className="grid gap-1">
+        <legend className="text-xs text-muted-foreground">Áreas adicionales</legend>
+        {areas.map((area) => (
+          <label key={area.id} className="flex items-center gap-2 text-sm">
+            <Checkbox checked={areaIds.includes(area.id)} onCheckedChange={(value) => setAreaIds((prev) => value === true ? [...prev, area.id] : prev.filter((id) => id !== area.id))} />
+            {area.name}
+          </label>
+        ))}
+      </fieldset>
+      <label className="flex items-center gap-2 text-sm"><Checkbox checked={pendiente} onCheckedChange={(value) => setPendiente(value === true)} />Pendiente de aprobación</label>
       <label className="flex items-center gap-2 text-sm"><Checkbox checked={active} onCheckedChange={(value) => setActive(value === true)} />Usuario activo</label>
+      <BotonRestablecer userId={user.id} />
       {error ? <p className="text-sm text-red-800">{error}</p> : null}
       <div><Button type="submit" size="sm" disabled={pending}>Guardar roles</Button></div>
     </form>

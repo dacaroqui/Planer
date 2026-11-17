@@ -1050,7 +1050,7 @@ export async function catalogos() {
   const [areas, types, users, marcas, prioridades, politicas, estados, transiciones, auditoria] = await Promise.all([
     prisma.area.findMany({ orderBy: { name: "asc" } }),
     prisma.requestType.findMany({ orderBy: [{ team: "asc" }, { name: "asc" }] }),
-    prisma.user.findMany({ include: { area: true, areaRoles: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({ include: { area: true, areaRoles: true, empresas: true, areasExtra: true }, orderBy: { name: "asc" } }),
     prisma.catalogItem.findMany({ where: { kind: "MARCA" }, orderBy: { sortOrder: "asc" } }),
     prisma.catalogItem.findMany({ where: { kind: "PRIORIDAD" }, orderBy: { sortOrder: "asc" } }),
     prisma.slaPolicy.findMany({ include: { type: true }, orderBy: [{ team: "asc" }, { priority: "asc" }] }),
