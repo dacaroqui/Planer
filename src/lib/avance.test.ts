@@ -52,4 +52,15 @@ describe("RQ-48 RQ-49 RQ-51 avance", () => {
     ], "EN_ANALISIS")
     expect(avance.porcentaje).toBe(50)
   })
+
+  it("un requerimiento abierto no llega a 100 aunque las tareas estén hechas", () => {
+    const abierto = avanceDesdeLista([
+      { id: "raiz", status: "HECHA", parentId: null },
+    ], "EN_PRODUCCION")
+    expect(abierto.porcentaje).toBe(99)
+    const cerrado = avanceDesdeLista([
+      { id: "raiz", status: "HECHA", parentId: null },
+    ], "CERRADO")
+    expect(cerrado.porcentaje).toBe(100)
+  })
 })

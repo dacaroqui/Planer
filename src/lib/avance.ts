@@ -9,6 +9,13 @@ export type Avance = {
 
 export const TEXTO_AVANCE = "El porcentaje del proyecto es el promedio del avance de sus tareas y del porcentaje de requerimientos cerrados. Solo entra lo que exista. Si queda algún requerimiento abierto, el proyecto no llega a 100 %."
 
+export const TEXTO_AVANCE_REQUERIMIENTO = "Un requerimiento abierto no llega a 100 %. El 100 % queda al cerrarlo."
+
+function topeSiAbierto(porcentaje: number, status: string) {
+  if (!CERRADOS.has(status) && porcentaje >= 100) return 99
+  return porcentaje
+}
+
 export type TareaConSubtareas = { status: string; subtareas?: { status: string }[] }
 
 export function porcentajeTarea(tarea: TareaConSubtareas) {
@@ -41,7 +48,7 @@ export function avanceRequerimiento(tareas: { id?: string; status: string; paren
     return {
       hechas: porcentajes.filter((valor) => valor === 100).length,
       total: raices.length,
-      porcentaje: Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length),
+      porcentaje: topeSiAbierto(Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length), status),
       fuente: "tareas",
     }
   }
@@ -67,7 +74,7 @@ export function avanceDesdeLista(tareas: { id: string; status: string; parentId?
   return {
     hechas: porcentajes.filter((valor) => valor === 100).length,
     total: grupos.length,
-    porcentaje: Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length),
+    porcentaje: topeSiAbierto(Math.round(porcentajes.reduce((suma, valor) => suma + valor, 0) / porcentajes.length), status),
     fuente: "tareas",
   }
 }
