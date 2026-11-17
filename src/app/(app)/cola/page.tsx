@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { EstadoBadge } from "@/components/insignias"
 import { formatDateTime } from "@/lib/format"
+import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 import { esAdmin, rolEn } from "@/lib/permissions"
 import { requireActor } from "@/server/session"
 import { listar } from "@/server/requests"
@@ -41,7 +42,7 @@ export default async function ColaPage() {
               <EstadoBadge status={item.status} />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {item.code} · {item.priority} · {item.brand} · {formatDateTime(item.createdAt)}
+              {item.code} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority} · {BRAND_LABEL[item.brand as BrandName] ?? item.brand} · {formatDateTime(item.createdAt)}
             </p>
           </Link>
         ))}

@@ -7,7 +7,8 @@ import { formatDate } from "@/lib/format"
 import { puedeCrearProyecto, puedeGestionarTareas, detalleProyecto } from "@/server/proyectos"
 import { requireActor } from "@/server/session"
 import { prisma } from "@/lib/prisma"
-import { tareaVencida } from "@/lib/avance"
+import { TEXTO_AVANCE, tareaVencida } from "@/lib/avance"
+import { NombreMiga } from "@/components/migas"
 
 const ESTADO = { PLANIFICADO: "Planificado", EN_CURSO: "En curso", EN_PAUSA: "En pausa", CERRADO: "Cerrado" }
 
@@ -24,6 +25,7 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
   const puede = puedeCrearProyecto(actor) || actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")
   return (
     <div className="space-y-6">
+      <NombreMiga nombre={proyecto.name} />
       <Link href="/proyectos" className="text-sm text-muted-foreground hover:underline">Volver a proyectos</Link>
       <div>
         <p className="text-sm text-muted-foreground">{proyecto.empresa.name} · {ESTADO[proyecto.status]}</p>
@@ -37,7 +39,7 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
           <span className="text-sm font-medium">{proyecto.avance.porcentaje}%</span>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          {proyecto.avance.fuente === "tareas" ? "Calculado con las tareas." : proyecto.avance.fuente === "requerimientos" ? "Sin tareas: calculado con requerimientos cerrados." : "Aún no hay trabajo asociado."}
+          {proyecto.avance.fuente === "vacio" ? "Aún no hay trabajo asociado." : TEXTO_AVANCE}
         </p>
       </div>
       <section className="rounded-xl border border-border bg-card p-4">

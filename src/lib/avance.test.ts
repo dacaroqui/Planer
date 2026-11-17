@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { avanceProyecto, porcentajeTarea } from "@/lib/avance"
+import { TEXTO_AVANCE, avanceDesdeLista, avanceProyecto, porcentajeTarea } from "@/lib/avance"
 
 describe("RQ-48 RQ-49 RQ-51 avance", () => {
   it("calcula el porcentaje de la tarea con sus subtareas", () => {
@@ -41,5 +41,15 @@ describe("RQ-48 RQ-49 RQ-51 avance", () => {
       requerimientos: [{ status: "NUEVO" }],
     })
     expect(tope.porcentaje).toBeLessThan(100)
+    expect(TEXTO_AVANCE).toMatch(/promedio/)
+  })
+
+  it("el detalle usa el mismo porcentaje que Planner, contando las subtareas", () => {
+    const avance = avanceDesdeLista([
+      { id: "raiz", status: "EN_CURSO", parentId: null },
+      { id: "hecha", status: "HECHA", parentId: "raiz" },
+      { id: "pendiente", status: "PENDIENTE", parentId: "raiz" },
+    ], "EN_ANALISIS")
+    expect(avance.porcentaje).toBe(50)
   })
 })

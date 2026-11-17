@@ -1,10 +1,11 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 const NOMBRES: Record<string, string> = {
-  panel: "Panel",
+  panel: "Inicio",
   requerimientos: "Requerimientos",
   nuevo: "Radicar",
   tablero: "Tablero",
@@ -23,14 +24,26 @@ const NOMBRES: Record<string, string> = {
 
 export function Migas() {
   const path = usePathname()
+  const [nombre, setNombre] = useState("")
+  useEffect(() => {
+    function oir(event: Event) {
+      setNombre(String((event as CustomEvent<string>).detail || ""))
+    }
+    window.addEventListener("mesa-miga", oir)
+    return () => {
+      window.removeEventListener("mesa-miga", oir)
+    }
+  }, [path])
   const partes = path.split("/").filter(Boolean)
-  const migas = [{ href: "/panel", label: "Panel" }]
+  const migas = [{ href: "/panel", label: "Inicio" }]
   let acumulado = ""
-  for (const parte of partes) {
-    if (parte === "panel") continue
+  partes.forEach((parte, index) => {
+    if (parte === "panel") return
     acumulado += `/${parte}`
-    migas.push({ href: acumulado, label: NOMBRES[parte] ?? decodeURIComponent(parte) })
-  }
+    const conocida = NOMBRES[parte]
+    const ultima = index === partes.length - 1
+    migas.push({ href: acumulado, label: conocida ?? (ultima && nombre ? nombre : decodeURIComponent(parte)) })
+  })
   return (
     <nav aria-label="Miga de pan" className="mx-auto w-full max-w-6xl px-4 pt-4 text-sm text-muted-foreground md:px-8">
       <ol className="flex flex-wrap items-center gap-1">
@@ -46,4 +59,14 @@ export function Migas() {
       </ol>
     </nav>
   )
+}
+
+export function NombreMiga({ nombre }: { nombre: string }) {
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("mesa-miga", { detail: nombre }))
+    return () => {
+      window.dispatchEvent(new CustomEvent("mesa-miga", { detail: "" }))
+    }
+  }, [nombre])
+  return null
 }

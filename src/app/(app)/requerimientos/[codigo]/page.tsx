@@ -8,10 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { etiquetaDeAutor } from "@/lib/permissions"
 import { formatBytes, formatDate, formatDateTime } from "@/lib/format"
 import { formatDuration } from "@/lib/sla"
-import { editarCamposAction, trasladarAction } from "@/server/actions"
+import { trasladarAction } from "@/server/actions"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
 import { avanceDesdeLista, tareaVencida } from "@/lib/avance"
+import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
+import { RESOLUCION_LABEL } from "@/lib/flujo-oficial"
+import { FormularioClasificar } from "@/components/formulario-clasificar"
 import { puedeGestionarTareas } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
 
@@ -38,7 +41,7 @@ export default async function DetallePage({
     select: { id: true, name: true },
   })
   const tareasRaiz = request.tasks.filter((tarea) => !tarea.parentId)
-  const avance = avanceDesdeLista(tareasRaiz, request.status)
+  const avance = avanceDesdeLista(request.tasks, request.status)
   const ratio = Math.max(0, Math.min(100, Math.round(sla.ratio * 100)))
 
   return (
@@ -73,7 +76,7 @@ export default async function DetallePage({
                 {request.stepsToReproduce ? <p className="whitespace-pre-wrap"><span className="font-medium">Pasos. </span>{request.stepsToReproduce}</p> : null}
                 {request.channels ? <p><span className="font-medium">Canal. </span>{request.channels}</p> : null}
                 {request.expectedResult ? <p className="whitespace-pre-wrap"><span className="font-medium">Resultado esperado. </span>{request.expectedResult}</p> : null}
-                <p className="text-xs text-muted-foreground">Empresa es la entidad del caso ({request.empresa.name}). Marca es la línea de comunicación ({request.brand === "AMBAS" ? "Ambas/Transversal" : request.brand}).</p>
+                <p className="text-xs text-muted-foreground">Empresa es la entidad del caso ({request.empresa.name}). Marca es la línea de comunicación ({BRAND_LABEL[request.brand as BrandName] ?? request.brand}).</p>
               </CardContent>
             </Card>
           </section>
@@ -163,16 +166,16 @@ export default async function DetallePage({
             <CardHeader><CardTitle>Ficha</CardTitle></CardHeader>
             <CardContent className="grid gap-2 text-sm">
               <Fila etiqueta="Tipo" valor={request.type.name} />
-              <Fila etiqueta="Prioridad" valor={request.priority} />
-              {request.priority !== request.prioritySuggested ? <Fila etiqueta="Prioridad sugerida" valor={request.prioritySuggested} /> : null}
+              <Fila etiqueta="Prioridad" valor={PRIORITY_LABEL[request.priority as PriorityName] ?? request.priority} />
+              {request.priority !== request.prioritySuggested ? <Fila etiqueta="Prioridad sugerida" valor={PRIORITY_LABEL[request.prioritySuggested as PriorityName] ?? request.prioritySuggested} /> : null}
               <Fila etiqueta="Empresa" valor={request.empresa.name} />
               <Fila etiqueta="Proyecto" valor={request.project?.name ?? "Sin proyecto"} />
-              <Fila etiqueta="Marca" valor={request.brand === "AMBAS" ? "Ambas/Transversal" : request.brand} />
+              <Fila etiqueta="Marca" valor={BRAND_LABEL[request.brand as BrandName] ?? request.brand} />
               <Fila etiqueta="Área" valor={request.area.name} />
               <Fila etiqueta="Solicitante" valor={request.requester.name} />
               <Fila etiqueta="Asignado" valor={request.assignee?.name ?? "Sin asignar"} />
               <Fila etiqueta="Fecha deseada" valor={formatDate(request.desiredDate)} />
-              <Fila etiqueta="Resolución" valor={request.resolution || "—"} />
+              <Fila etiqueta="Resolución" valor={request.resolution ? (RESOLUCION_LABEL[request.resolution] ?? request.resolution) : "—"} />
               <Fila etiqueta="Fecha comprometida" valor={formatDate(request.committedDate)} />
             </CardContent>
           </Card>
@@ -180,29 +183,16 @@ export default async function DetallePage({
             <Card>
               <CardHeader><CardTitle>Clasificar</CardTitle></CardHeader>
               <CardContent>
-                <form action={editarCamposAction} className="grid gap-2 text-sm">
-                  <input type="hidden" name="code" value={request.code} />
-                  <select name="typeId" defaultValue={request.typeId} className="h-9 rounded-lg border border-input px-2" aria-label="Tipo">
-                    {tiposArea.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.name}</option>)}
-                  </select>
-                  <select name="priority" defaultValue={request.priority} className="h-9 rounded-lg border border-input px-2" aria-label="Prioridad">
-                    <option value="CRITICA">Crítica</option>
-                    <option value="ALTA">Alta</option>
-                    <option value="MEDIA">Media</option>
-                    <option value="BAJA">Baja</option>
-                  </select>
-                  <select name="projectId" defaultValue={request.projectId ?? ""} className="h-9 rounded-lg border border-input px-2" aria-label="Proyecto">
-                    <option value="">Sin proyecto</option>
-                    {proyectosEmpresa.map((proyecto) => <option key={proyecto.id} value={proyecto.id}>{proyecto.name}</option>)}
-                  </select>
-                  <select name="brand" defaultValue={request.brand} className="h-9 rounded-lg border border-input px-2" aria-label="Marca">
-                    <option value="CIFES">CIFES</option>
-                    <option value="LUVANIA">Luvania</option>
-                    <option value="AMBAS">Ambas/Transversal</option>
-                  </select>
-                  <input name="committedDate" type="date" lang="es-CO" defaultValue={request.committedDate ? request.committedDate.toISOString().slice(0, 10) : ""} className="h-9 rounded-lg border border-input px-2" aria-label="Fecha comprometida" />
-                  <button className="h-9 rounded-lg bg-secondary text-sm" type="submit">Guardar clasificación</button>
-                </form>
+                <FormularioClasificar
+                  code={request.code}
+                  typeId={request.typeId}
+                  priority={request.priority}
+                  projectId={request.projectId}
+                  brand={request.brand}
+                  committedDate={request.committedDate ? request.committedDate.toISOString().slice(0, 10) : ""}
+                  tipos={tiposArea.map((tipo) => ({ id: tipo.id, name: tipo.name }))}
+                  proyectos={proyectosEmpresa.map((proyecto) => ({ id: proyecto.id, name: proyecto.name }))}
+                />
                 {detail.canMove ? (
                   <form action={trasladarAction} className="mt-3">
                     <input type="hidden" name="code" value={request.code} />

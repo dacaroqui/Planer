@@ -42,7 +42,7 @@ export default async function ProyectosPage({
             <p className="mt-1 text-sm text-muted-foreground">Responsable: {proyecto.leader.name}</p>
             <div className="mt-3 flex items-center gap-3">
               <Barra porcentaje={proyecto.avance.porcentaje} />
-              <span className="text-sm font-medium">{proyecto.avance.porcentaje}%</span>
+              <span className="text-sm font-medium" title="El porcentaje es el promedio del avance de las tareas y de los requerimientos cerrados. Si hay un requerimiento abierto, no llega a 100 %.">{proyecto.avance.porcentaje}%</span>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               {proyecto.abiertos} requerimientos abiertos · {proyecto.cerrados} cerrados · {proyecto.pendientes} {proyecto.pendientes === 1 ? "tarea pendiente" : "tareas pendientes"} · {proyecto.hechas} {proyecto.hechas === 1 ? "hecha" : "hechas"}

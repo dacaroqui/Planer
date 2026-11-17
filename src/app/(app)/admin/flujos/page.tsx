@@ -3,6 +3,7 @@ import { guardarEstadoAction, guardarSlaAction, guardarTransicionAction } from "
 import { EliminarEstado } from "@/components/eliminar-estado"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PRIORITY_LABEL, type PriorityName } from "@/lib/domain"
 import { puedeAdministrar } from "@/lib/permissions"
 import { requireActor } from "@/server/session"
 import { catalogos } from "@/server/requests"
@@ -73,7 +74,7 @@ export default async function FlujosPage() {
         <h2 className="font-heading text-2xl">Metas de SLA</h2>
         {data.politicas.map((item) => (
           <p key={item.id} className="text-sm">
-            {item.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {item.priority}
+            {item.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority}
             {item.type ? ` · ${item.type.name}` : " · cualquier tipo"} · primera respuesta {item.firstResponseMinutes / 60} h · solución {item.resolutionMinutes / 60} h
           </p>
         ))}
