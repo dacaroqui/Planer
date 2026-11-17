@@ -29,7 +29,7 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 2
 | RQ-32 | Consultar un dashboard de gestión | MVP |
 | RQ-35 | Configurar estados y transiciones por área | MVP |
 | RQ-36 | Administrar áreas, tipos, prioridades, marcas y campos | MVP |
-| RQ-38 | Iniciar sesión con la cuenta de Microsoft 365 | MVP |
+| RQ-38 | Iniciar sesión con la cuenta de Microsoft 365 | Fase 2 |
 | RQ-44 | Respaldar y restaurar la información | MVP |
 | RQ-46 | Gestionar empresas | Pedido del dueño |
 | RQ-47 | Gestionar proyectos por empresa | Pedido del dueño |
@@ -42,6 +42,10 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 2
 | RQ-54 | Invitar por enlace | Pedido del dueño |
 | RQ-55 | Registro propio con aprobación | Pedido del dueño |
 | RQ-56 | Recuperar contraseña | Pedido del dueño |
+| RQ-57 | Búsqueda global y atajos de teclado | Pedido del dueño |
+| RQ-58 | Acciones masivas y vistas guardadas | Pedido del dueño |
+| RQ-59 | Ayuda contextual por rol | Pedido del dueño |
+| RQ-60 | Autorización por recurso en API | Pedido del dueño |
 
 ## Criterios de RQ-46 a RQ-51
 
@@ -68,5 +72,13 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. Aquí queda solo el mapeo de las 2
 **RQ-55.** Dado que `REGISTRO_PUBLICO` no es `true`, cuando alguien abre `/registro`, entonces no puede crear una cuenta. Dado que el flag está activo y el dominio está permitido, cuando se registra, entonces queda pendiente de aprobación con rol Solicitante hasta que un administrador lo apruebe.
 
 **RQ-56.** Dado SMTP configurado, cuando la persona pide recuperar la contraseña, entonces recibe un enlace. Dado que no hay SMTP, cuando el administrador genera el restablecimiento, entonces puede copiar el enlace. El enlace vence a las 24 horas y no sirve una segunda vez.
+
+**RQ-57.** Dado que estoy en la mesa, cuando presiono `/`, entonces el foco va a la búsqueda. Cuando escribo un código DES- o MKT-, entonces la lista se filtra. `c` abre radicar, `g` luego `b` el tablero, `g` luego `l` la lista y `?` la ayuda.
+
+**RQ-58.** Dado un líder, cuando marca varios requerimientos y elige una prioridad, entonces esos casos cambian y los demás no. Dado un filtro, cuando guardo la vista, entonces puedo volver a abrirla en este navegador.
+
+**RQ-59.** Dado cualquier rol, cuando abre `/ayuda`, entonces ve los atajos y qué puede hacer ese rol.
+
+**RQ-60.** Dado un adjunto, cuando no hay sesión, entonces la respuesta es 401. Cuando la sesión no puede ver el requerimiento, entonces es 404 y no aparece el nombre interno del archivo. El dueño, el equipo del área y el administrador sí lo reciben.
 
 RQ-07, RQ-15, RQ-16, RQ-18, RQ-19, RQ-23, RQ-24, RQ-27, RQ-31, RQ-33, RQ-34, RQ-37, RQ-39, RQ-40, RQ-41, RQ-42, RQ-43 y RQ-45 no son MVP.

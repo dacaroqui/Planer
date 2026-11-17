@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Atajos } from "@/components/atajos"
 import { salir } from "@/server/actions"
 import { MenuMovil, Navegacion, type NavItem } from "@/components/navegacion"
 import {
@@ -48,6 +49,13 @@ export function Shell({
           </div>
           <Usuario actor={actor} team={team} />
         </header>
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 pt-4 md:px-8">
+          <form action="/requerimientos" className="flex-1">
+            <input id="busqueda-global" name="q" aria-label="Buscar por código o título" placeholder="Buscar DES- o MKT-" className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm" />
+          </form>
+          <Link href="/ayuda" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-sm" aria-label="Ayuda">?</Link>
+        </div>
+        <Atajos />
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
         <footer className="mx-auto w-full max-w-6xl px-4 pb-8 text-xs text-muted-foreground md:px-8">
           Los datos de los usuarios internos (nombre, correo y área) se usan solo para operar esta mesa, según la política de tratamiento de datos de CIFES y Luvania. No registre datos de estudiantes, deudores, pacientes ni socios.
@@ -67,7 +75,7 @@ function Usuario({ actor, team, inverted = false }: { actor: Actor; team: string
       >
         <span className="block font-medium">{actor.name}</span>
         <span className={inverted ? "block text-xs text-sidebar-foreground/70" : "block text-xs text-muted-foreground"}>
-          {ROLE_LABEL[actor.role]}{team ? ` · ${team}` : ""}
+          {ROLE_LABEL[actor.role]}{!actor.isAdmin && team ? ` · ${team}` : ""}
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

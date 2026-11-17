@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   if (actor.isAdmin || actor.memberships.length > 0) {
     items.push({ href: "/tablero", label: "Tablero", icon: "bandeja" })
-    items.push({ href: "/gerencia", label: "Dashboard", icon: "gerencia" })
+    items.push({ href: "/gerencia", label: "Panel de gestión", icon: "gerencia" })
   }
   items.push({ href: "/notificaciones", label: "Avisos", icon: "avisos", badge: unread })
   if (puedeAdministrar(actor)) {

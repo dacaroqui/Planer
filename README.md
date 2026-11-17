@@ -122,7 +122,8 @@ Ese comando es la demostración: levanta PostgreSQL y la mesa en [http://127.0.0
 | `UPLOAD_DIR` | Carpeta de adjuntos. |
 | `BUSINESS_WINDOWS` | Franjas hábiles, hora de Colombia. Por defecto `08:00-12:00,14:00-18:00`. |
 | `SLA_RISK_RATIO` | A partir de qué fracción del plazo el semáforo pasa a «en riesgo». Por defecto `0.75`. |
-| `CRON_SECRET` | Protege `POST /api/cron/sla`. En producción es obligatorio. Envíe `Authorization: Bearer <secreto>`. |
+| `CRON_SECRET` | Protege `POST /api/cron/sla`. En producción es obligatorio. Envíe `Authorization: Bearer <secreto>`. El aviso sale al 75 % del plazo y al vencer, una vez cada uno. Si no hay un programador externo, `SLA_SCHEDULER=true` revisa cada hora dentro del proceso. |
+| `AUTH_URL` en local | Si `APP_URL` apunta a un túnel, abra la mesa por ese túnel. En `http://localhost` la sesión no usa cookie `__Secure` y no redirige al túnel. `Secure` solo se añade cuando la petición llega por `https` (`X-Forwarded-Proto`). |
 
 La URL de retorno de Microsoft, solo si `AUTH_ENTRA_ENABLED=true`, es `{AUTH_URL}/api/auth/callback/microsoft-entra-id`.
 
