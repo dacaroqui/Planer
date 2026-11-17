@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { EliminarTarea } from "@/components/confirmar-eliminar"
 import { guardarTareaAction } from "@/server/actions"
 import { Barra } from "@/components/barra"
 import { Button } from "@/components/ui/button"
@@ -40,10 +41,12 @@ export type TareaPlanner = {
 export function PlannerTablero({
   grupos,
   puede,
+  puedeEliminar = false,
   agentes,
 }: {
   grupos: { id: string; nombre: string; tareas: TareaPlanner[] }[]
   puede: boolean
+  puedeEliminar?: boolean
   agentes: { id: string; name: string }[]
 }) {
   const router = useRouter()
@@ -107,9 +110,12 @@ export function PlannerTablero({
                       onDragStart={(event) => event.dataTransfer.setData("text/plain", tarea.id)}
                       className="rounded-lg border border-border bg-card p-3 text-sm"
                     >
-                      <button type="button" className="text-left font-medium" onClick={() => setAbierta(abierta === tarea.id ? null : tarea.id)}>
-                        {tarea.title}
-                      </button>
+                      <div className="flex items-start justify-between gap-2">
+                        <button type="button" className="text-left font-medium" onClick={() => setAbierta(abierta === tarea.id ? null : tarea.id)}>
+                          {tarea.title}
+                        </button>
+                        {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
+                      </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {tarea.assignee}{tarea.requestCode ? ` · ${tarea.requestCode}` : ""}{tarea.vencida ? " · vencida" : ""}
                       </p>
@@ -124,6 +130,7 @@ export function PlannerTablero({
                             <div key={sub.id} className="flex items-center justify-between gap-2 text-xs">
                               <span className={sub.status === "HECHA" ? "line-through" : ""}>{sub.title}</span>
                               <span className="text-muted-foreground">{sub.assignee}{sub.dueDate ? ` · ${sub.dueDate}` : ""}</span>
+                              {puedeEliminar ? <EliminarTarea id={sub.id} title={sub.title} /> : null}
                               {puede && sub.status !== "HECHA" ? (
                                 <form action={(data) => guardar(data)}>
                                   <input type="hidden" name="id" value={sub.id} />

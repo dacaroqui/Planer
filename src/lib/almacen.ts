@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { uploadDir } from "@/lib/files"
 
@@ -7,6 +7,7 @@ export type DriverAlmacen = "local" | "vercel-blob" | "netlify-blobs"
 export type Almacen = {
   guardar(clave: string, bytes: Buffer, tipo: string): Promise<void>
   leer(clave: string): Promise<Buffer | null>
+  borrar(clave: string): Promise<void>
 }
 
 export type ClienteVercel = {
@@ -19,11 +20,13 @@ export type ClienteVercel = {
     pathname: string,
     options: { access: "private"; useCache: false },
   ) => Promise<{ stream: ReadableStream<Uint8Array> | null } | null>
+  del: (pathname: string) => Promise<void>
 }
 
 export type TiendaNetlify = {
   set: (key: string, data: Buffer) => Promise<unknown>
   get: (key: string, options: { type: "arrayBuffer" }) => Promise<ArrayBuffer | null>
+  delete?: (key: string) => Promise<unknown>
 }
 
 const PREFIJO = "adjuntos"
@@ -48,6 +51,13 @@ export function almacenLocal(directorio: string): Almacen {
         return null
       }
     },
+    async borrar(clave) {
+      try {
+        await unlink(path.join(directorio, clave))
+      } catch {
+        // Ya no está en disco. Borrar otra vez no falla.
+      }
+    },
   }
 }
 
@@ -68,6 +78,9 @@ export function almacenVercel(cliente: ClienteVercel): Almacen {
       if (!resultado?.stream) return null
       return Buffer.from(await new Response(resultado.stream).arrayBuffer())
     },
+    async borrar(clave) {
+      await cliente.del(`${PREFIJO}/${clave}`)
+    },
   }
 }
 
@@ -85,13 +98,17 @@ export function almacenNetlify(tienda: TiendaNetlify): Almacen {
         return null
       }
     },
+    async borrar(clave) {
+      await tienda.delete?.(clave)
+    },
   }
 }
 
 async function clienteVercelReal(): Promise<ClienteVercel> {
-  const { get, put } = await import("@vercel/blob")
+  const { del, get, put } = await import("@vercel/blob")
   return {
     put: (pathname, body, options) => put(pathname, body, options),
+    del: (pathname) => del(pathname).then(() => undefined),
     get: async (pathname, options) => {
       const resultado = await get(pathname, options)
       if (!resultado || resultado.statusCode !== 200 || !resultado.stream) return null
@@ -106,6 +123,7 @@ async function tiendaNetlifyReal(): Promise<TiendaNetlify> {
   return {
     set: (key, data) => tienda.set(key, Uint8Array.from(data).buffer),
     get: (key, options) => tienda.get(key, options),
+    delete: (key) => tienda.delete(key),
   }
 }
 
@@ -120,6 +138,10 @@ export async function crearAlmacen(
 }
 
 let activo: Promise<Almacen> | null = null
+
+export function reiniciarAlmacen() {
+  activo = null
+}
 
 export function obtenerAlmacen() {
   activo ??= crearAlmacen()

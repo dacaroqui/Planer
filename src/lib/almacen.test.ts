@@ -39,6 +39,9 @@ describe("drivers de almacenamiento", () => {
         if (!body) return null
         return { stream: new Response(new Uint8Array(body)).body }
       },
+      async del(pathname) {
+        objetos.delete(pathname)
+      },
     }
     const almacen = almacenVercel(cliente)
     const guardado = await almacen.guardar("nota.txt", Buffer.from("privado"), "text/plain")
@@ -47,6 +50,8 @@ describe("drivers de almacenamiento", () => {
     expect(leido?.toString()).toBe("privado")
     expect(leido?.toString()).not.toContain("blob.vercel-storage.com")
     expect(await almacen.leer("otro.txt")).toBeNull()
+    await almacen.borrar("nota.txt")
+    expect(objetos.has("adjuntos/nota.txt")).toBe(false)
   })
 
   it("usa el almacén privado de Netlify y no publica una URL", async () => {

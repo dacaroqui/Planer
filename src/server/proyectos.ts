@@ -1,8 +1,8 @@
 import { DateTime } from "luxon"
 import { prisma } from "@/lib/prisma"
 import { agruparTareas, avanceProyecto, avanceRequerimiento, tareaVencida } from "@/lib/avance"
-import { DomainError, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
-import { esAdmin, puedeVer, rolEn } from "@/lib/permissions"
+import { DomainError, PermisoDenegado, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
+import { esAdmin, puedeAdministrar, puedeVer, rolEn } from "@/lib/permissions"
 import { ZONE } from "@/lib/time"
 
 export function puedeCrearProyecto(actor: Actor) {
@@ -155,6 +155,28 @@ export async function guardarTarea(
     })
   }
   return tarea
+}
+
+export async function eliminarTarea(actor: Actor, id: string) {
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado()
+  const tarea = await prisma.tarea.findUnique({
+    where: { id },
+    include: { request: { select: { code: true } } },
+  })
+  if (!tarea) throw new DomainError("La tarea no existe.")
+  const que = tarea.request ? `${tarea.request.code} · ${tarea.title}` : tarea.title
+  await prisma.$transaction(async (tx) => {
+    await tx.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: "ELIMINAR",
+        entity: "Tarea",
+        entityId: tarea.id,
+        toValue: que,
+      },
+    })
+    await tx.tarea.delete({ where: { id: tarea.id } })
+  })
 }
 
 export async function listarProyectos(actor: Actor, empresaId?: string) {

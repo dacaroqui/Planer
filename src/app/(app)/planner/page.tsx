@@ -91,7 +91,7 @@ export default async function PlannerPage({
       {grupos.size === 0 ? (
         <p className="text-sm text-muted-foreground">No hay tareas con esos filtros.</p>
       ) : (
-        <PlannerTablero grupos={[...grupos.values()]} puede={puede} agentes={responsables} />
+        <PlannerTablero grupos={[...grupos.values()]} puede={puede} puedeEliminar={actor.isAdmin} agentes={responsables} />
       )}
     </div>
   )

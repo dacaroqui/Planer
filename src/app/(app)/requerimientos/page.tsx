@@ -5,7 +5,7 @@ import { ListaRequerimientos } from "@/components/lista-requerimientos"
 import { Paginacion } from "@/components/tabla"
 import { STATUS_LABEL } from "@/lib/domain"
 import { consultaDesde, queryString } from "@/lib/list-query"
-import { esAdmin } from "@/lib/permissions"
+import { esAdmin, puedeAdministrar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { catalogoPara } from "@/server/catalogo-nav"
 import { listar } from "@/server/requests"
@@ -77,6 +77,7 @@ async function ListaCargada({
         puedePrioridad={puedePrioridad}
         puedeEstado={puedeEstado}
         puedeAsignar={puedeAsignar}
+        puedeEliminar={puedeAdministrar(actor)}
         estados={estados}
         agentes={agentes}
       />

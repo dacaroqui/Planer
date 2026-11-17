@@ -14,6 +14,7 @@ export function ListaRequerimientos({
   puedePrioridad = false,
   puedeEstado = false,
   puedeAsignar = false,
+  puedeEliminar = false,
   estados,
   agentes = [],
 }: {
@@ -26,10 +27,11 @@ export function ListaRequerimientos({
   puedePrioridad?: boolean
   puedeEstado?: boolean
   puedeAsignar?: boolean
+  puedeEliminar?: boolean
   estados?: { value: string; label: string }[]
   agentes?: { id: string; name: string }[]
 }) {
-  const selectable = puedePrioridad || puedeEstado || puedeAsignar
+  const selectable = puedePrioridad || puedeEstado || puedeAsignar || puedeEliminar
   const visibles = useMemo(() => items.map((item) => item.code), [items])
   const [selected, setSelected] = useState<string[]>([])
 
@@ -65,6 +67,8 @@ export function ListaRequerimientos({
           puedePrioridad={puedePrioridad}
           puedeEstado={puedeEstado}
           puedeAsignar={puedeAsignar}
+          puedeEliminar={puedeEliminar}
+          seleccion={items.filter((item) => selected.includes(item.code)).map((item) => ({ code: item.code, title: item.title }))}
           estados={estados}
           agentes={agentes}
           onLimpiar={() => setSelected([])}

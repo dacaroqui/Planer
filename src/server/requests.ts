@@ -10,6 +10,7 @@ import { pareceDatoPersonal } from "@/lib/datos-personales"
 import {
   DONE_STATUSES,
   DomainError,
+  PermisoDenegado,
   PAUSE_STATUSES,
   TEAM_LABEL,
   TERMINAL_STATUSES,
@@ -793,6 +794,48 @@ export async function adjuntar(
     await tx.request.update({ where: { id: requestId }, data: { updatedAt: now } })
     return attachment
   })
+}
+
+async function borrarClaves(claves: string[]) {
+  if (claves.length === 0) return
+  const almacen = await obtenerAlmacen()
+  for (const clave of claves) {
+    try {
+      await almacen.borrar(clave)
+    } catch (error) {
+      console.error("No se pudo borrar el adjunto", clave, error)
+    }
+  }
+}
+
+export async function eliminarRequerimiento(actor: Actor, code: string) {
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado()
+  const current = await prisma.request.findUnique({
+    where: { code },
+    include: { attachments: { select: { storedName: true } } },
+  })
+  if (!current) throw new DomainError("El requerimiento no existe.")
+  await prisma.$transaction(async (tx) => {
+    await tx.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: "ELIMINAR",
+        entity: "Request",
+        entityId: current.id,
+        toValue: `${current.code} · ${current.title}`,
+      },
+    })
+    await tx.request.delete({ where: { id: current.id } })
+  })
+  await borrarClaves(current.attachments.map((item) => item.storedName))
+}
+
+export async function eliminarRequerimientos(actor: Actor, codes: string[]) {
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado()
+  const unicos = [...new Set(codes.map((item) => item.trim()).filter(Boolean))]
+  if (unicos.length === 0) throw new DomainError("Seleccione al menos un requerimiento.")
+  for (const code of unicos) await eliminarRequerimiento(actor, code)
+  return unicos.length
 }
 
 async function estadosDe(team: TeamName) {

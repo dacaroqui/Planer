@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { AuthError, CredentialsSignin } from "next-auth"
 import { signIn, signOut } from "@/auth"
-import { DomainError, type TeamName } from "@/lib/domain"
+import { DomainError, PermisoDenegado, type TeamName } from "@/lib/domain"
 import { radicarDesdeFormulario } from "@/server/radicar-formulario"
-import { guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
+import { eliminarTarea, guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
+import { rechazoEliminar } from "@/server/eliminar"
 import {
   aceptarInvitacion,
   actualizarPerfil,
@@ -34,6 +35,8 @@ import {
   asignarMasiva,
   editarCampos,
   eliminarEstado,
+  eliminarRequerimiento,
+  eliminarRequerimientos,
   guardarEstado,
   guardarRoles,
   guardarSla,
@@ -46,13 +49,14 @@ import {
   vigilarSlas,
 } from "@/server/requests"
 
-export type ActionResult = { ok: true; message?: string; enlace?: string; resumen?: string; code?: string } | { ok: false; error: string }
+export type ActionResult = { ok: true; message?: string; enlace?: string; resumen?: string; code?: string } | { ok: false; error: string; status?: number }
 
 function esRedireccion(error: unknown) {
   return typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
 }
 
 function fallo(error: unknown): ActionResult {
+  if (error instanceof PermisoDenegado) return { ok: false, error: error.message, status: 403 }
   if (error instanceof DomainError) return { ok: false, error: error.message }
   console.error(error)
   return { ok: false, error: "No se pudo completar la acción." }
@@ -61,6 +65,8 @@ function fallo(error: unknown): ActionResult {
 function refrescar(code?: string) {
   revalidatePath("/panel")
   revalidatePath("/requerimientos")
+  revalidatePath("/planner")
+  revalidatePath("/proyectos")
   revalidatePath("/bandeja")
   revalidatePath("/gerencia")
   revalidatePath("/notificaciones")
@@ -716,4 +722,44 @@ export async function guardarEmpresaAction(formData: FormData): Promise<ActionRe
   }
   revalidatePath("/proyectos")
   return { ok: true, message: "Empresa guardada." }
+}
+
+export async function eliminarTareaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const rechazo = rechazoEliminar(actor)
+  if (rechazo) return rechazo
+  try {
+    await eliminarTarea(actor, String(formData.get("id") || ""))
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Tarea eliminada." }
+}
+
+export async function eliminarRequerimientoAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const rechazo = rechazoEliminar(actor)
+  if (rechazo) return rechazo
+  const code = String(formData.get("code") || "")
+  try {
+    await eliminarRequerimiento(actor, code)
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar(code)
+  return { ok: true, message: `Se eliminó ${code}.` }
+}
+
+export async function eliminarRequerimientosAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const rechazo = rechazoEliminar(actor)
+  if (rechazo) return rechazo
+  try {
+    const total = await eliminarRequerimientos(actor, codesDe(formData))
+    refrescar()
+    return { ok: true, message: `Se eliminaron ${total} requerimientos.` }
+  } catch (error) {
+    return fallo(error)
+  }
 }

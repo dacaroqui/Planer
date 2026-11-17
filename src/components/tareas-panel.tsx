@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { EliminarTarea } from "@/components/confirmar-eliminar"
 import { guardarTareaAction } from "@/server/actions"
 import { Barra } from "@/components/barra"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,7 @@ export function TareasPanel({
   tareas,
   porcentaje,
   puede,
+  puedeEliminar = false,
   requestId,
   projectId,
   parentId,
@@ -32,6 +34,7 @@ export function TareasPanel({
   tareas: TareaVista[]
   porcentaje: number
   puede: boolean
+  puedeEliminar?: boolean
   requestId?: string
   projectId?: string
   parentId?: string
@@ -71,6 +74,7 @@ export function TareasPanel({
               {tarea.vencida ? " · vencida" : ""}
             </p>
           </div>
+          <span className="flex flex-wrap items-center gap-2">
           {puede && tarea.status !== "HECHA" ? (
             <form action={(data) => enviar(data)}>
               <input type="hidden" name="id" value={tarea.id} />
@@ -81,6 +85,8 @@ export function TareasPanel({
               <Button type="submit" size="sm" disabled={pending}>Marcar hecha</Button>
             </form>
           ) : null}
+          {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} /> : null}
+          </span>
         </div>
       ))}
       {puede ? (

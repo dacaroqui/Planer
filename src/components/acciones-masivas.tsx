@@ -4,7 +4,9 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { asignarMasivaAction, estadoMasivaAction, prioridadMasivaAction } from "@/server/actions"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { asignarMasivaAction, eliminarRequerimientosAction, estadoMasivaAction, prioridadMasivaAction } from "@/server/actions"
+import { textoEliminar } from "@/lib/eliminar"
 import type { PriorityName } from "@/lib/domain"
 import { STATUS_LABEL } from "@/lib/domain"
 
@@ -20,6 +22,8 @@ export type AccionesMasivasProps = {
   puedePrioridad?: boolean
   puedeEstado?: boolean
   puedeAsignar?: boolean
+  puedeEliminar?: boolean
+  seleccion?: { code: string; title: string }[]
   estados?: { value: string; label: string }[]
   agentes?: { id: string; name: string }[]
   onLimpiar: () => void
@@ -30,6 +34,8 @@ export function AccionesMasivas({
   puedePrioridad = false,
   puedeEstado = false,
   puedeAsignar = false,
+  puedeEliminar = false,
+  seleccion = [],
   estados,
   agentes = [],
   onLimpiar,
@@ -39,6 +45,7 @@ export function AccionesMasivas({
   const [status, setStatus] = useState(estados?.[0]?.value ?? "NUEVO")
   const [assigneeId, setAssigneeId] = useState(agentes[0]?.id ?? "")
   const [pending, start] = useTransition()
+  const [confirmar, setConfirmar] = useState(false)
   const opcionesEstado = estados && estados.length > 0
     ? estados
     : Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))
@@ -126,9 +133,35 @@ export function AccionesMasivas({
           </Button>
         </div>
       ) : null}
+      {puedeEliminar ? (
+        <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => setConfirmar(true)}>
+          Eliminar
+        </Button>
+      ) : null}
       <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onLimpiar}>
         Limpiar
       </Button>
+      <Dialog open={confirmar} onOpenChange={(abierto) => { if (!abierto && !pending) setConfirmar(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2 text-sm">
+            {seleccion.filter((item) => codes.includes(item.code)).map((item) => (
+              <p key={item.code}>{textoEliminar(item)}</p>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={pending} onClick={() => setConfirmar(false)}>Cancelar</Button>
+            <Button type="button" variant="destructive" disabled={pending} onClick={() => {
+              aplicar(eliminarRequerimientosAction, {})
+              setConfirmar(false)
+            }}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

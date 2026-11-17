@@ -94,3 +94,11 @@ export class DomainError extends Error {
     this.name = "DomainError"
   }
 }
+
+export class PermisoDenegado extends DomainError {
+  readonly status = 403
+  constructor(message = "No tiene permiso para eliminar. Solo un administrador puede hacerlo.") {
+    super(message)
+    this.name = "PermisoDenegado"
+  }
+}

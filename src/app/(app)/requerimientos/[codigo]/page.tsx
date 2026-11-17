@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
 import { FichaSeguimiento, LineaEstados } from "@/components/seguimiento-solicitud"
 import { Gestion } from "@/components/gestion"
 import { TareasPanel } from "@/components/tareas-panel"
@@ -59,7 +60,10 @@ export default async function DetallePage({
           </p>
         ) : null}
         <p className="text-sm text-muted-foreground">{request.code}</p>
-        <h1 className="mt-1 font-heading text-4xl leading-tight">{request.title}</h1>
+        <div className="mt-1 flex items-start justify-between gap-3">
+          <h1 className="font-heading text-4xl leading-tight">{request.title}</h1>
+          {actor.isAdmin ? <MenuEliminarRequerimiento code={request.code} title={request.title} /> : null}
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <EstadoBadge status={request.status} />
           <SlaBadge state={sla.state} />
@@ -112,6 +116,7 @@ export default async function DetallePage({
               <TareasPanel
                 porcentaje={avance.porcentaje}
                 puede={puedeGestionarTareas(actor, request.team)}
+                puedeEliminar={actor.isAdmin}
                 requestId={request.id}
                 projectId={request.projectId ?? undefined}
                 agentes={agentesTarea}

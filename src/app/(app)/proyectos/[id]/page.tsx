@@ -59,6 +59,7 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
           <TareasPanel
             porcentaje={proyecto.avance.porcentaje}
             puede={puede && proyecto.requests.some((item) => puedeGestionarTareas(actor, item.team)) || puedeCrearProyecto(actor)}
+            puedeEliminar={actor.isAdmin}
             projectId={proyecto.id}
             agentes={agentes}
             tareas={proyecto.tasks.map((tarea) => ({
