@@ -143,8 +143,8 @@ export async function crearInvitacion(
   try {
     enviado = await enviar(
       email,
-      "Invitación a la mesa de requerimientos",
-      `Le invitaron a Mesa con el rol ${input.rol}. Abra el enlace, escriba su nombre y cree una contraseña. Vence en ${INVITACION_DIAS} días y solo puede usarse una vez.\n\n${enlace}\n`,
+      "Invitación a Planer",
+      `Le invitaron a Planer con el rol ${input.rol}. Abra el enlace, escriba su nombre y cree una contraseña. Vence en ${INVITACION_DIAS} días y solo puede usarse una vez.\n\n${enlace}\n`,
     )
   } catch (error) {
     console.error("No se pudo enviar la invitación", error)
@@ -277,7 +277,7 @@ export async function generarRestablecimiento(actor: Actor, userId: string) {
   try {
     enviado = await enviar(
       user.email,
-      "Restablecer la contraseña de la mesa",
+      "Restablecer la contraseña de Planer",
       `Use este enlace para crear una contraseña nueva. Vence en ${RESTABLECIMIENTO_HORAS} horas y solo puede usarse una vez.\n\n${enlace}\n`,
     )
   } catch (error) {
@@ -297,7 +297,7 @@ export async function solicitarRestablecimiento(email: string) {
     const enlace = await emitirRestablecimiento(user.id, null)
     await enviar(
       user.email,
-      "Restablecer la contraseña de la mesa",
+      "Restablecer la contraseña de Planer",
       `Use este enlace para crear una contraseña nueva. Vence en ${RESTABLECIMIENTO_HORAS} horas y solo puede usarse una vez.\n\n${enlace}\n`,
     )
   }

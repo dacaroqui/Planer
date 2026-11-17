@@ -1,8 +1,8 @@
-# Mesa
+# Planer
 
-Mesa interna de requerimientos de CIFES y Luvania. El personal radica pedidos a Desarrollo o a Marketing, sigue el estado y el historial, y conversa dentro del mismo requerimiento. La interfaz está en español de Colombia.
+Planer es la mesa interna de requerimientos de CIFES y Luvania. El personal radica pedidos a Desarrollo o a Marketing, sigue el estado y el historial, y conversa dentro del mismo requerimiento. La interfaz está en español de Colombia.
 
-Es un reemplazo ligero de una mesa de servicio: cinco roles, un flujo por equipo, SLA en horas hábiles y correo por un proveedor intercambiable.
+Es un reemplazo ligero de una mesa de servicio: cinco roles, un flujo por equipo, SLA en horas hábiles y correo por un proveedor intercambiable. La etiqueta sigue siendo CIFES · Luvania.
 
 ## Requisitos
 
@@ -24,7 +24,7 @@ npm run db:setup
 npm run dev
 ```
 
-La mesa queda en [http://127.0.0.1:38471](http://127.0.0.1:38471).
+Planer queda en [http://127.0.0.1:38471](http://127.0.0.1:38471).
 
 `db:setup` aplica las migraciones. Los usuarios ficticios solo se cargan si `SEED_DEMO=true`. En desarrollo, con `DEV_AUTH_ENABLED=true`, la pantalla de ingreso también ofrece esos perfiles sin contraseña. En producción el ingreso es correo y contraseña.
 

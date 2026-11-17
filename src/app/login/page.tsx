@@ -46,21 +46,21 @@ export default async function LoginPage({
 
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="flex flex-col justify-between bg-sidebar px-8 py-10 text-sidebar-foreground md:px-14">
+      <section className="flex flex-col justify-between bg-[#222B7C] px-8 py-10 text-white md:px-14">
         <div>
-          <p className="text-xs tracking-[0.22em] text-sidebar-primary">CIFES · LUVANIA</p>
-          <h1 className="mt-6 max-w-xl font-heading text-5xl leading-[0.95] md:text-7xl">Mesa</h1>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-sidebar-foreground/80">
-            La mesa interna donde académica, la clínica, admisiones y el resto de la casa le piden trabajo a Desarrollo y a Marketing, y pueden ver cómo se está atendiendo.
+          <p className="text-xs tracking-[0.22em] text-[#4FB3DB]">CIFES · LUVANIA</p>
+          <h1 className="mt-6 max-w-xl text-5xl leading-[0.95] font-semibold text-white md:text-7xl">Planer</h1>
+          <p className="mt-6 max-w-md text-base leading-relaxed text-white/80">
+            CIFES · Luvania. Aquí académica, la clínica, admisiones y el resto de la casa le piden trabajo a Desarrollo y a Marketing, y pueden ver cómo se está atendiendo.
           </p>
         </div>
-        <p className="mt-10 text-sm text-sidebar-foreground/60">Solo cuentas del dominio cifes.edu.co.</p>
+        <p className="mt-10 text-sm text-white/70">Solo cuentas del dominio cifes.edu.co.</p>
       </section>
       <section className="flex items-center px-6 py-10 md:px-12">
         <div className="mx-auto w-full max-w-md space-y-6">
           <div>
             <h2 className="font-heading text-3xl">Ingresar</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Use el correo y la contraseña de la mesa. Si todavía no tiene cuenta, pida una invitación al administrador.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Use el correo y la contraseña de Planer. Si todavía no tiene cuenta, pida una invitación al administrador.</p>
           </div>
           {error ? (
             <p role="alert" className={`rounded-lg px-3 py-2 text-sm ${aviso ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>{error}</p>
@@ -85,7 +85,7 @@ export default async function LoginPage({
             <Card>
               <CardHeader>
                 <CardTitle>Usuarios de prueba</CardTitle>
-                <CardDescription>Perfiles ficticios para recorrer la mesa sin credenciales reales.</CardDescription>
+                <CardDescription>Perfiles ficticios para recorrer Planer sin credenciales reales.</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-2">
                 {usuarios.map((usuario) => (

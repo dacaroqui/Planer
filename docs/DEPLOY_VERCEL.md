@@ -1,6 +1,6 @@
-# Publicar Mesa en Vercel o Netlify
+# Publicar Planer en Vercel o Netlify
 
-La mesa queda en una URL fija. La base es Postgres en Neon. Los adjuntos no se guardan en el disco del servidor: en Vercel van a Blob y en Netlify a Blobs. Quien descarga un archivo pasa por `/api/adjuntos` y solo lo recibe si puede ver el requerimiento. Esa ruta responde 401 sin sesión y 404 sin permiso. No entrega la URL del almacén.
+Planer queda en una URL fija. La base es Postgres en Neon. Los adjuntos no se guardan en el disco del servidor: en Vercel van a Blob y en Netlify a Blobs. Quien descarga un archivo pasa por `/api/adjuntos` y solo lo recibe si puede ver el requerimiento. Esa ruta responde 401 sin sesión y 404 sin permiso. No entrega la URL del almacén.
 
 `npm run build` genera el cliente de Prisma y compila. No abre la base. En el hosting el comando es `npm run vercel-build`: ejecuta `prisma migrate deploy` y después el build. Ese comando aplica migraciones pendientes. No borra tablas ni carga la demostración.
 

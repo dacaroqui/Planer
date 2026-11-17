@@ -980,7 +980,7 @@ export async function resumen(actor: Actor) {
   const now = new Date()
   const items = await prisma.request.findMany({
     where: { AND: [visibilidad(actor), { status: { notIn: ["CERRADO", "CANCELADO", "RECHAZADO"] } }] },
-    include: { pauses: true, type: true, requester: true, assignee: true, area: true },
+    include: { pauses: true, type: true, requester: true, assignee: true, area: true, empresa: true },
     orderBy: { updatedAt: "desc" },
   })
   const decorated = items.map((item) => ({ ...item, sla: evaluarSla(item, now) }))

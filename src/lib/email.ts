@@ -32,7 +32,7 @@ export class SmtpEmailProvider implements EmailProvider {
         : undefined,
     })
     await transport.sendMail({
-      from: process.env.EMAIL_FROM || "Mesa CIFES <mesa@cifes.edu.co>",
+      from: process.env.EMAIL_FROM || "Planer CIFES <mesa@cifes.edu.co>",
       to: message.to,
       subject: message.subject,
       text: message.text,

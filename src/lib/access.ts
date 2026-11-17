@@ -15,7 +15,7 @@ export function evaluarIngreso(
     return { ok: false as const, reason: "La cuenta está pendiente de aprobación." }
   }
   if (!user && !options.aprovisionar) {
-    return { ok: false as const, reason: "El usuario no está registrado en la mesa." }
+    return { ok: false as const, reason: "El usuario no está registrado en Planer." }
   }
   return { ok: true as const }
 }

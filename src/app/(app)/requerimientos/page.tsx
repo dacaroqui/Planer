@@ -37,7 +37,7 @@ export default async function RequerimientosPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-4xl">Requerimientos</h1>
+        <h1 className="text-2xl font-semibold">Lista</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Aquí ve los requerimientos que su rol le permite consultar. Las notas internas quedan para el equipo del área.
         </p>

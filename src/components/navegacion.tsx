@@ -79,7 +79,7 @@ export function MenuMovil({ items }: { items: NavItem[] }) {
       </SheetTrigger>
       <SheetContent side="left" className="bg-sidebar text-sidebar-foreground">
         <SheetHeader>
-          <SheetTitle className="font-heading text-sidebar-foreground">Mesa</SheetTitle>
+          <SheetTitle className="font-heading text-sidebar-foreground">Planer</SheetTitle>
         </SheetHeader>
         <div className="px-4">
           <Enlaces items={items} />

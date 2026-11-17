@@ -8,7 +8,7 @@ export default function ErrorMesa({ error, reset }: { error: Error & { digest?: 
   useEffect(() => {
     const texto = `${error.message} ${error.digest ?? ""}`
     if (/Server Action|Failed to find|ChunkLoad|chunk/i.test(texto)) {
-      setAviso("La mesa se actualizó en el servidor. Vamos a recargar esta vista.")
+      setAviso("Planer se actualizó en el servidor. Vamos a recargar esta vista.")
       const timer = window.setTimeout(() => window.location.reload(), 1200)
       return () => window.clearTimeout(timer)
     }
