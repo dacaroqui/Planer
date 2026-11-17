@@ -7,9 +7,13 @@ export async function register() {
     await asegurarCatalogo()
     await asegurarAdminInicial()
     if (process.env.SLA_SCHEDULER === "true" && process.env.CRON_SECRET) {
-      const { vigilarSlas } = await import("@/server/requests")
+      const port = process.env.PORT || "3000"
+      const secreto = process.env.CRON_SECRET
       setInterval(() => {
-        vigilarSlas().catch((error) => console.error("No se pudo revisar el SLA", error))
+        fetch(`http://127.0.0.1:${port}/api/cron/sla`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${secreto}` },
+        }).catch((error) => console.error("No se pudo revisar el SLA", error))
       }, 60 * 60 * 1000)
     }
   } catch (error) {

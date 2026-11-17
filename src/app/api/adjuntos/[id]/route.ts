@@ -3,6 +3,7 @@ import path from "node:path"
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { uploadDir } from "@/lib/files"
+import { cuerpoSinSesion } from "@/lib/rutas-publicas"
 import { resolverAdjunto } from "@/server/adjuntos"
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -10,7 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const email = session?.user?.email?.toLowerCase() ?? null
   const { id } = await context.params
   const acceso = await resolverAdjunto(email, id)
-  if (acceso.status === 401) return new NextResponse("Debe iniciar sesión.", { status: 401 })
+  if (acceso.status === 401) return NextResponse.json(cuerpoSinSesion(), { status: 401 })
   if (acceso.status === 403) return new NextResponse("Usuario inactivo.", { status: 403 })
   if (acceso.status !== 200) return new NextResponse("No encontrado.", { status: 404 })
   try {

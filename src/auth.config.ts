@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth"
+import { middlewarePermite } from "@/lib/rutas-publicas"
 
 export const authConfig = {
   trustHost: true,
@@ -20,17 +21,7 @@ export const authConfig = {
   },
   callbacks: {
     authorized({ auth, request }) {
-      const path = request.nextUrl.pathname
-      if (
-        path === "/login" ||
-        path === "/registro" ||
-        path.startsWith("/invitar/") ||
-        path.startsWith("/restablecer/") ||
-        path.startsWith("/api/auth") ||
-        path.startsWith("/api/salud") ||
-        path.startsWith("/api/cron")
-      ) return true
-      return Boolean(auth?.user)
+      return middlewarePermite(request.nextUrl.pathname, Boolean(auth?.user))
     },
   },
 } satisfies NextAuthConfig
