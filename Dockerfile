@@ -8,6 +8,8 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ENV DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos
+ENV DIRECT_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos
 RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

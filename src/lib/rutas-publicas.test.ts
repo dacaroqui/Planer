@@ -15,5 +15,7 @@ describe("H-01 las rutas /api no redirigen al login", () => {
     expect(fuente).not.toContain("@/server/requests")
     expect(fuente).not.toContain("nodemailer")
     expect(fuente).toContain("/api/cron/sla")
+    expect(fuente).toContain("VERCEL")
+    expect(fuente).toContain("NETLIFY")
   })
 })

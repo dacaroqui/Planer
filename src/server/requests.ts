@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, writeFile } from "node:fs/promises"
-import path from "node:path"
 import { DateTime } from "luxon"
 import { Prisma, type Team } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { appBaseUrl, createEmailProvider, type EmailMessage, type EmailProvider } from "@/lib/email"
-import { assertAllowedFile, safeFilename, uploadDir } from "@/lib/files"
+import { obtenerAlmacen } from "@/lib/almacen"
+import { assertAllowedFile, safeFilename } from "@/lib/files"
 import { pareceDatoPersonal } from "@/lib/datos-personales"
 import {
   DONE_STATUSES,
@@ -767,8 +766,8 @@ export async function adjuntar(
   }
   const now = clock(deps)
   const storedName = `${randomUUID()}.${ext}`
-  await mkdir(uploadDir(), { recursive: true })
-  await writeFile(path.join(uploadDir(), storedName), file.bytes)
+  const almacen = await obtenerAlmacen()
+  await almacen.guardar(storedName, file.bytes, file.type || "application/octet-stream")
   const filename = safeFilename(file.name)
   return prisma.$transaction(async (tx) => {
     const attachment = await tx.attachment.create({

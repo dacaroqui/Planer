@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { vigilarSlas } from "@/server/requests"
 
-export async function POST(request: Request) {
+async function revisar(request: Request) {
   const secret = process.env.CRON_SECRET
   if (process.env.NODE_ENV === "production") {
     if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -13,3 +13,6 @@ export async function POST(request: Request) {
   const result = await vigilarSlas()
   return NextResponse.json(result)
 }
+
+export const GET = revisar
+export const POST = revisar

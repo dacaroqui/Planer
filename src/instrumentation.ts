@@ -6,7 +6,8 @@ export async function register() {
   try {
     await asegurarCatalogo()
     await asegurarAdminInicial()
-    if (process.env.SLA_SCHEDULER === "true" && process.env.CRON_SECRET) {
+    const enPlataforma = process.env.VERCEL === "1" || process.env.NETLIFY === "true"
+    if (process.env.SLA_SCHEDULER === "true" && process.env.CRON_SECRET && !enPlataforma) {
       const port = process.env.PORT || "3000"
       const secreto = process.env.CRON_SECRET
       setInterval(() => {

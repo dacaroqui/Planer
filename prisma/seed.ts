@@ -1,10 +1,11 @@
 import { PrismaClient } from "@prisma/client"
+import { esSemillaDemo } from "../src/lib/semilla-modo"
 import { asegurarCatalogo } from "../src/server/semilla"
 import { toActor } from "../src/lib/actor"
 import { radicar, transicionar, asignar, editarCampos } from "../src/server/requests"
 import { MemoryEmailProvider } from "../src/lib/email"
 
-const prisma = new PrismaClient()
+export const prisma = new PrismaClient()
 
 async function limpiar() {
   await prisma.notification.deleteMany()
@@ -26,8 +27,8 @@ async function limpiar() {
   await prisma.area.deleteMany()
 }
 
-async function main() {
-  if (process.env.SEED_DEMO !== "true") {
+export async function sembrar() {
+  if (!esSemillaDemo({ SEED_DEMO: process.env.SEED_DEMO })) {
     await asegurarCatalogo(prisma)
     const { asegurarAdminInicial } = await import("../src/server/admin-inicial")
     await asegurarAdminInicial()
@@ -205,9 +206,12 @@ async function main() {
   console.log("Semilla demo lista. Usuarios @cifes.edu.co, sin contraseña.")
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-}).finally(async () => {
-  await prisma.$disconnect()
-})
+const entrada = process.argv[1]?.replace(/\\/g, "/").endsWith("prisma/seed.ts")
+if (entrada) {
+  sembrar().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  }).finally(async () => {
+    await prisma.$disconnect()
+  })
+}

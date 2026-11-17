@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0 -p 38471",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "vercel-build": "prisma migrate deploy && prisma generate && next build",
+    "seed:inicial": "tsx scripts/seed-inicial.ts",
     "start": "sh scripts/start.sh",
     "create-admin": "tsx scripts/create-admin.ts",
     "lint": "eslint",
-    "test": "DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test prisma migrate deploy && vitest run",
+    "test": "DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test DIRECT_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test prisma migrate deploy && vitest run",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "seed:reset-demo": "SEED_DEMO=true prisma db seed",
@@ -20,7 +22,9 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@netlify/blobs": "^11.1.9",
     "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.9.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",

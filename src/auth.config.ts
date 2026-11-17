@@ -2,7 +2,7 @@ import type { NextAuthConfig } from "next-auth"
 import { middlewarePermite } from "@/lib/rutas-publicas"
 
 export const authConfig = {
-  trustHost: true,
+  trustHost: process.env.AUTH_TRUST_HOST !== "false",
   useSecureCookies: false,
   secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },

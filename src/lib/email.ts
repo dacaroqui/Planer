@@ -1,3 +1,5 @@
+import { urlPublica } from "@/lib/origenes"
+
 export type EmailMessage = { to: string; subject: string; text: string }
 
 export interface EmailProvider {
@@ -49,5 +51,5 @@ export function createEmailProvider(): EmailProvider {
 }
 
 export function appBaseUrl() {
-  return (process.env.APP_URL || process.env.AUTH_URL || "http://127.0.0.1:38471").replace(/\/$/, "")
+  return urlPublica()
 }

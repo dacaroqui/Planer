@@ -21,6 +21,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://requerimientos:requerimientos@db:5432/requerimientos
+      DIRECT_URL: postgresql://requerimientos:requerimientos@db:5432/requerimientos
       APP_URL: http://127.0.0.1:3000
       AUTH_URL: http://127.0.0.1:3000
       AUTH_SECRET: demo-mesa-cifes-luvania-cambie-esto

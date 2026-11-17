@@ -90,6 +90,8 @@ ADMIN_EMAIL=admin@cifes.edu.co ADMIN_PASSWORD='una-clave-de-8-o-mas' npm run cre
 
 El primer ingreso es ese administrador. En Usuarios genera una invitación, copia el enlace y se lo entrega a la persona. El enlace vence en 7 días y solo sirve una vez. Microsoft 365 queda apagado salvo `AUTH_ENTRA_ENABLED=true`. El registro en `/registro` queda apagado salvo `REGISTRO_PUBLICO=true`.
 
+Para Vercel o Netlify con Neon, siga [docs/DEPLOY_VERCEL.md](docs/DEPLOY_VERCEL.md). El comando de build allí es `npm run vercel-build`: aplica `prisma migrate deploy` y no borra datos. `npm run build` solo genera el cliente y compila; no necesita una base en marcha. La semilla de producción es `npm run seed:inicial`: catálogos y el administrador de `ADMIN_EMAIL`. Los datos de demostración solo entran con `SEED_DEMO=true`.
+
 ## Docker
 
 ```bash
@@ -102,8 +104,10 @@ Ese comando es la demostración: levanta PostgreSQL y la mesa en [http://127.0.0
 
 | Variable | Uso |
 | --- | --- |
-| `DATABASE_URL` | Conexión de PostgreSQL. |
-| `APP_URL` y `AUTH_URL` | URL pública, la misma. Los enlaces salen de `APP_URL`. Si empieza por `https://`, la cookie de sesión es `Secure`. |
+| `DATABASE_URL` | Conexión de PostgreSQL. En Neon es la del pooler, con `pgbouncer=true`. |
+| `DIRECT_URL` | Conexión directa, sin pooler. Solo la usan las migraciones. En local puede ser igual a `DATABASE_URL`. |
+| `APP_URL` y `AUTH_URL` | URL pública. Si no están, se usan `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_URL` o `URL` de Netlify. |
+| `AUTH_TRUST_HOST` | `true` para que la sesión use el host de la petición. |
 | `AUTH_SECRET` | Firma de la sesión. Cámbielo fuera de su máquina. |
 | `ADMIN_EMAIL` y `ADMIN_PASSWORD` | Crean el primer administrador si ese correo no existe. |
 | `AUTH_ENTRA_ENABLED` | `true` activa Microsoft 365. Por defecto queda apagado. |
@@ -112,17 +116,19 @@ Ese comando es la demostración: levanta PostgreSQL y la mesa en [http://127.0.0
 | `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Id de directorio. El issuer queda en `https://login.microsoftonline.com/<tenant>/v2.0`. |
 | `AUTH_ALLOWED_EMAIL_DOMAIN` | Dominios permitidos, separados por coma. Por defecto `cifes.edu.co`. |
 | `DEV_AUTH_ENABLED` | `true` solo en desarrollo. En producción déjelo en `false`. |
-| `SEED_DEMO` | `true` borra la base y carga la demostración. |
+| `SEED_DEMO` | `true` borra la base y carga la demostración. `npm run seed:inicial` no lo hace. |
 | `REGISTRO_PUBLICO` | `true` abre `/registro`. Por defecto está apagado. |
 | `PORT` | Puerto de `npm start`. Por defecto 3000. |
-| `ALLOWED_ORIGINS` | Hosts extra, separados por coma, para las server actions detrás de un proxy. Admite comodines (`*.trycloudflare.com`). Se suma a los hosts de `APP_URL` y `AUTH_URL`. Defínalo antes de `npm run build`. |
+| `ALLOWED_ORIGINS` | Hosts extra, separados por coma. Se suma a `APP_URL`, `AUTH_URL`, `VERCEL_URL`, el dominio de producción y la URL de Netlify. Admite comodines. |
 | `EMAIL_PROVIDER` | `console` escribe el correo en la salida del proceso. `smtp` usa las variables SMTP. |
 | `EMAIL_FROM` | Remitente. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | Servidor de correo, solo si el proveedor es `smtp`. |
-| `UPLOAD_DIR` | Carpeta de adjuntos. Use una ruta absoluta en el servidor. Si queda relativa, se resuelve desde la raíz del proyecto (no desde `.next/standalone`, que es el directorio de trabajo del proceso). La carpeta se crea al guardar o al descargar. |
+| `STORAGE_DRIVER` | `local` (defecto), `vercel-blob` o `netlify-blobs`. La descarga sigue en `/api/adjuntos` y no publica la URL del blob. |
+| `UPLOAD_DIR` | Carpeta de adjuntos cuando el driver es `local`. Si es relativa, se resuelve desde la raíz del proyecto. |
 | `BUSINESS_WINDOWS` | Franjas hábiles, hora de Colombia. Por defecto `08:00-12:00,14:00-18:00`. |
 | `SLA_RISK_RATIO` | A partir de qué fracción del plazo el semáforo pasa a «en riesgo». Por defecto `0.75`. |
-| `CRON_SECRET` | Protege `POST /api/cron/sla`. En producción es obligatorio. Envíe `Authorization: Bearer <secreto>`. El aviso sale al 75 % del plazo y al vencer, una vez cada uno. Si no hay un programador externo, `SLA_SCHEDULER=true` revisa cada hora dentro del proceso. |
+| `CRON_SECRET` | Protege `GET` y `POST /api/cron/sla`. En producción es obligatorio. Vercel Cron y la función de Netlify envían `Authorization: Bearer`. |
+| `SLA_SCHEDULER` | `true` revisa el SLA cada hora dentro del proceso. No arranca en Vercel ni en Netlify. |
 | `AUTH_URL` en local | Si `APP_URL` apunta a un túnel, abra la mesa por ese túnel. En `http://localhost` la sesión no usa cookie `__Secure` y no redirige al túnel. `Secure` solo se añade cuando la petición llega por `https` (`X-Forwarded-Proto`). |
 
 La URL de retorno de Microsoft, solo si `AUTH_ENTRA_ENABLED=true`, es `{AUTH_URL}/api/auth/callback/microsoft-entra-id`.
