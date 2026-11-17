@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Atajos } from "@/components/atajos"
+import { Atajos, BotonAtajos } from "@/components/atajos"
 import { Migas } from "@/components/migas"
 import { salir } from "@/server/actions"
 import { MenuMovil, Navegacion, type NavItem } from "@/components/navegacion"
@@ -54,7 +54,7 @@ export function Shell({
           <form action="/requerimientos" className="flex-1">
             <input id="busqueda-global" name="q" aria-label="Buscar por código o título" placeholder="Buscar DES- o MKT-" className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm" />
           </form>
-          <Link href="/ayuda" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-sm" aria-label="Ayuda">?</Link>
+          <BotonAtajos />
         </div>
         <Migas />
         <Atajos />

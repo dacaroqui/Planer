@@ -28,7 +28,8 @@ export default async function PanelPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">{ROLE_LABEL[actor.role]}</p>
-          <h1 className="font-heading text-4xl">Hola, {actor.name.split(" ")[0]}</h1>
+          <h1 className="font-heading text-4xl">Inicio</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Hola, {actor.name.split(" ")[0]}.</p>
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">
             {data.abiertos.length} requerimientos abiertos · {data.resueltos7} resueltos en los últimos 7 días.
           </p>

@@ -1,14 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const ATAJOS = [
   ["?", "Ver esta lista"],
   ["/", "Buscar por código o título"],
   ["c", "Radicar"],
-  ["g luego i", "Panel"],
+  ["g luego i", "Inicio"],
   ["g luego l", "Lista de requerimientos"],
   ["g luego b", "Tablero"],
   ["g luego p", "Planner"],
@@ -21,6 +22,12 @@ function enCampo(target: EventTarget | null) {
   if (!elemento) return false
   const etiqueta = elemento.tagName
   return etiqueta === "INPUT" || etiqueta === "TEXTAREA" || etiqueta === "SELECT" || elemento.isContentEditable
+}
+
+export function BotonAtajos() {
+  return (
+    <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-sm" aria-label="Atajos de teclado" onClick={() => window.dispatchEvent(new Event("mesa-atajos"))}>?</button>
+  )
 }
 
 export function Atajos() {
@@ -55,8 +62,13 @@ export function Atajos() {
       if (previo === "g" && event.key === "h") router.push("/ayuda")
       previo = event.key
     }
+    function abrir() { setAbierta(true) }
     window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+    window.addEventListener("mesa-atajos", abrir)
+    return () => {
+      window.removeEventListener("keydown", onKey)
+      window.removeEventListener("mesa-atajos", abrir)
+    }
   }, [router])
   return (
     <Dialog open={abierta} onOpenChange={setAbierta}>
@@ -72,6 +84,9 @@ export function Atajos() {
             </li>
           ))}
         </ul>
+        <DialogFooter>
+          <Link href="/ayuda" className="text-sm underline" onClick={() => setAbierta(false)}>Abrir la ayuda</Link>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
