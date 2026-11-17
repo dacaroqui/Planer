@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { debePedirProyecto, debePedirResponsable, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
 import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 
 export type Tarjeta = {
@@ -84,12 +84,13 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
     setError(null)
     start(async () => {
       const result = await transicionarAction(data)
-      if (!result.ok) {
-        setError(result.error)
-        toast.error(result.error)
-        return
-      }
-      setDialogo(null)
+    if (!result.ok) {
+      setError(avisoTrasMovimiento(false, result.error))
+      toast.error(result.error)
+      return
+    }
+    setError(avisoTrasMovimiento(true, null))
+    setDialogo(null)
       toast.success(result.message || `${code} cambió de estado.`, {
         duration: 10000,
         action: {
@@ -168,7 +169,12 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
           </SelectContent>
         </Select>
       </div>
-      {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">{error}</p> : null}
+      {error ? (
+        <p className="flex items-start justify-between gap-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900" role="alert">
+          <span>{error}</span>
+          <button type="button" className="underline" onClick={() => setError(null)} aria-label="Cerrar aviso">Cerrar</button>
+        </p>
+      ) : null}
       <div className="flex gap-3 overflow-x-auto pb-2">
         {columnas.map((columna) => (
           <section
@@ -232,8 +238,8 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
           ) : null}
           {movimiento?.requiresCommittedDate && !tarjetas.find((item) => item.code === dialogo?.code)?.committedDate ? (
             <div className="grid gap-1">
-              <Label htmlFor="fecha-tablero">Fecha comprometida</Label>
-              <Input id="fecha-tablero" type="date" lang="es-CO" value={fecha} onChange={(event) => setFecha(event.target.value)} />
+              <Label htmlFor="fecha-tablero">{marcaObligatoria("Fecha comprometida").etiqueta}</Label>
+              <Input id="fecha-tablero" type="date" lang="es-CO" aria-required={marcaObligatoria("Fecha comprometida").ariaRequired} value={fecha} onChange={(event) => setFecha(event.target.value)} />
             </div>
           ) : null}
           {movimiento && movimientoCierra(movimiento) ? (
