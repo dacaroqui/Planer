@@ -174,18 +174,19 @@ export async function listarProyectos(actor: Actor, empresaId?: string) {
   return proyectos
     .filter((proyecto) => {
       if (esAdmin(actor) || puedeCrearProyecto(actor)) return true
-      if (actor.memberships.some((item) => item.role === "OBSERVADOR" || item.role === "AGENTE" || item.role === "LIDER")) return true
+      if (actor.memberships.length > 0) return proyecto.requests.some((request) => puedeVer(actor, request)) || actor.memberships.some((item) => item.role === "LIDER")
       return proyecto.requests.some((request) => request.requesterId === actor.id)
     })
     .map((proyecto) => {
+      const requerimientos = proyecto.requests.filter((request) => puedeVer(actor, request))
       const raices = agruparTareas(proyecto.tasks)
-      const avance = avanceProyecto({ tareas: raices, requerimientos: proyecto.requests })
-      const abiertos = proyecto.requests.filter((item) => !TERMINAL_STATUSES.has(item.status)).length
-      const cerrados = proyecto.requests.length - abiertos
+      const avance = avanceProyecto({ tareas: raices, requerimientos })
+      const abiertos = requerimientos.filter((item) => !TERMINAL_STATUSES.has(item.status)).length
+      const cerrados = requerimientos.length - abiertos
       const pendientes = raices.filter((item) => item.status !== "HECHA").length
       const hechas = raices.filter((item) => item.status === "HECHA").length
       const vencidas = proyecto.tasks.filter((item) => tareaVencida(item)).length
-      return { ...proyecto, avance, abiertos, cerrados, pendientes, hechas, vencidas }
+      return { ...proyecto, requests: requerimientos, avance, abiertos, cerrados, pendientes, hechas, vencidas }
     })
 }
 
@@ -200,20 +201,17 @@ export async function detalleProyecto(actor: Actor, id: string) {
     },
   })
   if (!proyecto) return null
-  const visible = esAdmin(actor)
-    || puedeCrearProyecto(actor)
-    || actor.memberships.length > 0
-    || proyecto.requests.some((request) => puedeVer(actor, request))
+  const requests = proyecto.requests.filter((request) => puedeVer(actor, request))
+  const visible = esAdmin(actor) || puedeCrearProyecto(actor) || requests.length > 0
   if (!visible) return null
-  const tareas = [
-    ...proyecto.tasks,
-    ...proyecto.requests.flatMap((request) => request.tasks.filter((tarea) => tarea.projectId !== proyecto.id)),
-  ]
-  const unicas = [...new Map(tareas.map((tarea) => [tarea.id, tarea])).values()]
+  const ids = new Set(requests.map((request) => request.id))
+  const tareas = proyecto.tasks.filter((tarea) => !tarea.requestId || ids.has(tarea.requestId))
   return {
     ...proyecto,
-    avance: avanceProyecto({ tareas: agruparTareas(unicas), requerimientos: proyecto.requests }),
-    avanceRequerimientos: proyecto.requests.map((request) => ({
+    requests,
+    tasks: tareas,
+    avance: avanceProyecto({ tareas: agruparTareas(tareas), requerimientos: requests }),
+    avanceRequerimientos: requests.map((request) => ({
       ...request,
       avance: avanceRequerimiento(request.tasks, request.status),
     })),

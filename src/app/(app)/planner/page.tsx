@@ -1,9 +1,10 @@
 import { porcentajeTarea, tareaVencida } from "@/lib/avance"
 import { PlannerTablero } from "@/components/planner-tablero"
-import { esAdmin } from "@/lib/permissions"
+import { equiposVisibles, esAdmin, puedeVerPlanner } from "@/lib/permissions"
 import { formatDate } from "@/lib/format"
 import { puedeCrearProyecto, puedeGestionarTareas } from "@/server/proyectos"
 import { listarPlanner } from "@/server/planner"
+import { opcionesVisibles } from "@/server/requests"
 import { requireActor } from "@/server/session"
 import { prisma } from "@/lib/prisma"
 
@@ -13,15 +14,31 @@ export default async function PlannerPage({
   searchParams: Promise<{ empresa?: string; proyecto?: string; responsable?: string }>
 }) {
   const actor = await requireActor()
+  if (!puedeVerPlanner(actor)) {
+    return (
+      <div className="max-w-xl">
+        <h1 className="font-heading text-4xl">Planner</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Planner es para quien gestiona tareas del área. Como solicitante u observador, el avance está en sus solicitudes y en los proyectos.</p>
+      </div>
+    )
+  }
   const params = await searchParams
   const tareas = await listarPlanner(actor, {
     empresaId: params.empresa,
     projectId: params.proyecto,
     assigneeId: params.responsable,
   })
-  const empresas = await prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } })
-  const proyectos = await prisma.proyecto.findMany({ orderBy: { name: "asc" }, include: { empresa: true } })
-  const responsables = await prisma.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+  const opciones = await opcionesVisibles(actor)
+  const equipos = equiposVisibles(actor)
+  const responsables = await prisma.user.findMany({
+    where: esAdmin(actor)
+      ? { active: true }
+      : { active: true, areaRoles: { some: { team: { in: [...equipos] } } } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  })
+  const empresas = opciones.empresas
+  const proyectos = opciones.proyectos
   const grupos = new Map<string, { id: string; nombre: string; tareas: Parameters<typeof PlannerTablero>[0]["grupos"][number]["tareas"] }>()
   for (const tarea of tareas) {
     const id = tarea.projectId ?? "sin-proyecto"

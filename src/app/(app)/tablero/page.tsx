@@ -1,5 +1,5 @@
 import { Tablero } from "@/components/tablero"
-import { esAdmin, rolEn, transicionesPara } from "@/lib/permissions"
+import { equiposVisibles, esAdmin, rolEn, transicionesPara } from "@/lib/permissions"
 import { nombreEstado } from "@/lib/flujo-oficial"
 import { requireActor } from "@/server/session"
 import { listar } from "@/server/requests"
@@ -20,7 +20,7 @@ export default async function TableroPage({
     return (
       <div className="max-w-xl">
         <h1 className="font-heading text-4xl">Tablero</h1>
-        <p className="mt-3 text-sm text-muted-foreground">El tablero es del área donde tiene rol de agente, líder u observador.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Esa área no es la suya. El tablero solo muestra el equipo donde tiene rol.</p>
       </div>
     )
   }
@@ -48,7 +48,7 @@ export default async function TableroPage({
           <h1 className="font-heading text-4xl">Tablero {team === "DESARROLLO" ? "de Desarrollo" : "de Marketing"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">Arrastre una tarjeta solo si su rol puede hacer esa transición. Si no, vuelve a su lugar.</p>
         </div>
-        {(esAdmin(actor) || actor.memberships.length > 1) ? (
+        {(esAdmin(actor) || equiposVisibles(actor).length > 1) ? (
           <div className="flex gap-2 text-sm">
             <a className="underline" href="/tablero?team=DESARROLLO">Desarrollo</a>
             <a className="underline" href="/tablero?team=MARKETING">Marketing</a>

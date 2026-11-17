@@ -31,8 +31,26 @@ export function puedeVer(actor: Actor, request: { team: TeamName; requesterId: s
   return rolEn(actor, request.team) !== null
 }
 
-export function puedeRadicar(actor: Actor) {
+export function esObservadorPuro(actor: Actor) {
   return actor.active
+    && !esAdmin(actor)
+    && actor.memberships.length > 0
+    && actor.memberships.every((item) => item.role === "OBSERVADOR")
+}
+
+export function puedeRadicar(actor: Actor) {
+  return actor.active && !esObservadorPuro(actor)
+}
+
+export function puedeVerPlanner(actor: Actor) {
+  if (!actor.active) return false
+  if (esAdmin(actor)) return true
+  return actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")
+}
+
+export function equiposVisibles(actor: Actor) {
+  if (esAdmin(actor)) return ["DESARROLLO", "MARKETING"] as const
+  return [...new Set(actor.memberships.map((item) => item.team))]
 }
 
 export function puedeVerNotaInterna(actor: Actor, team: TeamName) {

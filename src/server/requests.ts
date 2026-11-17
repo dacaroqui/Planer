@@ -813,6 +813,26 @@ export async function getDetalle(actor: Actor, code: string) {
   }
 }
 
+export async function opcionesVisibles(actor: Actor) {
+  const rows = await prisma.request.findMany({
+    where: visibilidad(actor),
+    select: {
+      empresa: { select: { id: true, name: true } },
+      project: { select: { id: true, name: true, empresa: { select: { name: true } } } },
+      type: { select: { id: true, name: true } },
+      requester: { select: { id: true, name: true } },
+      assignee: { select: { id: true, name: true } },
+    },
+  })
+  const porId = <T extends { id: string }>(items: Array<T | null | undefined>) => [...new Map(items.filter((item): item is T => Boolean(item)).map((item) => [item.id, item])).values()]
+  return {
+    empresas: porId(rows.map((row) => row.empresa)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    proyectos: porId(rows.map((row) => row.project)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    tipos: porId(rows.map((row) => row.type)).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    personas: porId(rows.flatMap((row) => [row.requester, row.assignee])).sort((a, b) => a.name.localeCompare(b.name, "es")),
+  }
+}
+
 function visibilidad(actor: Actor): Prisma.RequestWhereInput {
   if (esAdmin(actor)) return {}
   const teams = [...new Set(actor.memberships.map((item) => item.team))]
