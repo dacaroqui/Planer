@@ -44,6 +44,7 @@ async function reset() {
   await prisma.workflowTransition.deleteMany()
   await prisma.workflowState.deleteMany()
   await prisma.catalogItem.deleteMany()
+  await prisma.empresa.updateMany({ data: { exigirProyectoAlClasificar: false } })
   await prisma.area.deleteMany()
 }
 

@@ -6,7 +6,7 @@ import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
 import { renderMarkdown } from "@/lib/markdown"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ROLE_LABEL } from "@/lib/domain"
+import { etiquetaDeAutor } from "@/lib/permissions"
 import { formatBytes, formatDate, formatDateTime } from "@/lib/format"
 import { formatDuration } from "@/lib/sla"
 import { editarCamposAction, trasladarAction } from "@/server/actions"
@@ -21,7 +21,7 @@ export default async function DetallePage({
   searchParams,
 }: {
   params: Promise<{ codigo: string }>
-  searchParams: Promise<{ confirmado?: string }>
+  searchParams: Promise<{ confirmado?: string; guardado?: string }>
 }) {
   const actor = await requireActor()
   const { codigo } = await params
@@ -38,12 +38,16 @@ export default async function DetallePage({
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   })
-  const avance = avanceDesdeLista(request.tasks, request.status)
+  const tareasRaiz = request.tasks.filter((tarea) => !tarea.parentId)
+  const avance = avanceDesdeLista(tareasRaiz, request.status)
   const ratio = Math.max(0, Math.min(100, Math.round(sla.ratio * 100)))
 
   return (
     <div className="space-y-6">
       <div>
+        {consulta.guardado === "1" ? (
+          <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">Clasificación guardada.</p>
+        ) : null}
         {consulta.confirmado === "1" ? (
           <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
             Quedó radicado con el código {request.code}. También enviamos la confirmación al correo de los líderes del área. <a className="underline" href={`/requerimientos/${request.code}`}>Abrir este detalle</a>.
@@ -69,7 +73,7 @@ export default async function DetallePage({
                 requestId={request.id}
                 projectId={request.projectId ?? undefined}
                 agentes={agentesTarea}
-                tareas={request.tasks.map((tarea) => ({
+                tareas={tareasRaiz.map((tarea) => ({
                   id: tarea.id,
                   title: tarea.title,
                   status: tarea.status,
@@ -84,10 +88,13 @@ export default async function DetallePage({
             <CardHeader><CardTitle>Qué se pidió</CardTitle></CardHeader>
             <CardContent className="space-y-4 text-sm leading-relaxed">
               <p className="whitespace-pre-wrap">{request.description}</p>
-              <div>
-                <p className="text-xs tracking-wide text-muted-foreground uppercase">Resultado esperado</p>
-                <p className="mt-1 whitespace-pre-wrap">{request.expectedResult}</p>
-              </div>
+              {request.expectedResult ? (
+                <div>
+                  <p className="text-xs tracking-wide text-muted-foreground uppercase">Resultado esperado</p>
+                  <p className="mt-1 whitespace-pre-wrap">{request.expectedResult}</p>
+                </div>
+              ) : null}
+              <p className="text-xs text-muted-foreground">La empresa es la entidad del caso. La marca es la línea de comunicación (CIFES, Luvania o ambas).</p>
               {request.resolution ? (
                 <div>
                   <p className="text-xs tracking-wide text-muted-foreground uppercase">Resolución</p>
@@ -120,7 +127,7 @@ export default async function DetallePage({
                   <p className="text-sm font-medium">
                     {comment.author.name}
                     <span className="ml-2 text-xs font-normal text-muted-foreground">
-                      {ROLE_LABEL[comment.author.role]} · {formatDateTime(comment.createdAt)}
+                      {etiquetaDeAutor(comment.author, request.team)} · {formatDateTime(comment.createdAt)}
                       {comment.internal ? " · Nota interna" : ""}
                     </span>
                   </p>
@@ -133,7 +140,7 @@ export default async function DetallePage({
                 <div key={activity.id} className="border-l-2 border-primary/30 pl-3">
                   <p className="text-sm">{activity.message}</p>
                   <p className="text-xs text-muted-foreground">
-                    {activity.actor?.name ?? "Mesa"} · {formatDateTime(activity.createdAt)}
+                    {activity.actor ? `${activity.actor.name} · ${etiquetaDeAutor(activity.actor, request.team)}` : "Mesa"} · {formatDateTime(activity.createdAt)}
                     {activity.internal ? " · Interno" : ""}
                   </p>
                 </div>

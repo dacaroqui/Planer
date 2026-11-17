@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { SearchIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,14 @@ export function Filtros({
 }) {
   const router = useRouter()
   const params = useSearchParams()
+  const [vistas, setVistas] = useState<{ nombre: string; query: string }[]>([])
+  useEffect(() => {
+    try {
+      setVistas(JSON.parse(localStorage.getItem("mesa-vistas") || "[]"))
+    } catch {
+      setVistas([])
+    }
+  }, [])
 
   function aplicar(clave: string, valor: string) {
     const next = new URLSearchParams(params.toString())
@@ -116,6 +125,16 @@ export function Filtros({
         <Button type="button" size="sm" variant={params.get("assigned") === "1" ? "default" : "outline"} onClick={() => aplicar("assigned", params.get("assigned") === "1" ? "" : "1")}>
           Asignados a mí
         </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => {
+          const nombre = window.prompt("Nombre de la vista")
+          if (!nombre) return
+          const siguientes = [...vistas.filter((item) => item.nombre !== nombre), { nombre, query: params.toString() }]
+          localStorage.setItem("mesa-vistas", JSON.stringify(siguientes))
+          setVistas(siguientes)
+        }}>Guardar vista</Button>
+        {vistas.map((vista) => (
+          <Button key={vista.nombre} type="button" size="sm" variant="outline" onClick={() => router.push(vista.query ? `${ruta}?${vista.query}` : ruta)}>{vista.nombre}</Button>
+        ))}
       </div>
     </div>
   )

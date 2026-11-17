@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { guardarTareaAction } from "@/server/actions"
@@ -48,6 +48,8 @@ export function PlannerTablero({
 }) {
   const router = useRouter()
   const [abierta, setAbierta] = useState<string | null>(null)
+  const [vista, setVista] = useState(grupos)
+  useEffect(() => setVista(grupos), [grupos])
   const [pending, start] = useTransition()
 
   function guardar(data: FormData) {
@@ -66,7 +68,7 @@ export function PlannerTablero({
     event.preventDefault()
     if (!puede) return
     const id = event.dataTransfer.getData("text/plain")
-    const tarea = grupos.flatMap((grupo) => grupo.tareas).find((item) => item.id === id)
+    const tarea = vista.flatMap((grupo) => grupo.tareas).find((item) => item.id === id)
     if (!tarea || tarea.projectId !== projectId) {
       toast.error("Mueva la tarea dentro de su proyecto.")
       return
@@ -76,12 +78,16 @@ export function PlannerTablero({
     data.set("title", tarea.title)
     data.set("status", status)
     if (projectId !== "sin-proyecto") data.set("projectId", projectId)
+    setVista((actual) => actual.map((grupo) => ({
+      ...grupo,
+      tareas: grupo.tareas.map((item) => item.id === id ? { ...item, status: status as TareaPlanner["status"], porcentaje: status === "HECHA" && item.subtareas.length === 0 ? 100 : item.porcentaje } : item),
+    })))
     guardar(data)
   }
 
   return (
     <div className="space-y-8">
-      {grupos.map((grupo) => (
+      {vista.map((grupo) => (
         <section key={grupo.id}>
           <h2 className="font-heading text-2xl">{grupo.nombre}</h2>
           <div className="mt-3 grid gap-3 lg:grid-cols-3">
@@ -125,7 +131,7 @@ export function PlannerTablero({
                                   <input type="hidden" name="status" value="HECHA" />
                                   <input type="hidden" name="parentId" value={tarea.id} />
                                   {tarea.projectId !== "sin-proyecto" ? <input type="hidden" name="projectId" value={tarea.projectId} /> : null}
-                                  <Button type="submit" size="sm" variant="outline" disabled={pending}>Hecha</Button>
+                                  <Button type="submit" size="sm" variant="outline" disabled={pending} aria-label={`Marcar subtarea como hecha: ${sub.title}`}>Marcar subtarea como hecha</Button>
                                 </form>
                               ) : <span>{sub.status === "HECHA" ? "Hecha" : sub.status === "EN_CURSO" ? "En curso" : "Pendiente"}</span>}
                             </div>

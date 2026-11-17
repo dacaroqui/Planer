@@ -1,8 +1,10 @@
 import { Suspense } from "react"
+import { AccionesMasivas } from "@/components/acciones-masivas"
 import { Filtros } from "@/components/filtros"
 import { Paginacion, TablaRequerimientos } from "@/components/tabla"
 import { STATUS_LABEL } from "@/lib/domain"
 import { consultaDesde, queryString } from "@/lib/list-query"
+import { esAdmin } from "@/lib/permissions"
 import { requireActor } from "@/server/session"
 import { listar, opcionesVisibles } from "@/server/requests"
 
@@ -39,6 +41,7 @@ export default async function RequerimientosPage({
           solicitantes={opciones.personas.map((item) => ({ value: item.id, label: item.name }))}
         />
       </Suspense>
+      {esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER") ? <AccionesMasivas codes={data.items.map((item) => item.code)} /> : null}
       <TablaRequerimientos
         items={data.items}
         vacio="No hay requerimientos con esos filtros. Pruebe otra búsqueda o radique uno nuevo."

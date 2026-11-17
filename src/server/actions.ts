@@ -26,12 +26,14 @@ import {
   comentar,
   crearArea,
   crearTipo,
+  cambiarPrioridadMasiva,
   editarCampos,
   eliminarEstado,
   guardarEstado,
   guardarRoles,
   guardarSla,
   guardarTransicion,
+  marcarAvisoLeido,
   marcarAvisosLeidos,
   deshacerTransicion,
   transicionar,
@@ -344,6 +346,12 @@ export async function marcarAvisosAction() {
   refrescar()
 }
 
+export async function marcarAvisoAction(formData: FormData) {
+  const actor = await requireActor()
+  await marcarAvisoLeido(actor, String(formData.get("id") || ""))
+  refrescar()
+}
+
 export async function vigilarSlasAction(): Promise<ActionResult> {
   const actor = await requireActor()
   if (actor.role !== "ADMINISTRADOR") return { ok: false, error: "Solo el administrador dispara la revisión de SLA." }
@@ -433,6 +441,18 @@ function exigir(error: unknown): never {
   throw error
 }
 
+export async function prioridadMasivaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  const codes = String(formData.get("codes") || "").split(",").map((item) => item.trim()).filter(Boolean)
+  try {
+    const total = await cambiarPrioridadMasiva(actor, codes, String(formData.get("priority") || ""))
+    refrescar()
+    return { ok: true, message: `Prioridad actualizada en ${total} requerimientos.` }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
 export async function editarCamposAction(formData: FormData) {
   const actor = await requireActor()
   const code = String(formData.get("code") || "")
@@ -451,6 +471,7 @@ export async function editarCamposAction(formData: FormData) {
     exigir(error)
   }
   refrescar(code)
+  redirect(`/requerimientos/${code}?guardado=1`)
 }
 
 export async function trasladarAction(formData: FormData) {
@@ -565,7 +586,11 @@ export async function guardarTareaAction(formData: FormData): Promise<ActionResu
   refrescar()
   revalidatePath("/proyectos")
   revalidatePath("/planner")
-  return { ok: true, message: status === "HECHA" ? "Tarea hecha. El avance se actualizó." : "Tarea guardada." }
+  const esSubtarea = Boolean(formData.get("parentId"))
+  const mensaje = esSubtarea
+    ? (status === "HECHA" ? "Subtarea marcada como hecha." : "Subtarea guardada.")
+    : (status === "HECHA" ? "Tarea hecha. El avance se actualizó." : "Tarea guardada.")
+  return { ok: true, message: mensaje }
 }
 
 export async function guardarProyectoAction(formData: FormData): Promise<ActionResult> {

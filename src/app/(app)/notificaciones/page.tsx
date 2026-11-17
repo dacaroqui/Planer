@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { marcarAvisosAction } from "@/server/actions"
+import { marcarAvisoAction, marcarAvisosAction } from "@/server/actions"
 import { Button } from "@/components/ui/button"
 import { formatDateTime } from "@/lib/format"
 import { requireActor } from "@/server/session"
@@ -40,6 +40,12 @@ export default async function AvisosPage() {
                     {" · "}
                     <Link className="underline" href={`/requerimientos/${item.request.code}`}>{item.request.code}</Link>
                   </>
+                ) : null}
+                {!item.readAt ? (
+                  <form action={marcarAvisoAction} className="inline">
+                    <input type="hidden" name="id" value={item.id} />
+                    <button className="ml-2 underline" type="submit">Marcar leído</button>
+                  </form>
                 ) : null}
               </p>
             </article>

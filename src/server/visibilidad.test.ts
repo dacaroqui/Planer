@@ -24,6 +24,7 @@ async function reset() {
   await prisma.areaRole.deleteMany()
   await prisma.codeSequence.deleteMany()
   await prisma.user.deleteMany()
+  await prisma.empresa.updateMany({ data: { exigirProyectoAlClasificar: false } })
   await prisma.area.deleteMany()
 }
 
@@ -181,5 +182,6 @@ describe("H-02 H-03 H-05 H-17 visibilidad", () => {
     })
     await transicionar(helena, caso.id, "Iniciar análisis", null, { projectId: proyecto.id })
     expect((await prisma.request.findUniqueOrThrow({ where: { id: caso.id } })).status).toBe("EN_ANALISIS")
+    await prisma.empresa.update({ where: { id: empresa.id }, data: { exigirProyectoAlClasificar: false } })
   })
 })

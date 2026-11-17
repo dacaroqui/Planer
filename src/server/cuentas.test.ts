@@ -27,6 +27,7 @@ async function reset() {
   await prisma.usuarioArea.deleteMany()
   await prisma.areaRole.deleteMany()
   await prisma.user.deleteMany()
+  await prisma.empresa.updateMany({ data: { exigirProyectoAlClasificar: false } })
   await prisma.area.deleteMany()
 }
 

@@ -6,7 +6,6 @@ import { SelectorArchivo } from "@/components/archivo"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { avisoDatosPersonales } from "@/lib/datos-personales"
@@ -194,9 +193,9 @@ export function FormularioRadicar({
 
 function Campo({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1.5">
-      <Label>{etiqueta}</Label>
+    <label className="grid gap-1.5 text-sm">
+      <span className="font-medium">{etiqueta}</span>
       {children}
-    </div>
+    </label>
   )
 }
