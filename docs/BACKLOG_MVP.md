@@ -47,6 +47,8 @@ Fuente: `HUs_Plataforma_Requerimientos.xlsx`. La columna Release dice si la hist
 | RQ-59 | Ayuda contextual por rol | Pedido del dueño |
 | RQ-60 | Autorización por recurso en API | Pedido del dueño |
 
+**RQ-03.** Tipos permitidos: pdf, png, jpg, jpeg, webp, gif, txt, csv, doc, docx, xls, xlsx, ppt y pptx. txt y csv se mantienen. No se admite zip ni exe. Tope 25 MB.
+
 ## Criterios de RQ-46 a RQ-51
 
 **RQ-46.** Dado un líder o administrador, cuando crea una empresa, entonces aparece en los filtros y en el formulario. Dado la semilla, cuando se abre el catálogo, entonces existen CIFES y Luvania. La marca del requerimiento se conserva.
