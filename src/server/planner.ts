@@ -24,7 +24,15 @@ export async function listarPlanner(
     and.push({
       OR: [
         { request: propio },
-        { project: { requests: { some: propio } } },
+        {
+          requestId: null,
+          project: { requests: { some: propio } },
+          OR: [
+            { assigneeId: null },
+            { assigneeId: actor.id },
+            { assignee: { areaRoles: { some: { team: { in: teams } } } } },
+          ],
+        },
       ],
     })
   }

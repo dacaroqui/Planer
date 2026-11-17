@@ -6,6 +6,7 @@ import { toActor } from "@/lib/actor"
 import { puedeRadicar, puedeVerPlanner, equiposVisibles } from "@/lib/permissions"
 import { detalleProyecto } from "@/server/proyectos"
 import { getDetalle, opcionesVisibles, radicar, transicionar } from "@/server/requests"
+import { listarPlanner } from "@/server/planner"
 
 async function reset() {
   await prisma.notification.deleteMany()
@@ -124,9 +125,25 @@ describe("H-02 H-03 H-05 H-17 visibilidad", () => {
     expect(detalle?.requests.map((item) => item.code)).toEqual([propio.code])
     expect(JSON.stringify(detalle)).not.toContain("Julián Secreto")
     expect(await getDetalle(agente, "MKT-0099")).toBeNull()
+    await prisma.request.update({ where: { id: propio.id }, data: { assigneeId: agente.id } })
     const opciones = await opcionesVisibles(ana)
     expect(opciones.personas.map((item) => item.name)).toEqual(["Ana"])
     expect(opciones.personas.map((item) => item.name)).not.toContain("Julián Secreto")
+    expect(opciones.personas.map((item) => item.name)).not.toContain("Valentina")
+    const ajenas = await opcionesVisibles(agente)
+    expect(ajenas.personas.map((item) => item.name)).not.toContain("Julián Secreto")
+    await prisma.tarea.create({
+      data: {
+        title: "Tarea de marketing",
+        projectId: proyecto.id,
+        requestId: (await prisma.request.findUniqueOrThrow({ where: { code: "MKT-0099" } })).id,
+        assigneeId: ajeno.id,
+        createdById: ajeno.id,
+        status: "PENDIENTE",
+      },
+    })
+    const planner = await listarPlanner(agente, {})
+    expect(planner.map((item) => item.title)).not.toContain("Tarea de marketing")
   })
 
   it("el canal es obligatorio y no se sale de Nuevo sin proyecto si la empresa lo exige", async () => {

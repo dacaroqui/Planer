@@ -22,8 +22,19 @@ export function movimientoAlSoltar(tarjetas: TarjetaMovible[], code: string, col
   return { ok: true as const, code: tarjeta.code, moves }
 }
 
+export function movimientoCierra(move: { to: string }) {
+  return move.to === "CERRADO" || move.to === "RECHAZADO" || move.to === "CANCELADO"
+}
+
 export function movimientoExigeDialogo(move: MovimientoTablero) {
-  return Boolean(move.requiresComment || move.requiresDelivery)
+  return Boolean(move.requiresComment || move.requiresDelivery || movimientoCierra(move))
+}
+
+export function debePedirResponsable(
+  tarjeta: { assigneeId?: string | null },
+  move: { requiresAssignee?: boolean },
+) {
+  return Boolean(move.requiresAssignee) && !tarjeta.assigneeId
 }
 
 export function debePedirProyecto(
@@ -33,10 +44,16 @@ export function debePedirProyecto(
   return tarjeta.status === "NUEVO" && Boolean(tarjeta.exigeProyecto) && !tarjeta.projectId && move.to !== "NUEVO" && move.to !== "RECHAZADO" && move.to !== "CANCELADO"
 }
 
-export function validarDatosMovimiento(move: MovimientoTablero, comment: string, deliveryUrl: string) {
-  if (move.requiresAssignee) return "Asigne un responsable en el requerimiento antes de mover la tarjeta."
-  if (move.requiresCommittedDate) return "Defina la fecha comprometida en el requerimiento antes de mover la tarjeta."
-  if (move.requiresComment && comment.trim().length < 2) return "Escriba el motivo. Queda en el historial."
+export function validarDatosMovimiento(
+  move: MovimientoTablero,
+  comment: string,
+  deliveryUrl: string,
+  tarjeta?: { assigneeId?: string | null; committedDate?: string | null },
+) {
+  if (move.requiresAssignee && !tarjeta?.assigneeId) return "Elija un responsable. El cambio no se aplicó."
+  if (move.requiresCommittedDate && !tarjeta?.committedDate) return "Defina la fecha comprometida. El cambio no se aplicó."
+  if ((move.requiresComment || movimientoCierra(move)) && comment.trim().length < 2) return "Escriba el motivo. Queda en el historial."
+  if (movimientoCierra(move) && !comment.trim()) return "Escriba un comentario antes de cerrar."
   if (move.requiresDelivery && deliveryUrl.trim().length > 0 && deliveryUrl.trim().length < 4) return "El enlace de la entrega no es válido."
   return null
 }

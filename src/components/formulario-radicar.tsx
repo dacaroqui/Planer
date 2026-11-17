@@ -1,6 +1,8 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useRef, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { radicarAction } from "@/server/actions"
 import { SelectorArchivo } from "@/components/archivo"
 import { Button } from "@/components/ui/button"
@@ -48,6 +50,8 @@ export function FormularioRadicar({
   const [areaId, setAreaId] = useState(areaInicial?.id ?? "")
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
+  const enviando = useRef(false)
+  const router = useRouter()
   const visibles = useMemo(() => tipos.filter((tipo) => tipo.team === team), [tipos, team])
   const elegido = visibles.find((tipo) => tipo.id === typeId) ?? null
 
@@ -86,9 +90,18 @@ export function FormularioRadicar({
         if (projectId) data.set("projectId", projectId)
         data.set("declares", "1")
         data.set("reviewedPersonalData", reviewed ? "1" : "0")
+        if (enviando.current) return
+        enviando.current = true
         start(async () => {
           const result = await radicarAction(data)
-          if (result && !result.ok) setError(result.error)
+          if (!result.ok) {
+            enviando.current = false
+            setError(result.error)
+            toast.error(result.error)
+            return
+          }
+          toast.success(result.message || `Radicado ${result.code}.`)
+          router.push(`/requerimientos/${result.code}?confirmado=1`)
         })
       }}
     >

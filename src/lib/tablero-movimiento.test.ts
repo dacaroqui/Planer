@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
-import { debePedirProyecto, movimientoAlSoltar, movimientoExigeDialogo, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
+import { debePedirProyecto, debePedirResponsable, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
 
 const tarjetas: TarjetaMovible[] = [
   {
@@ -37,7 +37,8 @@ describe("tablero: la tarjeta arrastrada", () => {
     expect(movimientoExigeDialogo(entregar)).toBe(true)
     expect(validarDatosMovimiento(entregar, "", "")).toMatch(/motivo/)
     expect(validarDatosMovimiento(entregar, "Listo para revisar.", "")).toBeNull()
-    expect(validarDatosMovimiento(tarjetas[1].moves[0], "", "")).toBeNull()
+    expect(validarDatosMovimiento(tarjetas[1].moves[0], "Cierro con este motivo.", "")).toBeNull()
+    expect(validarDatosMovimiento(tarjetas[1].moves[0], "", "")).toMatch(/motivo/)
   })
 
   it("Enviar a pruebas y Entregar para validación conservan los datos obligatorios", () => {
@@ -54,5 +55,15 @@ describe("tablero: la tarjeta arrastrada", () => {
     expect(debePedirProyecto({ status: "NUEVO", exigeProyecto: true, projectId: null }, { to: "EN_ANALISIS" })).toBe(true)
     expect(debePedirProyecto({ status: "NUEVO", exigeProyecto: true, projectId: "p1" }, { to: "EN_ANALISIS" })).toBe(false)
     expect(debePedirProyecto({ status: "NUEVO", exigeProyecto: false, projectId: null }, { to: "EN_ANALISIS" })).toBe(false)
+  })
+
+  it("no pide responsable si ya está asignado y cerrar abre diálogo", () => {
+    const aprobar = { name: "Aprobar", to: "APROBADO", column: "Aprobado / En cola", requiresAssignee: true, requiresCommittedDate: true }
+    expect(debePedirResponsable({ assigneeId: "agente" }, aprobar)).toBe(false)
+    expect(debePedirResponsable({ assigneeId: null }, aprobar)).toBe(true)
+    expect(validarDatosMovimiento(aprobar, "", "", { assigneeId: "agente", committedDate: "2026-11-20" })).toBeNull()
+    const cerrar = { name: "Aprobar entrega", to: "CERRADO", column: "Cerrado" }
+    expect(movimientoCierra(cerrar)).toBe(true)
+    expect(movimientoExigeDialogo(cerrar)).toBe(true)
   })
 })

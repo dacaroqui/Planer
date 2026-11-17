@@ -41,7 +41,7 @@ import {
   vigilarSlas,
 } from "@/server/requests"
 
-export type ActionResult = { ok: true; message?: string; enlace?: string; resumen?: string } | { ok: false; error: string }
+export type ActionResult = { ok: true; message?: string; enlace?: string; resumen?: string; code?: string } | { ok: false; error: string }
 
 function esRedireccion(error: unknown) {
   return typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
@@ -247,7 +247,7 @@ export async function radicarAction(formData: FormData): Promise<ActionResult> {
   const result = await radicarDesdeFormulario(actor, formData)
   if (!result.ok) return result
   refrescar(result.code)
-  redirect(`/requerimientos/${result.code}?confirmado=1`)
+  return { ok: true, code: result.code, message: `Radicado ${result.code}.` }
 }
 
 export async function transicionarAction(formData: FormData): Promise<ActionResult> {
@@ -262,7 +262,13 @@ export async function transicionarAction(formData: FormData): Promise<ActionResu
       request.id,
       String(formData.get("name") || formData.get("to") || ""),
       String(formData.get("comment") || ""),
-      { deliveryUrl: String(formData.get("deliveryUrl") || ""), projectId: String(formData.get("projectId") || "") || null },
+      {
+        deliveryUrl: String(formData.get("deliveryUrl") || ""),
+        projectId: String(formData.get("projectId") || "") || null,
+        assigneeId: String(formData.get("assigneeId") || "") || null,
+        committedDate: String(formData.get("committedDate") || "") || null,
+        resolution: String(formData.get("resolution") || "") || null,
+      },
     )
     refrescar(code)
     const { statusLabel } = await import("@/lib/domain")
@@ -453,7 +459,7 @@ export async function prioridadMasivaAction(formData: FormData): Promise<ActionR
   }
 }
 
-export async function editarCamposAction(formData: FormData) {
+export async function editarCamposAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
   const code = String(formData.get("code") || "")
   try {
@@ -468,10 +474,10 @@ export async function editarCamposAction(formData: FormData) {
       projectId: String(formData.get("projectId") || "") || null,
     })
   } catch (error) {
-    exigir(error)
+    return fallo(error)
   }
   refrescar(code)
-  redirect(`/requerimientos/${code}?guardado=1`)
+  return { ok: true, message: "Clasificación guardada." }
 }
 
 export async function trasladarAction(formData: FormData) {
@@ -509,14 +515,15 @@ export async function guardarEstadoAction(formData: FormData) {
   refrescar()
 }
 
-export async function eliminarEstadoAction(formData: FormData) {
+export async function eliminarEstadoAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
   try {
     await eliminarEstado(actor, String(formData.get("id") || ""), String(formData.get("moveTo") || "") || undefined)
   } catch (error) {
-    exigir(error)
+    return fallo(error)
   }
   refrescar()
+  return { ok: true, message: "Estado eliminado." }
 }
 
 export async function guardarTransicionAction(formData: FormData) {

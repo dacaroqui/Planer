@@ -16,6 +16,7 @@ import {
   editarCampos,
   getDetalle,
   deshacerTransicion,
+  eliminarEstado,
   radicar,
   transicionar,
 } from "@/server/requests"
@@ -297,6 +298,52 @@ describe("tablero: transición, entrega y deshacer", () => {
     const detail = await getDetalle(helena, request.code)
     expect(detail?.request.status).toBe("EN_ANALISIS")
     expect(detail?.request.activities.some((item) => item.message.includes("Se cerró por error en el tablero."))).toBe(true)
+  })
+
+  it("no borra un estado con casos y explica el motivo", async () => {
+    const { incidencia, ana, helena } = await mundo()
+    const admin = toActor(await prisma.user.create({
+      data: { name: "Admin", email: "admin.ejemplo@cifes.edu.co", role: "ADMINISTRADOR", areaId: (await prisma.area.findFirstOrThrow()).id },
+      include: { areaRoles: true },
+    }))
+    await radicar(ana, {
+      ...base,
+      title: "Caso que ocupa Nuevo",
+      description: "Este caso impide borrar el estado Nuevo del flujo de desarrollo.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "BAJA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el aula de prueba y ver el módulo en blanco.",
+    })
+    const nuevo = await prisma.workflowState.findFirstOrThrow({ where: { team: "DESARROLLO", key: "NUEVO" } })
+    await expect(eliminarEstado(admin, nuevo.id)).rejects.toThrow(/tiene \d+ requerimientos/)
+    const vacio = await prisma.workflowState.create({
+      data: { team: "DESARROLLO", key: "PRUEBA_BORRAR", name: "Prueba borrar", category: "ACTIVO", boardColumn: "Prueba borrar", sortOrder: 900 },
+    })
+    await eliminarEstado(admin, vacio.id)
+    expect(await prisma.workflowState.findUnique({ where: { id: vacio.id } })).toBeNull()
+    await expect(eliminarEstado(helena, nuevo.id)).rejects.toThrow(/administrador/)
+  })
+
+  it("aprueba si ya hay responsable y fecha, y no lo pide otra vez", async () => {
+    const { incidencia, ana, helena, valentina } = await mundo()
+    const request = await radicar(ana, {
+      ...base,
+      title: "Caso ya asignado",
+      description: "El responsable y la fecha ya están. Aprobar no debe pedirlos de nuevo.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el aula de prueba y ver el módulo en blanco.",
+    })
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { status: "EN_ANALISIS", assigneeId: valentina.id, committedDate: new Date("2026-11-20") },
+    })
+    await transicionar(helena, request.id, "Aprobar", null)
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: request.id } })).status).toBe("APROBADO")
   })
 })
 

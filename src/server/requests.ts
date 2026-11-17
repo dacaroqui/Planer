@@ -348,7 +348,7 @@ export async function radicar(
     }, messages, actor.id)
     return created
   })
-  await deliver(email, messages)
+  void deliver(email, messages)
   return request
 }
 
@@ -357,7 +357,7 @@ export async function transicionar(
   requestId: string,
   name: string,
   comment: string | null,
-  extra?: { deliveryUrl?: string; projectId?: string | null },
+  extra?: { deliveryUrl?: string; projectId?: string | null; assigneeId?: string | null; committedDate?: string | null; resolution?: string | null },
   deps?: Deps,
 ) {
   const current = await prisma.request.findUnique({
@@ -372,8 +372,10 @@ export async function transicionar(
   if (!transition) throw new DomainError("No puede ejecutar esa transición.")
   const note = comment?.trim() ?? ""
   if (transition.requiresComment && note.length < 2) throw new DomainError("Escriba el motivo o la pregunta. Queda visible para el solicitante.")
-  if (transition.requiresAssignee && !current.assigneeId) throw new DomainError("Asigne un responsable antes de aprobar.")
-  if (transition.requiresCommittedDate && !current.committedDate) throw new DomainError("Defina la fecha comprometida antes de aprobar.")
+  const assigneeId = extra?.assigneeId || current.assigneeId
+  if (transition.requiresAssignee && !assigneeId) throw new DomainError("Elija un responsable antes de aprobar.")
+  const committed = extra?.committedDate || (current.committedDate ? current.committedDate.toISOString().slice(0, 10) : "")
+  if (transition.requiresCommittedDate && !committed) throw new DomainError("Defina la fecha comprometida antes de aprobar.")
   let projectId = current.projectId
   if (extra?.projectId) {
     const proyecto = await prisma.proyecto.findFirst({ where: { id: extra.projectId, empresaId: current.empresaId } })
@@ -395,15 +397,24 @@ export async function transicionar(
   const email = mailer(deps)
   const messages: EmailMessage[] = []
   const updated = await prisma.$transaction(async (tx) => {
-    const data: Prisma.RequestUpdateInput = { status: destino, updatedAt: now, ...(projectId && projectId !== current.projectId ? { project: { connect: { id: projectId } } } : {}) }
+    const data: Prisma.RequestUpdateInput = {
+      status: destino,
+      updatedAt: now,
+      ...(projectId && projectId !== current.projectId ? { project: { connect: { id: projectId } } } : {}),
+      ...(extra?.assigneeId && extra.assigneeId !== current.assigneeId ? { assignee: { connect: { id: extra.assigneeId } } } : {}),
+      ...(extra?.committedDate ? { committedDate: new Date(extra.committedDate) } : {}),
+    }
     if (destino === "EN_ESPERA") data.previousStatus = current.status
     if (transition.toPrevious) data.previousStatus = null
     const entraPausa = !PAUSE_STATUSES.has(current.status) && PAUSE_STATUSES.has(destino)
     const salePausa = PAUSE_STATUSES.has(current.status) && !PAUSE_STATUSES.has(destino)
     if (entraPausa) await tx.slaPause.create({ data: { requestId: current.id, startedAt: now, reason: destino } })
     if (salePausa) await tx.slaPause.updateMany({ where: { requestId: current.id, endedAt: null }, data: { endedAt: now } })
-    if (transition.resolution) {
-      data.resolution = transition.resolution
+    const resoluciones = new Set(["RESUELTO", "NO_SE_HARA", "DUPLICADO", "CANCELADO_SOLICITANTE"])
+    const resolucionElegida = extra?.resolution && resoluciones.has(extra.resolution) ? extra.resolution : null
+    const cierra = destino === "CERRADO" || destino === "RECHAZADO" || destino === "CANCELADO"
+    if (transition.resolution || (resolucionElegida && cierra)) {
+      data.resolution = resolucionElegida || transition.resolution
       data.resolvedAt = now
       data.closedAt = now
     }
@@ -837,11 +848,12 @@ export async function opcionesVisibles(actor: Actor) {
     },
   })
   const porId = <T extends { id: string }>(items: Array<T | null | undefined>) => [...new Map(items.filter((item): item is T => Boolean(item)).map((item) => [item.id, item])).values()]
+  const soloLoPropio = !esAdmin(actor) && actor.memberships.length === 0
   return {
     empresas: porId(rows.map((row) => row.empresa)).sort((a, b) => a.name.localeCompare(b.name, "es")),
     proyectos: porId(rows.map((row) => row.project)).sort((a, b) => a.name.localeCompare(b.name, "es")),
     tipos: porId(rows.map((row) => row.type)).sort((a, b) => a.name.localeCompare(b.name, "es")),
-    personas: porId(rows.flatMap((row) => [row.requester, row.assignee])).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    personas: porId(rows.flatMap((row) => (soloLoPropio ? [row.requester] : [row.requester, row.assignee]))).sort((a, b) => a.name.localeCompare(b.name, "es")),
   }
 }
 
@@ -1197,7 +1209,11 @@ export async function eliminarEstado(actor: Actor, id: string, moveToKey?: strin
   if (usados > 0) {
     throw new DomainError(`El estado «${state.name}» tiene ${usados} requerimientos. Muévalos a otro estado antes de eliminarlo.`)
   }
-  await prisma.workflowState.delete({ where: { id } })
+  try {
+    await prisma.workflowState.delete({ where: { id } })
+  } catch {
+    throw new DomainError(`No se puede eliminar «${state.name}» porque el flujo todavía lo usa. Quite primero las transiciones que entran o salen de ese estado.`)
+  }
 }
 
 export async function guardarTransicion(
