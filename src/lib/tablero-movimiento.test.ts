@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
-import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, dentroDeVentanaDeshacer, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, transicionDeDetalle, VENTANA_DESHACER_MS, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, camposRequeridos, debePedirProyecto, debePedirResponsable, dentroDeVentanaDeshacer, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, tituloConfirmacion, transicionDeDetalle, VENTANA_DESHACER_MS, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
 
 const tarjetas: TarjetaMovible[] = [
   {
@@ -15,6 +15,17 @@ const tarjetas: TarjetaMovible[] = [
     ],
   },
 ]
+
+describe("confirmación al soltar", () => {
+  it("nombra la transición y los campos que pide antes de aplicarla", () => {
+    expect(tituloConfirmacion("Iniciar análisis")).toBe("Confirmar «Iniciar análisis»")
+    expect(camposRequeridos({ to: "EN_ANALISIS" })).toEqual([])
+    expect(camposRequeridos({ to: "EN_ESPERA", requiresComment: true })).toEqual(["Comentario"])
+    expect(camposRequeridos({ to: "EN_VALIDACION", requiresComment: true, requiresDelivery: true })).toEqual(["Comentario", "Enlace o adjunto de la entrega"])
+    expect(camposRequeridos({ to: "APROBADO", requiresAssignee: true, requiresCommittedDate: true })).toEqual(["Responsable", "Fecha comprometida"])
+    expect(camposRequeridos({ to: "CERRADO" })).toEqual(["Comentario"])
+  })
+})
 
 describe("tablero: la tarjeta arrastrada", () => {
   it("usa el código arrastrado y no el de otra tarjeta de la misma columna", () => {

@@ -53,6 +53,7 @@ export function Marco({
   children: React.ReactNode
 }) {
   const path = usePathname()
+  const inicio = actor.role === "SOLICITANTE" ? "/mis-solicitudes" : "/panel"
   const [abierta, setAbierta] = useState(true)
   const [recientes, setRecientes] = useState<EspacioNav[]>([])
   const [espaciosAbiertos, setEspaciosAbiertos] = useState(true)
@@ -75,7 +76,7 @@ export function Marco({
       <aside className={cn("hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex lg:flex-col", abierta ? "px-3" : "px-2")}>
         <div className="flex items-center justify-between py-4">
           {abierta ? (
-            <Link href="/panel" className="px-2">
+            <Link href={inicio} className="px-2">
               <p className="text-lg font-semibold leading-none text-[#1658B0]">Planer</p>
               <p className="mt-1 text-[11px] text-muted-foreground">CIFES · Luvania</p>
             </Link>
@@ -85,9 +86,9 @@ export function Marco({
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto pb-6 text-sm" aria-label="Principal">
-          <Enlace href="/panel" activo={path === "/panel"} etiqueta="Para ti" icono={<HomeIcon className="size-4" />} compacta={!abierta} />
-          <Recientes items={recientes} compacta={!abierta} />
-          <Enlace href="/panel?tab=marcado" activo={path === "/panel"} etiqueta="Marcados como favoritos" icono={<StarIcon className="size-4" />} compacta={!abierta} />
+          {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel" activo={path === "/panel"} etiqueta="Para ti" icono={<HomeIcon className="size-4" />} compacta={!abierta} />}
+          <Recientes items={recientes} compacta={!abierta} destino={inicio} />
+          {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel?tab=marcado" activo={path === "/panel"} etiqueta="Marcados como favoritos" icono={<StarIcon className="size-4" />} compacta={!abierta} />}
           <div className="mt-3">
             <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent" onClick={() => setEspaciosAbiertos((v) => !v)} aria-expanded={espaciosAbiertos}>
               <ChevronDownIcon className={cn("size-3", espaciosAbiertos ? "" : "-rotate-90")} />
@@ -125,7 +126,7 @@ export function Marco({
       </aside>
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-white px-3 py-2">
-          <Link href="/panel" className="text-sm font-semibold text-[#1658B0] lg:hidden">Planer</Link>
+          <Link href={inicio} className="text-sm font-semibold text-[#1658B0] lg:hidden">Planer</Link>
           <form action="/requerimientos" className="mx-auto w-full max-w-xl">
             <input id="busqueda-global" name="q" aria-label="Buscar por código o título" placeholder="Buscar" className="h-9 w-full rounded-md border border-input bg-[#F4F7FC] px-3 text-sm" />
           </form>
@@ -165,8 +166,8 @@ function Enlace({ href, etiqueta, icono, activo, compacta }: { href: string; eti
   )
 }
 
-function Recientes({ items, compacta }: { items: EspacioNav[]; compacta: boolean }) {
-  if (compacta) return <Enlace href="/panel?tab=reciente" activo={false} etiqueta="Recientes" icono={<ClockIcon className="size-4" />} compacta />
+function Recientes({ items, compacta, destino }: { items: EspacioNav[]; compacta: boolean; destino: string }) {
+  if (compacta) return <Enlace href={destino} activo={false} etiqueta="Recientes" icono={<ClockIcon className="size-4" />} compacta />
   return (
     <div>
       <p className="flex items-center gap-2 px-2 py-1.5 text-sm"><ClockIcon className="size-4" /> Recientes</p>

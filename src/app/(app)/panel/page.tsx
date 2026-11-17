@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import { ParaTi } from "@/components/para-ti"
 import { catalogoPara } from "@/server/catalogo-nav"
 import { resumen } from "@/server/requests"
@@ -9,6 +10,7 @@ export default async function PanelPage({
   searchParams: Promise<{ tab?: string }>
 }) {
   const actor = await requireActor()
+  if (actor.role === "SOLICITANTE") redirect("/mis-solicitudes")
   const params = await searchParams
   const opciones = await catalogoPara(actor)
   const data = await resumen(actor)

@@ -48,6 +48,8 @@ export default async function TableroEspacioPage({
             to: move.to,
             requiresComment: Boolean(move.requiresComment),
             requiresDelivery: Boolean(move.requiresDelivery),
+            requiresAssignee: Boolean(move.requiresAssignee),
+            requiresCommittedDate: Boolean(move.requiresCommittedDate),
           })) : []
           return {
             code: item.code,

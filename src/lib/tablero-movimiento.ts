@@ -82,6 +82,25 @@ export function marcaObligatoria(etiqueta: string) {
   return { etiqueta: `${etiqueta} *`, ariaRequired: true as const }
 }
 
+export function tituloConfirmacion(nombre: string) {
+  return `Confirmar «${nombre}»`
+}
+
+export function camposRequeridos(move: {
+  to?: string
+  requiresComment?: boolean
+  requiresDelivery?: boolean
+  requiresAssignee?: boolean
+  requiresCommittedDate?: boolean
+}) {
+  const campos: string[] = []
+  if (move.requiresComment || move.to === "CERRADO" || move.to === "RECHAZADO" || move.to === "CANCELADO") campos.push("Comentario")
+  if (move.requiresDelivery) campos.push("Enlace o adjunto de la entrega")
+  if (move.requiresAssignee) campos.push("Responsable")
+  if (move.requiresCommittedDate) campos.push("Fecha comprometida")
+  return campos
+}
+
 export function movimientoExigeDialogo(move: MovimientoTablero) {
   return Boolean(move.requiresComment || move.requiresDelivery || movimientoCierra(move))
 }

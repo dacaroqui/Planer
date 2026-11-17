@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CamposMovimiento } from "@/components/campos-movimiento"
-import { avisoTrasMovimiento, debePedirProyecto, debePedirResponsable, movimientoAlSoltar, movimientoExigeDialogo, VENTANA_DESHACER_MS, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, camposRequeridos, debePedirProyecto, debePedirResponsable, movimientoAlSoltar, tituloConfirmacion, VENTANA_DESHACER_MS, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
 import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 
 export type Tarjeta = {
@@ -126,19 +126,13 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
     }
     const move = decision.moves[0]
     const tarjeta = tarjetas.find((item) => item.code === decision.code)
-    const pideResponsable = tarjeta ? debePedirResponsable(tarjeta, move) : Boolean(move.requiresAssignee)
-    const pideFecha = Boolean(move.requiresCommittedDate) && !tarjeta?.committedDate
-    if (decision.moves.length > 1 || movimientoExigeDialogo(move) || pideResponsable || pideFecha || (tarjeta && debePedirProyecto(tarjeta, move))) {
-      setMotivo("")
-      setEntrega("")
-      setProyectoId(tarjeta?.projectId ?? "")
-      setResponsableId(tarjeta?.assigneeId ?? "")
-      setFecha(tarjeta?.committedDate ?? "")
-      setResolucion("RESUELTO")
-      setDialogo({ code: decision.code, moves: decision.moves, elegido: move.name })
-      return
-    }
-    ejecutar(decision.code, move, "", "")
+    setMotivo("")
+    setEntrega("")
+    setProyectoId(tarjeta?.projectId ?? "")
+    setResponsableId(tarjeta?.assigneeId ?? "")
+    setFecha(tarjeta?.committedDate ?? "")
+    setResolucion("RESUELTO")
+    setDialogo({ code: decision.code, moves: decision.moves, elegido: move.name })
   }
 
   return (
@@ -205,8 +199,10 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
       <Dialog open={Boolean(dialogo)} onOpenChange={(open) => { if (!open) setDialogo(null) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mover {dialogo?.code}</DialogTitle>
+            <DialogTitle>{movimiento ? tituloConfirmacion(movimiento.name) : `Mover ${dialogo?.code}`}</DialogTitle>
           </DialogHeader>
+          <p className="text-sm text-muted-foreground">Si cancela, la tarjeta se queda en su columna.</p>
+          {movimiento && camposRequeridos(movimiento).length > 0 ? <p className="text-sm">Este paso pide: {camposRequeridos(movimiento).join(", ")}.</p> : <p className="text-sm">Este paso no pide datos adicionales.</p>}
           {dialogo && dialogo.moves.length > 1 ? (
             <div className="grid gap-2">
               {dialogo.moves.map((item) => (

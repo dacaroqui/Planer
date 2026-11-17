@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { FichaSeguimiento, LineaEstados } from "@/components/seguimiento-solicitud"
 import { Gestion } from "@/components/gestion"
 import { TareasPanel } from "@/components/tareas-panel"
 import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
@@ -13,7 +14,8 @@ import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
 import { TEXTO_AVANCE_REQUERIMIENTO, avanceDesdeLista, tareaVencida } from "@/lib/avance"
 import { transicionDeDetalle } from "@/lib/tablero-movimiento"
-import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
+import { BRAND_LABEL, PRIORITY_LABEL, statusLabel, type BrandName, type PriorityName } from "@/lib/domain"
+import { armarEtapas, pasoEsperado } from "@/lib/seguimiento"
 import { RESOLUCION_LABEL } from "@/lib/flujo-oficial"
 import { FormularioClasificar } from "@/components/formulario-clasificar"
 import { puedeGestionarTareas } from "@/server/proyectos"
@@ -64,8 +66,29 @@ export default async function DetallePage({
           <EquipoBadge team={request.team} />
         </div>
         <p className="mt-2 text-sm text-muted-foreground">Radicado {formatDateTime(request.createdAt)} por {request.requester.name}.</p>
-        <p className="mt-2 text-sm">Siguiente paso: {detail.transitions[0]?.name ?? "No hay acciones pendientes para su rol."}</p>
+        <div className="mt-4 rounded-xl border border-[#dfe1e6] bg-white p-4">
+          <FichaSeguimiento
+            codigo={request.code}
+            etapas={armarEtapas({
+              status: request.status,
+              createdAt: request.createdAt,
+              updatedAt: request.updatedAt,
+              cambios: request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({ toValue: item.toValue, createdAt: item.createdAt })),
+            })}
+            responsable={request.assignee?.name ?? "Sin responsable todavía"}
+            sla={sla.state}
+            vence={sla.dueAt ? sla.dueAt.toISOString() : null}
+            paso={pasoEsperado(request.status)}
+            ctaHref="#gestion"
+          />
+        </div>
       </div>
+      <LineaEstados cambios={request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({
+        id: item.id,
+        cuando: item.createdAt.toISOString(),
+        texto: item.fromValue && item.toValue ? `${statusLabel(item.fromValue)} → ${statusLabel(item.toValue)}. ${item.message}` : item.message,
+        autor: item.actor?.name ?? "Planer",
+      }))} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-8">
           <section aria-labelledby="pedido" className="space-y-3">

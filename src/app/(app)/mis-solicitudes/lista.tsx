@@ -2,43 +2,49 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { EstadoBadge } from "@/components/insignias"
+import { FichaSeguimiento } from "@/components/seguimiento-solicitud"
 import { Button } from "@/components/ui/button"
-import { formatDateTime } from "@/lib/format"
+import type { SlaState } from "@/lib/domain"
+import type { EtapaVista } from "@/lib/seguimiento"
 
 export type Solicitud = {
   code: string
   title: string
-  team: string
   status: string
   assignee: string
-  updatedAt: string
+  sla: SlaState
+  vence: string | null
+  paso: { texto: string; cta: string | null }
+  etapas: EtapaVista[]
+  cerrado: boolean
 }
 
 export function ListaMisSolicitudes({ items }: { items: Solicitud[] }) {
   const [filtro, setFiltro] = useState<"abiertos" | "cerrados">("abiertos")
-  const visibles = useMemo(() => items.filter((item) => {
-    const cerrado = ["CERRADO", "RECHAZADO", "CANCELADO"].includes(item.status)
-    return filtro === "cerrados" ? cerrado : !cerrado
-  }), [items, filtro])
+  const visibles = useMemo(() => items.filter((item) => filtro === "cerrados" ? item.cerrado : !item.cerrado), [items, filtro])
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
         <Button type="button" size="sm" variant={filtro === "abiertos" ? "default" : "outline"} onClick={() => setFiltro("abiertos")}>Abiertos</Button>
         <Button type="button" size="sm" variant={filtro === "cerrados" ? "default" : "outline"} onClick={() => setFiltro("cerrados")}>Cerrados</Button>
       </div>
-      {visibles.length === 0 ? <p className="text-sm text-muted-foreground">No tiene requerimientos en este grupo.</p> : (
-        <div className="grid gap-2">
+      {visibles.length === 0 ? <p className="text-sm text-muted-foreground">No tiene solicitudes en este grupo.</p> : (
+        <div className="grid gap-3">
           {visibles.map((item) => (
-            <Link key={item.code} href={`/requerimientos/${item.code}`} className="rounded-xl border border-border bg-card px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{item.title}</span>
-                <EstadoBadge status={item.status} />
+            <article key={item.code} className="rounded-xl border border-[#dfe1e6] bg-white px-4 py-4">
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                <Link href={`/requerimientos/${item.code}`} className="font-medium text-[#15122A] hover:underline">{item.title}</Link>
+                <Link href={`/requerimientos/${item.code}`} className="text-xs font-medium text-[#1658B0] hover:underline">{item.code}</Link>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {item.code} · {item.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {item.assignee} · {formatDateTime(new Date(item.updatedAt))}
-              </p>
-            </Link>
+              <FichaSeguimiento
+                codigo={item.code}
+                etapas={item.etapas}
+                responsable={item.assignee}
+                sla={item.sla}
+                vence={item.vence}
+                paso={item.paso}
+              />
+            </article>
           ))}
         </div>
       )}

@@ -5,7 +5,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Avatar, IconoPrioridad, IconoTipo } from "@/components/iconos-planer"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { transicionarAction } from "@/server/actions"
+import { camposRequeridos, tituloConfirmacion } from "@/lib/tablero-movimiento"
 import { COLUMNAS_KANBAN, claveGrupo, columnaDeEstado, necesitaInformacion, transicionHaciaColumna, type ColumnaKanban, type GrupoTablero } from "@/lib/kanban"
 import { FilterIcon, MoreHorizontalIcon, SlidersHorizontalIcon } from "lucide-react"
 import { PRIORITY_LABEL } from "@/lib/domain"
@@ -20,7 +23,7 @@ export type TarjetaEspacio = {
   marca: string
   asignado: string
   assigneeId: string | null
-  moves: { name: string; to: string; requiresComment?: boolean; requiresDelivery?: boolean }[]
+  moves: { name: string; to: string; requiresComment?: boolean; requiresDelivery?: boolean; requiresAssignee?: boolean; requiresCommittedDate?: boolean }[]
 }
 
 export type EstadoEspacio = { key: string; name: string; category: string }
@@ -46,6 +49,9 @@ export function TableroEspacio({
   const [menu, setMenu] = useState(false)
   const [grupo, setGrupo] = useState<GrupoTablero>("ninguno")
   const [pending, start] = useTransition()
+  const [confirma, setConfirma] = useState<TarjetaEspacio["moves"][number] & { code: string } | null>(null)
+  const [motivo, setMotivo] = useState("")
+  const [entrega, setEntrega] = useState("")
   const avatares = [...new Set(tarjetas.map((item) => item.asignado).filter(Boolean))]
   const yo = tarjetas.find((item) => item.assigneeId === actorId)?.asignado
   const areas = [...new Set(tarjetas.map((item) => item.area).filter(Boolean))]
@@ -79,20 +85,26 @@ export function TableroEspacio({
       toast.error(decision.error)
       return
     }
-    if (decision.move.requiresComment || decision.move.requiresDelivery || decision.move.to === "CERRADO") {
-      toast.error("Ese paso pide datos en el detalle. La tarjeta vuelve a su lugar.")
-      return
-    }
+    setMotivo("")
+    setEntrega("")
+    setConfirma({ code, ...decision.move })
+  }
+
+  function aplicar() {
+    if (!confirma) return
     const data = new FormData()
-    data.set("code", code)
-    data.set("name", decision.move.name)
+    data.set("code", confirma.code)
+    data.set("name", confirma.name)
+    if (motivo.trim()) data.set("comment", motivo.trim())
+    if (entrega.trim()) data.set("deliveryUrl", entrega.trim())
     start(async () => {
       const result = await transicionarAction(data)
       if (!result.ok) {
         toast.error(result.error)
         return
       }
-      toast.success(result.message || `${code} cambió de columna.`)
+      toast.success(result.message || `${confirma.code} cambió de columna.`)
+      setConfirma(null)
       router.refresh()
     })
   }
@@ -185,6 +197,34 @@ export function TableroEspacio({
           </div>
         </section>
       ))}
+      <Dialog open={Boolean(confirma)} onOpenChange={(abierto) => { if (!abierto && !pending) setConfirma(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirma ? tituloConfirmacion(confirma.name) : "Confirmar"}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{confirma ? `${confirma.code} cambiará con «${confirma.name}». Si cancela, la tarjeta se queda donde está.` : null}</p>
+          {confirma && camposRequeridos(confirma).length > 0 ? <p className="text-sm">Este paso pide: {camposRequeridos(confirma).join(", ")}.</p> : <p className="text-sm">Este paso no pide datos adicionales.</p>}
+          {confirma?.requiresComment || confirma?.to === "CERRADO" ? (
+            <label className="grid gap-1 text-sm">
+              Comentario
+              <textarea value={motivo} onChange={(event) => setMotivo(event.target.value)} className="min-h-20 rounded-md border border-[#dfe1e6] px-2 py-1" />
+            </label>
+          ) : null}
+          {confirma?.requiresDelivery ? (
+            <label className="grid gap-1 text-sm">
+              Enlace de la entrega
+              <input value={entrega} onChange={(event) => setEntrega(event.target.value)} className="h-9 rounded-md border border-[#dfe1e6] px-2" />
+            </label>
+          ) : null}
+          {confirma && (confirma.requiresAssignee || confirma.requiresCommittedDate) ? (
+            <p className="text-sm">El responsable o la fecha se completan en el detalle si todavía no están.</p>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirma(null)} disabled={pending}>Cancelar</Button>
+            <Button type="button" onClick={aplicar} disabled={pending || !confirma}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
