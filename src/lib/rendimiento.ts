@@ -293,6 +293,62 @@ function acotar(value?: string) {
   return value
 }
 
+const PERIODO_CORTO: Record<PeriodoClave, string> = {
+  semana: "Semana",
+  mes: "Mes",
+  anio: "Año",
+  rango: "Rango",
+}
+
+export type ChipRendimiento = { id: string; texto: string; patch: Partial<FiltrosRendimiento> }
+
+export function filtrosLimpios(): Partial<FiltrosRendimiento> {
+  return {
+    periodo: "mes",
+    desde: undefined,
+    hasta: undefined,
+    personas: [],
+    areaId: undefined,
+    empresaId: undefined,
+    equipo: undefined,
+    tipoId: undefined,
+    prioridad: undefined,
+  }
+}
+
+export function chipsRendimiento(
+  filtros: FiltrosRendimiento,
+  nombres: { persona: Map<string, string>; area: Map<string, string>; empresa: Map<string, string>; tipo: Map<string, string> },
+): ChipRendimiento[] {
+  const chips: ChipRendimiento[] = []
+  if (filtros.periodo !== "mes") {
+    const detalle = filtros.periodo === "rango" && filtros.desde && filtros.hasta
+      ? `${filtros.desde} – ${filtros.hasta}`
+      : PERIODO_CORTO[filtros.periodo]
+    chips.push({
+      id: "periodo",
+      texto: `Periodo: ${detalle}`,
+      patch: { periodo: "mes", desde: undefined, hasta: undefined },
+    })
+  }
+  for (const id of filtros.personas) {
+    chips.push({
+      id: `persona-${id}`,
+      texto: `Persona: ${nombres.persona.get(id) ?? id}`,
+      patch: { personas: filtros.personas.filter((item) => item !== id) },
+    })
+  }
+  if (filtros.areaId) chips.push({ id: "area", texto: `Área: ${nombres.area.get(filtros.areaId) ?? filtros.areaId}`, patch: { areaId: undefined } })
+  if (filtros.empresaId) chips.push({ id: "empresa", texto: `Espacio: ${nombres.empresa.get(filtros.empresaId) ?? filtros.empresaId}`, patch: { empresaId: undefined } })
+  if (filtros.equipo) chips.push({ id: "equipo", texto: `Equipo: ${filtros.equipo === "DESARROLLO" ? "Desarrollo" : "Marketing"}`, patch: { equipo: undefined } })
+  if (filtros.tipoId) chips.push({ id: "tipo", texto: `Tipo: ${nombres.tipo.get(filtros.tipoId) ?? filtros.tipoId}`, patch: { tipoId: undefined } })
+  if (filtros.prioridad) {
+    const prioridad = { BAJA: "Baja", MEDIA: "Media", ALTA: "Alta", CRITICA: "Crítica" }[filtros.prioridad]
+    chips.push({ id: "prioridad", texto: `Prioridad: ${prioridad}`, patch: { prioridad: undefined } })
+  }
+  return chips
+}
+
 export function hrefRendimiento(base: string, filtros: FiltrosRendimiento, patch: Partial<FiltrosRendimiento> = {}) {
   const next = { ...filtros, ...patch }
   const params = new URLSearchParams()

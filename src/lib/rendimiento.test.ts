@@ -5,7 +5,10 @@ import {
   alcanceRendimiento,
   aplicarSeleccion,
   armarTablero,
+  chipsRendimiento,
   filasACsv,
+  filtrosLimpios,
+  hrefRendimiento,
   instanteDeCorte,
   leerFiltros,
   mediana,
@@ -13,6 +16,7 @@ import {
   rangoPeriodo,
   serieTendencia,
   type FilaRendimiento,
+  type FiltrosRendimiento,
   type PersonaCandidata,
   type PersonaRendimiento,
   type SolicitudMedible,
@@ -315,6 +319,40 @@ describe("permisos del rendimiento", () => {
     expect(filtros.personas).toEqual(["val", "cam"])
     expect(filtros.equipo).toBeUndefined()
     expect(filtros.prioridad).toBe("ALTA")
+  })
+
+  it("arma chips que se quitan sin perder el resto de la consulta", () => {
+    const base: FiltrosRendimiento = {
+      periodo: "semana",
+      personas: ["val", "cam"],
+      areaId: "tec",
+      empresaId: "cifes",
+      equipo: "DESARROLLO",
+      tipoId: "bug",
+      prioridad: "ALTA",
+      orden: "asignados",
+      dir: "desc",
+    }
+    const chips = chipsRendimiento(base, {
+      persona: new Map([["val", "Valentina"], ["cam", "Camila"]]),
+      area: new Map([["tec", "Tecnología"]]),
+      empresa: new Map([["cifes", "CIFES"]]),
+      tipo: new Map([["bug", "Error (bug)"]]),
+    })
+    expect(chips.map((chip) => chip.texto)).toEqual([
+      "Periodo: Semana",
+      "Persona: Valentina",
+      "Persona: Camila",
+      "Área: Tecnología",
+      "Espacio: CIFES",
+      "Equipo: Desarrollo",
+      "Tipo: Error (bug)",
+      "Prioridad: Alta",
+    ])
+    const sinCamila = chips.find((chip) => chip.id === "persona-cam")
+    expect(hrefRendimiento("/rendimiento/exportar", { ...base, ...sinCamila?.patch })).toContain("persona=val")
+    expect(hrefRendimiento("/rendimiento/exportar", { ...base, ...sinCamila?.patch })).not.toContain("persona=cam")
+    expect(hrefRendimiento("/rendimiento", { ...base, ...filtrosLimpios() })).toBe("/rendimiento?periodo=mes&orden=asignados&dir=desc")
   })
 })
 
