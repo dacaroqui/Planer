@@ -131,6 +131,7 @@ export function Marco({
             <div className="mt-4 border-t border-sidebar-border pt-3">
               {abierta ? <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">Administración</p> : null}
               <Enlace href="/admin/usuarios" activo={path.startsWith("/admin/usuarios")} etiqueta="Usuarios" icono={<UsersIcon className="size-4" />} compacta={!abierta} />
+              <Enlace href="/admin/areas" activo={path.startsWith("/admin/areas")} etiqueta="Áreas" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/catalogos" activo={path.startsWith("/admin/catalogos")} etiqueta="Catálogos" icono={<BookOpenIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/flujos" activo={path.startsWith("/admin/flujos")} etiqueta="Flujos y SLA" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
             </div>
