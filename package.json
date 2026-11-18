@@ -10,6 +10,7 @@
     "start": "sh scripts/start.sh",
     "create-admin": "tsx scripts/create-admin.ts",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "DATABASE_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test DIRECT_URL=postgresql://requerimientos:requerimientos@127.0.0.1:5432/requerimientos_test prisma migrate deploy && vitest run",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",

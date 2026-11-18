@@ -206,6 +206,8 @@ model Tarea {
 
   @@index([requestId])
   @@index([projectId])
+  @@index([assigneeId, createdAt])
+  @@index([assigneeId, completedAt])
 }
 
 model AreaRole {
@@ -349,6 +351,8 @@ model Request {
   @@index([areaId])
   @@index([resolvedAt])
   @@index([team, status, updatedAt])
+  @@index([assigneeId, createdAt])
+  @@index([assigneeId, resolvedAt])
 }
 
 model SlaPause {
@@ -358,6 +362,8 @@ model SlaPause {
   startedAt DateTime
   endedAt   DateTime?
   reason    String
+
+  @@index([requestId, startedAt])
 }
 
 model Comment {

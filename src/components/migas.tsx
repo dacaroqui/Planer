@@ -15,6 +15,7 @@ const NOMBRES: Record<string, string> = {
   proyectos: "Proyectos",
   planner: "Planner",
   gerencia: "Panel de gestión",
+  rendimiento: "Rendimiento",
   ayuda: "Ayuda",
   "mis-solicitudes": "Mis solicitudes",
   notificaciones: "Avisos",

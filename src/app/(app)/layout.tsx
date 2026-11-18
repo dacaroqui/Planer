@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { Esqueleto } from "@/components/esqueleto"
 import { Marco } from "@/components/marco"
+import { alcanceRendimiento } from "@/lib/rendimiento"
 import { puedeAdministrar, puedeRadicar, puedeVerPlanner } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { catalogoPara } from "@/server/catalogo-nav"
@@ -14,6 +15,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const unread = await prisma.notification.count({ where: { userId: actor.id, readAt: null } })
   const lider = actor.isAdmin || actor.memberships.some((item) => item.role === "LIDER")
   const equipo = actor.isAdmin || actor.memberships.length > 0
+  const alcance = alcanceRendimiento(actor)
+  const rendimiento = alcance.tipo === "ninguno" ? null : alcance.tipo === "propio" ? "propio" as const : "equipo" as const
   return (
     <Marco
       actor={actor}
@@ -24,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       puedePlanner={puedeVerPlanner(actor)}
       puedeCola={lider}
       puedeTablero={equipo}
+      rendimiento={rendimiento}
     >
       <Suspense fallback={<Esqueleto />}>{children}</Suspense>
     </Marco>

@@ -36,7 +36,8 @@ import {
   esAdmin,
   rolEn,
 } from "@/lib/permissions"
-import { addBusinessMinutes, describeWindows, slaSnapshot, windowsFromEnv, type PauseInterval } from "@/lib/sla"
+import { snapshotSolucion } from "@/lib/sla-solicitud"
+import { addBusinessMinutes, describeWindows } from "@/lib/sla"
 import { ZONE } from "@/lib/time"
 
 type Tx = Prisma.TransactionClient
@@ -65,10 +66,6 @@ function mailer(deps?: Deps) {
 function link(code: string) {
   return `${appBaseUrl()}/requerimientos/${code}`
 }
-function pausesOf(pauses: { startedAt: Date; endedAt: Date | null }[]): PauseInterval[] {
-  return pauses.map((pause) => ({ startedAt: pause.startedAt, endedAt: pause.endedAt }))
-}
-
 export function evaluarSla(request: {
   slaStartedAt: Date
   resolutionMinutes?: number
@@ -81,19 +78,7 @@ export function evaluarSla(request: {
   firstResponseStoppedAt?: Date | null
   firstResponseMet?: boolean | null
 }, now = new Date()) {
-  const target = request.resolutionMinutes || request.slaTargetMinutes
-  const solution = slaSnapshot(
-    {
-      startedAt: request.slaStartedAt,
-      targetMinutes: target,
-      pauses: pausesOf(request.pauses),
-      now,
-      resolvedAt: request.resolvedAt,
-      cancelled: request.status === "CANCELADO" || request.status === "RECHAZADO",
-      riskRatio: Number(process.env.SLA_RISK_RATIO || 0.75),
-    },
-    windowsFromEnv(),
-  )
+  const { snap: solution } = snapshotSolucion(request, now)
   const firstTarget = request.firstResponseMinutes ?? 0
   let firstState: "A_TIEMPO" | "EN_RIESGO" | "VENCIDO" | "CUMPLIDO" | "INCUMPLIDO" | "NO_APLICA" = "NO_APLICA"
   if (firstTarget > 0 && request.firstResponseDueAt) {

@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client"
+import { DateTime } from "luxon"
 import { esSemillaDemo } from "../src/lib/semilla-modo"
+import { businessMinutesBetween } from "../src/lib/sla"
 import { asegurarCatalogo } from "../src/server/semilla"
 import { toActor } from "../src/lib/actor"
 import { radicar, transicionar, asignar, editarCampos } from "../src/server/requests"
@@ -96,6 +98,7 @@ export async function sembrar() {
     brand: "LUVANIA",
     justification: "La pauta de la semana no tiene pieza aprobada.",
     channels: "Instagram",
+    publishAt: "2026-11-21",
     declares: true,
   }, { email })
   await transicionar(sara, piezaReq.id, "Revisar brief", null, {}, { email })
@@ -203,7 +206,186 @@ export async function sembrar() {
   await prisma.comment.create({ data: { requestId: reqAula.id, authorId: valentinaUser.id, body: "El fallo está en un recurso de video del módulo de **prueba**.", internal: false } })
   await prisma.comment.create({ data: { requestId: reqAula.id, authorId: anaUser.id, body: "Confirmo que pasa solo en la cohorte demo.", internal: false } })
   await prisma.comment.create({ data: { requestId: reqHistoria.id, authorId: camilaUser.id, body: "La primera versión usa solo ilustración, sin fotografías.", internal: false } })
+  await variarRendimientoDemo()
   console.log("Semilla demo lista. Usuarios @cifes.edu.co, sin contraseña.")
+}
+
+async function variarRendimientoDemo() {
+  const zona = "America/Bogota"
+  const hoy = DateTime.now().setZone(zona).startOf("day")
+  const lunes = hoy.startOf("week")
+  const en = (dias: number, hora: number, minuto = 0) =>
+    hoy.plus({ days: dias }).set({ hour: hora, minute: minuto, second: 0, millisecond: 0 }).toJSDate()
+  const marca = (fecha: DateTime) => fecha.toJSDate()
+  const valentina = await prisma.user.findUniqueOrThrow({ where: { email: "valentina.ejemplo@cifes.edu.co" } })
+  const mateo = await prisma.user.findUniqueOrThrow({ where: { email: "mateo.ejemplo@cifes.edu.co" } })
+  const camila = await prisma.user.findUniqueOrThrow({ where: { email: "camila.ejemplo@cifes.edu.co" } })
+  const helena = await prisma.user.findUniqueOrThrow({ where: { email: "helena.ejemplo@cifes.edu.co" } })
+  const ana = await prisma.user.findUniqueOrThrow({ where: { email: "ana.ejemplo@cifes.edu.co" } })
+  const julian = await prisma.user.findUniqueOrThrow({ where: { email: "julian.ejemplo@cifes.edu.co" } })
+  const cifes = await prisma.empresa.findUniqueOrThrow({ where: { name: "CIFES" } })
+  const luvania = await prisma.empresa.findUniqueOrThrow({ where: { name: "Luvania" } })
+  const academico = await prisma.area.findUniqueOrThrow({ where: { name: "Académico" } })
+  const clinica = await prisma.area.findUniqueOrThrow({ where: { name: "Clínica Luvania" } })
+  const bug = await prisma.requestType.findFirstOrThrow({ where: { team: "DESARROLLO", name: "Error (bug)" } })
+  const pieza = await prisma.requestType.findFirstOrThrow({ where: { team: "MARKETING", name: "Pieza gráfica" } })
+
+  await prisma.request.updateMany({
+    where: { status: { notIn: ["CERRADO", "RECHAZADO", "CANCELADO"] }, code: { notIn: ["DES-0002", "DES-0007"] } },
+    data: { slaStartedAt: en(0, 8), slaTargetMinutes: 1440, resolutionMinutes: 1440 },
+  })
+
+  const inicioRiesgo = lunes.set({ hour: 8, minute: 0, second: 0, millisecond: 0 })
+  const consumido = businessMinutesBetween(inicioRiesgo.toJSDate(), new Date())
+  const metaRiesgo = Math.max(120, Math.ceil(consumido / 0.9))
+  await prisma.request.update({
+    where: { code: "DES-0002" },
+    data: {
+      slaStartedAt: inicioRiesgo.toJSDate(),
+      createdAt: inicioRiesgo.toJSDate(),
+      slaTargetMinutes: metaRiesgo,
+      resolutionMinutes: metaRiesgo,
+      resolvedAt: null,
+      closedAt: null,
+    },
+  })
+  const inicioVencido = lunes.minus({ weeks: 2 }).set({ hour: 8, minute: 0, second: 0, millisecond: 0 })
+  await prisma.request.update({
+    where: { code: "DES-0007" },
+    data: {
+      slaStartedAt: inicioVencido.toJSDate(),
+      createdAt: inicioVencido.toJSDate(),
+      slaTargetMinutes: 480,
+      resolutionMinutes: 480,
+      resolvedAt: null,
+      closedAt: null,
+    },
+  })
+
+  const tardeInicio = lunes.minus({ days: 5 }).set({ hour: 8, minute: 0, second: 0, millisecond: 0 })
+  const tardeFin = lunes.minus({ days: 4 }).set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
+  await prisma.request.update({
+    where: { code: "DES-0005" },
+    data: {
+      status: "CERRADO",
+      resolution: "RESUELTO",
+      slaStartedAt: tardeInicio.toJSDate(),
+      createdAt: tardeInicio.toJSDate(),
+      resolvedAt: tardeFin.toJSDate(),
+      closedAt: tardeFin.toJSDate(),
+      updatedAt: tardeFin.toJSDate(),
+      slaTargetMinutes: 480,
+      resolutionMinutes: 480,
+    },
+  })
+  const tarde = await prisma.request.findUniqueOrThrow({ where: { code: "DES-0005" } })
+  await prisma.slaPause.create({
+    data: {
+      requestId: tarde.id,
+      startedAt: tardeInicio.set({ hour: 10 }).toJSDate(),
+      endedAt: tardeInicio.set({ hour: 11 }).toJSDate(),
+      reason: "El solicitante debía confirmar el texto del aula de prueba.",
+    },
+  })
+  const aTiempo = lunes.set({ hour: 8, minute: 0, second: 0, millisecond: 0 })
+  const aTiempoFin = lunes.set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
+  await prisma.request.update({
+    where: { code: "DES-0011" },
+    data: {
+      status: "CERRADO",
+      resolution: "RESUELTO",
+      slaStartedAt: aTiempo.toJSDate(),
+      createdAt: aTiempo.toJSDate(),
+      resolvedAt: aTiempoFin.toJSDate(),
+      closedAt: aTiempoFin.toJSDate(),
+      updatedAt: aTiempoFin.toJSDate(),
+      slaTargetMinutes: 480,
+      resolutionMinutes: 480,
+    },
+  })
+
+  await prisma.request.create({
+    data: {
+      code: "DES-0013",
+      title: "Ajuste del calendario de la cohorte demo",
+      description: "Mateo revisa el calendario de prueba. Caso de demostración, sin personas reales.",
+      brand: "CIFES",
+      empresaId: cifes.id,
+      priority: "MEDIA",
+      prioritySuggested: "MEDIA",
+      team: "DESARROLLO",
+      status: "EN_DESARROLLO",
+      typeId: bug.id,
+      areaId: academico.id,
+      requesterId: ana.id,
+      assigneeId: mateo.id,
+      declaresNoPersonalData: true,
+      slaStartedAt: en(0, 8),
+      slaTargetMinutes: 1440,
+      resolutionMinutes: 1440,
+      firstResponseMinutes: 240,
+      createdAt: en(-2, 9),
+      updatedAt: en(0, 8),
+    },
+  })
+  await prisma.request.create({
+    data: {
+      code: "MKT-0009",
+      title: "Pieza de cierre de la semana demo",
+      description: "Camila cierra una pieza de demostración, sin pacientes ni alumnos reales.",
+      brand: "LUVANIA",
+      empresaId: luvania.id,
+      priority: "MEDIA",
+      prioritySuggested: "MEDIA",
+      team: "MARKETING",
+      status: "CERRADO",
+      resolution: "RESUELTO",
+      typeId: pieza.id,
+      areaId: clinica.id,
+      requesterId: julian.id,
+      assigneeId: camila.id,
+      declaresNoPersonalData: true,
+      slaStartedAt: aTiempo.toJSDate(),
+      resolvedAt: lunes.set({ hour: 15 }).toJSDate(),
+      closedAt: lunes.set({ hour: 15 }).toJSDate(),
+      slaTargetMinutes: 1440,
+      resolutionMinutes: 1440,
+      firstResponseMinutes: 240,
+      createdAt: aTiempo.toJSDate(),
+      updatedAt: lunes.set({ hour: 15 }).toJSDate(),
+    },
+  })
+
+  await prisma.tarea.updateMany({
+    where: { assigneeId: valentina.id, status: "HECHA" },
+    data: { completedAt: marca(lunes.minus({ days: 10 }).set({ hour: 11, minute: 0, second: 0, millisecond: 0 })) },
+  })
+  await prisma.tarea.updateMany({
+    where: { assigneeId: camila.id, status: "HECHA" },
+    data: { completedAt: marca(lunes.set({ hour: 16, minute: 0, second: 0, millisecond: 0 })) },
+  })
+  await prisma.tarea.create({
+    data: {
+      title: "Cerrar el ajuste de la semana",
+      status: "HECHA",
+      assigneeId: valentina.id,
+      createdById: helena.id,
+      createdAt: aTiempo.toJSDate(),
+      completedAt: lunes.set({ hour: 17 }).toJSDate(),
+    },
+  })
+  await prisma.tarea.create({
+    data: {
+      title: "Cerrar el informe de enero de la cohorte demo",
+      status: "HECHA",
+      assigneeId: valentina.id,
+      createdById: helena.id,
+      createdAt: hoy.set({ month: 1, day: 20, hour: 9, minute: 0, second: 0, millisecond: 0 }).toJSDate(),
+      completedAt: hoy.set({ month: 1, day: 20, hour: 11, minute: 0, second: 0, millisecond: 0 }).toJSDate(),
+    },
+  })
+  await prisma.codeSequence.update({ where: { prefix: "DES" }, data: { last: 13 } })
+  await prisma.codeSequence.update({ where: { prefix: "MKT" }, data: { last: 9 } })
 }
 
 const entrada = process.argv[1]?.replace(/\\/g, "/").endsWith("prisma/seed.ts")
