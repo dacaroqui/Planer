@@ -12,6 +12,8 @@ import { requireActor } from "@/server/session"
 import { dashboard, listar } from "@/server/requests"
 import { listarProyectos } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
+import { resumenGrowth } from "@/server/growth"
+import { puedeVerGrowth } from "@/lib/growth"
 
 export default async function DashboardPage({
   searchParams,
@@ -49,6 +51,7 @@ export default async function DashboardPage({
     listarProyectos(actor, empresaId),
   ])
   const avances = projectId ? avanceProyectos.filter((item) => item.id === projectId) : avanceProyectos
+  const growth = puedeVerGrowth(actor) ? await resumenGrowth(actor) : null
   const soloLectura = !esAdmin(actor) && actor.memberships.every((item) => item.role === "OBSERVADOR") && !actor.memberships.some((item) => rolEn(actor, item.team) !== "OBSERVADOR")
   const mitad = Math.ceil(data.porEstado.length / 2)
   const columnas = [data.porEstado.slice(0, mitad), data.porEstado.slice(mitad)]
@@ -61,6 +64,12 @@ export default async function DashboardPage({
       <Suspense>
         <ControlesPanel empresas={empresas} areas={areasCatalogo} proyectos={proyectosCatalogo} />
       </Suspense>
+      {growth ? (
+        <Link href="/growth" className="block rounded-lg border border-[#E7F0FB] bg-[#F4F8FE] px-4 py-3 text-sm">
+          <p className="font-medium text-[#1658B0]">Growth · {growth.ciclo}</p>
+          <p className="text-muted-foreground">{growth.activos} experimentos activos · {growth.pendientes} con resultados pendientes</p>
+        </Link>
+      ) : null}
       <div className="grid gap-3 lg:grid-cols-3">
         <Tarjeta icono={<ClipboardListIcon className="size-5 text-[#1658B0]" />} fondo="#E7F0FB" etiqueta="Requerimientos abiertos" valor={String(data.abiertos)} href={`/requerimientos?${new URLSearchParams({ ...(team ? { team } : {}), ...(areaId ? { area: areaId } : {}) }).toString()}`} />
         <Tarjeta icono={<ClockIcon className="size-5 text-[#B45309]" />} fondo="#FEF3C7" etiqueta="Cumplimiento de SLA" valor={data.cumplimiento === null ? "—" : `${data.cumplimiento} %`} />

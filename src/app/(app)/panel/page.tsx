@@ -3,6 +3,8 @@ import { ParaTi } from "@/components/para-ti"
 import { catalogoPara } from "@/server/catalogo-nav"
 import { resumen } from "@/server/requests"
 import { tareasAsignadas } from "@/server/para-ti"
+import { experimentosParaTi } from "@/server/growth"
+import { puedeVerGrowth } from "@/lib/growth"
 import { requireActor } from "@/server/session"
 
 export default async function PanelPage({
@@ -14,7 +16,7 @@ export default async function PanelPage({
   if (actor.role === "SOLICITANTE") redirect("/mis-solicitudes")
   const params = await searchParams
   const opciones = await catalogoPara(actor)
-  const [data, tareas] = await Promise.all([resumen(actor), tareasAsignadas(actor.id)])
+  const [data, tareas, growth] = await Promise.all([resumen(actor), tareasAsignadas(actor.id), experimentosParaTi(actor)])
   const pedidos = data.items.slice(0, 40).map((item) => ({
     code: item.code,
     title: item.title,
@@ -48,7 +50,38 @@ export default async function PanelPage({
       puedeBandeja={actor.isAdmin || actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")}
       ahoraIso={new Date().toISOString()}
       espacios={opciones.empresas.map((item) => ({ id: item.id, name: item.name }))}
-      items={[...pedidos, ...piezas.filter((tarea) => !pedidos.some((pedido) => pedido.code === tarea.code && pedido.tipo === "Tarea"))]}
+      items={[
+        ...pedidos,
+        ...piezas.filter((tarea) => !pedidos.some((pedido) => pedido.code === tarea.code && pedido.tipo === "Tarea")),
+        ...(puedeVerGrowth(actor) ? growth.flatMap((item) => [
+          {
+            code: item.id,
+            title: `${item.ciclo.nombre}: ${item.nombre}`,
+            tipo: "Experimento",
+            espacio: item.brand === "LUVANIA" ? "Luvania" : "CIFES",
+            espacioId: "",
+            asignado: actor.name,
+            marca: item.brand,
+            actualizado: item.updatedAt.toISOString(),
+            assigneeId: item.ownerId,
+            href: `/growth/${item.id}`,
+            pedido: "Propuesta de Growth",
+          },
+          ...item.tareas.map((tarea) => ({
+            code: tarea.id,
+            title: tarea.title,
+            tipo: "Tarea",
+            espacio: "Growth",
+            espacioId: "",
+            asignado: actor.name,
+            marca: item.brand,
+            actualizado: tarea.updatedAt.toISOString(),
+            assigneeId: actor.id,
+            href: `/growth/${item.id}`,
+            pedido: item.nombre,
+          })),
+        ]) : []),
+      ]}
     />
   )
 }

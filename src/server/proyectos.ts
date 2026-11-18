@@ -104,7 +104,7 @@ export async function guardarProyecto(
   return prisma.proyecto.create({ data })
 }
 
-async function contextoTarea(input: { requestId?: string | null; projectId?: string | null }) {
+async function contextoTarea(input: { requestId?: string | null; projectId?: string | null; experimentoId?: string | null }) {
   const request = input.requestId
     ? await prisma.request.findUnique({ where: { id: input.requestId }, include: { empresa: true, area: true } })
     : null
@@ -114,8 +114,10 @@ async function contextoTarea(input: { requestId?: string | null; projectId?: str
   if (request && project && request.empresaId !== project.empresaId) {
     throw new DomainError("El proyecto no pertenece a la empresa del requerimiento.")
   }
-  if (!request && !project) throw new DomainError("La tarea debe colgar de un requerimiento o de un proyecto.")
-  return { request, project }
+  const experimento = input.experimentoId ? await prisma.growthExperimento.findUnique({ where: { id: input.experimentoId } }) : null
+  if (input.experimentoId && !experimento) throw new DomainError("El experimento no existe.")
+  if (!request && !project && !experimento) throw new DomainError("La tarea debe colgar de un requerimiento, un proyecto o un experimento.")
+  return { request, project, experimento }
 }
 
 export async function guardarTarea(

@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { Esqueleto } from "@/components/esqueleto"
 import { Marco } from "@/components/marco"
 import { alcanceRendimiento } from "@/lib/rendimiento"
+import { puedeVerGrowth } from "@/lib/growth"
 import { puedeAdministrar, puedeRadicar, puedeVerPlanner } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { catalogoPara } from "@/server/catalogo-nav"
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       puedeCola={lider}
       puedeTablero={equipo}
       puedeBandeja={actor.isAdmin || actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")}
+      puedeGrowth={puedeVerGrowth(actor)}
       rendimiento={rendimiento}
     >
       <Suspense fallback={<Esqueleto />}>{children}</Suspense>
