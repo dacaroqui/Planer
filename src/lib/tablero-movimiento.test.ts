@@ -23,7 +23,7 @@ describe("confirmación al soltar", () => {
     expect(camposRequeridos({ to: "EN_ESPERA", requiresComment: true })).toEqual(["Comentario"])
     expect(camposRequeridos({ to: "EN_VALIDACION", requiresComment: true, requiresDelivery: true })).toEqual(["Comentario", "Enlace o adjunto de la entrega"])
     expect(camposRequeridos({ to: "APROBADO", requiresAssignee: true, requiresCommittedDate: true })).toEqual(["Responsable", "Fecha comprometida"])
-    expect(camposRequeridos({ to: "CERRADO" })).toEqual(["Comentario"])
+    expect(camposRequeridos({ to: "CERRADO" })).toEqual([])
   })
 })
 
@@ -46,10 +46,11 @@ describe("tablero: la tarjeta arrastrada", () => {
       requiresDelivery: true,
     }
     expect(movimientoExigeDialogo(entregar)).toBe(true)
-    expect(validarDatosMovimiento(entregar, "", "")).toMatch(/motivo/)
+    expect(validarDatosMovimiento(entregar, "", "")).toBeNull()
     expect(validarDatosMovimiento(entregar, "Listo para revisar.", "")).toBeNull()
     expect(validarDatosMovimiento(tarjetas[1].moves[0], "Cierro con este motivo.", "")).toBeNull()
-    expect(validarDatosMovimiento(tarjetas[1].moves[0], "", "")).toMatch(/motivo/)
+    expect(validarDatosMovimiento(tarjetas[1].moves[0], "", "")).toBeNull()
+    expect(validarDatosMovimiento(tarjetas[1].moves[1], "", "")).toMatch(/motivo/)
   })
 
   it("Enviar a pruebas y Entregar para validación conservan los datos obligatorios", () => {

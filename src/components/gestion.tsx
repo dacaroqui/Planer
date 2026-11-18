@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { CamposMovimiento } from "@/components/campos-movimiento"
 import { detalleExigeDialogo, debePedirResponsable, VENTANA_DESHACER_MS, validarDatosMovimiento } from "@/lib/tablero-movimiento"
+import { notaResolucionOpcional, visibilidadDefecto } from "@/lib/cronologia"
 
 type Transicion = { name: string; to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean; requiresAssignee?: boolean; requiresCommittedDate?: boolean }
 type Agente = { id: string; name: string }
@@ -27,6 +28,8 @@ export function Gestion({
   puedeComentar,
   puedeNota,
   puedeAdjuntar,
+  notaPrefill = "",
+  soloTransiciones = false,
 }: {
   code: string
   transiciones: Transicion[]
@@ -37,6 +40,8 @@ export function Gestion({
   puedeComentar: boolean
   puedeNota: boolean
   puedeAdjuntar: boolean
+  notaPrefill?: string
+  soloTransiciones?: boolean
 }) {
   const router = useRouter()
   const [comment, setComment] = useState("")
@@ -111,6 +116,8 @@ export function Gestion({
     data.set("name", transicion.name)
     data.set("comment", note)
     data.set("deliveryUrl", deliveryUrl)
+    data.set("visibilidad", visibilidadDefecto(transicion.name))
+    if (notaResolucionOpcional(transicion)) data.set("resolutionNote", note)
     if (transicion.to === "CERRADO") data.set("resolution", resolucion)
     if (responsableId) data.set("assigneeId", responsableId)
     if (fecha) data.set("committedDate", fecha)
@@ -156,7 +163,7 @@ export function Gestion({
                 disabled={pending}
                 onClick={() => {
                   if (detalleExigeDialogo(transicion, { assigneeId: asignadoId, committedDate: fechaComprometida })) {
-                    setMotivo(comment)
+                    setMotivo(notaResolucionOpcional(transicion) ? (notaPrefill || comment) : comment)
                     setEntrega("")
                     setResolucion("RESUELTO")
                     setResponsableId(asignadoId ?? "")
@@ -177,7 +184,7 @@ export function Gestion({
         <p className="text-sm text-muted-foreground">No hay acciones disponibles para su perfil en este estado.</p>
       )}
 
-      {puedeComentar ? (
+      {!soloTransiciones && puedeComentar ? (
         <form
           className="grid gap-2 border-t border-border pt-4"
           onSubmit={(event) => {
@@ -202,7 +209,7 @@ export function Gestion({
         </form>
       ) : null}
 
-      {puedeAdjuntar ? (
+      {!soloTransiciones && puedeAdjuntar ? (
         <form
           className="grid gap-2 border-t border-border pt-4"
           onSubmit={(event) => {
@@ -241,6 +248,7 @@ export function Gestion({
             onMotivo={setMotivo}
             entrega={entrega}
             onEntrega={setEntrega}
+            etiquetaMotivo={dialogo && notaResolucionOpcional(dialogo) ? "Qué se hizo" : "Motivo"}
           />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDialogo(null)}>Cancelar</Button>

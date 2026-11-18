@@ -26,6 +26,7 @@ export const ORDENES = [
   "tareasAsignadas",
   "tareasCompletadas",
   "tareasSinHacer",
+  "horasRegistradas",
 ] as const
 
 export type OrdenRendimiento = (typeof ORDENES)[number]
@@ -106,6 +107,7 @@ export type FilaRendimiento = {
   tareasAsignadas: number
   tareasCompletadas: number
   tareasSinHacer: number
+  horasRegistradas: number
 }
 
 export type ResumenRendimiento = {
@@ -430,7 +432,7 @@ function pct(parte: number, total: number) {
 
 const TAREAS_VACIAS: TareasAgg = { semana: 0, mes: 0, anio: 0, asignadas: 0, completadas: 0, sinHacer: 0 }
 
-function filaDe(persona: PersonaRendimiento, mediciones: Medicion[], tareas: TareasAgg): FilaRendimiento {
+function filaDe(persona: PersonaRendimiento, mediciones: Medicion[], tareas: TareasAgg, horasRegistradas = 0): FilaRendimiento {
   const completados = mediciones.filter((item) => item.completado)
   const horas = completados.map((item) => item.horas)
   const demoras = mediciones.flatMap((item) => item.demora === null ? [] : [item.demora])
@@ -462,6 +464,7 @@ function filaDe(persona: PersonaRendimiento, mediciones: Medicion[], tareas: Tar
     tareasAsignadas: tareas.asignadas,
     tareasCompletadas: tareas.completadas,
     tareasSinHacer: tareas.sinHacer,
+    horasRegistradas,
   }
 }
 
@@ -473,6 +476,7 @@ export function armarTablero(input: {
   now: Date
   orden?: OrdenRendimiento
   dir?: Direccion
+  horasPorPersona?: Map<string, number>
 }) {
   const instante = instanteDeCorte(input.periodo, input.now)
   const ids = new Set(input.personas.map((item) => item.id))
@@ -486,7 +490,7 @@ export function armarTablero(input: {
     grupos.set(solicitud.assigneeId, lista)
     todas.push(medicion)
   }
-  const filas = input.personas.map((persona) => filaDe(persona, grupos.get(persona.id) ?? [], input.tareas.get(persona.id) ?? TAREAS_VACIAS))
+  const filas = input.personas.map((persona) => filaDe(persona, grupos.get(persona.id) ?? [], input.tareas.get(persona.id) ?? TAREAS_VACIAS, input.horasPorPersona?.get(persona.id) ?? 0))
   const horas = todas.filter((item) => item.completado).map((item) => item.horas)
   const demoras = todas.flatMap((item) => item.demora === null ? [] : [item.demora])
   const abiertos = todas.filter((item) => !item.completado)
@@ -613,6 +617,7 @@ const CSV_COLUMNAS: Array<[string, (fila: FilaRendimiento) => string | number | 
   ["Tareas asignadas", (fila) => fila.tareasAsignadas],
   ["Tareas hechas", (fila) => fila.tareasCompletadas],
   ["Tareas sin hacer", (fila) => fila.tareasSinHacer],
+  ["Horas registradas", (fila) => fila.horasRegistradas],
 ]
 
 function celdaCsv(valor: string | number | null) {

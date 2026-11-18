@@ -53,6 +53,7 @@ export default async function MisSolicitudesPage() {
             cambios: item.activities,
           }),
           cerrado: TERMINAL_STATUSES.has(item.status),
+          hecho: item.resolutionNote,
         }
       })} />
     </div>

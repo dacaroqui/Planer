@@ -23,6 +23,7 @@ import {
   type TareasAgg,
 } from "@/lib/rendimiento"
 import { ZONE } from "@/lib/time"
+import { horasDeMinutos } from "@/lib/cronologia"
 
 type Cargada = PersonaRendimiento & PersonaCandidata
 
@@ -45,11 +46,16 @@ export async function tableroRendimiento(actor: Actor, filtros: FiltrosRendimien
   const ids = personas.map((item) => item.id)
   let solicitudes: SolicitudMedible[] = []
   let tareas = new Map<string, TareasAgg>()
+  let horasPorPersona = new Map<string, number>()
   if (ids.length > 0) {
-    ;[solicitudes, tareas] = await Promise.all([
+    const [solicitudesCargadas, tareasCargadas, horas] = await Promise.all([
       cargarSolicitudes(ids, alcance, filtros, { start: periodo.start, end: periodo.end }),
       cargarTareas(ids, alcance, filtros, periodo, now),
+      cargarHoras(ids, periodo),
     ])
+    solicitudes = solicitudesCargadas
+    tareas = tareasCargadas
+    horasPorPersona = horas
   }
   const tablero = armarTablero({
     personas,
@@ -59,6 +65,7 @@ export async function tableroRendimiento(actor: Actor, filtros: FiltrosRendimien
     now,
     orden: filtros.orden,
     dir: filtros.dir,
+    horasPorPersona,
   })
   return {
     denegado: false as const,
@@ -79,11 +86,12 @@ export async function detalleRendimiento(actor: Actor, personaId: string, filtro
   const persona = permitidas.find((item) => item.id === personaId)
   if (!persona) return { denegado: false as const, encontrado: false as const }
   const ventana = ventanaHistorica(periodo, now)
-  const [solicitudes, tareas] = await Promise.all([
+  const [solicitudes, tareas, horasPorPersona] = await Promise.all([
     cargarSolicitudes([personaId], alcance, filtros, ventana),
     cargarTareas([personaId], alcance, filtros, periodo, now),
+    cargarHoras([personaId], periodo),
   ])
-  const tablero = armarTablero({ personas: [persona], solicitudes, tareas, periodo, now })
+  const tablero = armarTablero({ personas: [persona], solicitudes, tareas, periodo, now, horasPorPersona })
   const ancla = instanteDeCorte(periodo, now)
   return {
     denegado: false as const,
@@ -286,5 +294,17 @@ async function cargarTareas(
       sinHacer: Number(row.sinHacer),
     })
   }
+  return map
+}
+
+async function cargarHoras(ids: string[], periodo: Rango) {
+  const map = new Map<string, number>()
+  if (ids.length === 0) return map
+  const filas = await prisma.comment.groupBy({
+    by: ["authorId"],
+    where: { kind: "REGISTRO", authorId: { in: ids }, createdAt: { gte: periodo.start, lt: periodo.end } },
+    _sum: { minutes: true },
+  })
+  for (const fila of filas) map.set(fila.authorId, horasDeMinutos(fila._sum.minutes ?? 0))
   return map
 }

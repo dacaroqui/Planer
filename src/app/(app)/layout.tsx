@@ -27,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       puedePlanner={puedeVerPlanner(actor)}
       puedeCola={lider}
       puedeTablero={equipo}
+      puedeBandeja={actor.isAdmin || actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")}
       rendimiento={rendimiento}
     >
       <Suspense fallback={<Esqueleto />}>{children}</Suspense>

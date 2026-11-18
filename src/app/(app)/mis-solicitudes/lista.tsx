@@ -17,6 +17,7 @@ export type Solicitud = {
   paso: { texto: string; cta: string | null }
   etapas: EtapaVista[]
   cerrado: boolean
+  hecho?: string | null
 }
 
 export function ListaMisSolicitudes({ items }: { items: Solicitud[] }) {
@@ -36,6 +37,7 @@ export function ListaMisSolicitudes({ items }: { items: Solicitud[] }) {
                 <Link href={`/requerimientos/${item.code}`} className="font-medium text-[#15122A] hover:underline">{item.title}</Link>
                 <Link href={`/requerimientos/${item.code}`} className="text-xs font-medium text-[#1658B0] hover:underline">{item.code}</Link>
               </div>
+              {item.hecho ? <p className="mb-3 rounded-lg bg-[#F4F8FE] px-3 py-2 text-sm"><span className="font-medium">Qué se hizo. </span>{item.hecho}</p> : null}
               <FichaSeguimiento
                 codigo={item.code}
                 etapas={item.etapas}

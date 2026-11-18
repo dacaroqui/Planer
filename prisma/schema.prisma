@@ -22,6 +22,13 @@ enum Team {
   MARKETING
 }
 
+enum TipoComentario {
+  PUBLICA
+  INTERNA
+  REGISTRO
+  SOLICITUD_INFO
+}
+
 model Area {
   id               String        @id @default(cuid())
   name             String        @unique
@@ -93,6 +100,7 @@ model User {
   ledProjects   Proyecto[]     @relation("ProjectLeader")
   assignedTasks Tarea[]        @relation("TaskAssignee")
   createdTasks  Tarea[]        @relation("TaskCreator")
+  ultimasPublicas Request[]    @relation("LastPublic")
 }
 
 model Empresa {
@@ -203,9 +211,12 @@ model Tarea {
   children    Tarea[]     @relation("Subtareas")
   createdById String
   createdBy   User        @relation("TaskCreator", fields: [createdById], references: [id])
-  completedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  completedAt     DateTime?
+  horasEstimadas  Decimal?    @db.Decimal(8, 2)
+  horasReales     Decimal?    @db.Decimal(8, 2)
+  registros       Comment[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@index([requestId])
   @@index([projectId])
@@ -335,6 +346,10 @@ model Request {
   firstResponseMet       Boolean?
   resolvedAt             DateTime?
   closedAt               DateTime?
+  resolutionNote         String?
+  lastPublicActorId      String?
+  lastPublicActor        User?        @relation("LastPublic", fields: [lastPublicActorId], references: [id])
+  lastPublicAt           DateTime?
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   comments               Comment[]
@@ -356,6 +371,7 @@ model Request {
   @@index([team, status, updatedAt])
   @@index([assigneeId, createdAt])
   @@index([assigneeId, resolvedAt])
+  @@index([lastPublicAt])
 }
 
 model SlaPause {
@@ -370,16 +386,23 @@ model SlaPause {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  requestId String
-  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
-  body      String
-  internal  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id         String         @id @default(cuid())
+  requestId  String
+  request    Request        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User           @relation(fields: [authorId], references: [id])
+  body       String
+  kind       TipoComentario @default(PUBLICA)
+  minutes    Int?
+  tareaId    String?
+  tarea      Tarea?         @relation(fields: [tareaId], references: [id], onDelete: SetNull)
+  compartir  Boolean        @default(false)
+  internal   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
 
   @@index([requestId])
+  @@index([tareaId])
+  @@index([kind])
 }
 
 model Attachment {
