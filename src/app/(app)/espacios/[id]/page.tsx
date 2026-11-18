@@ -8,6 +8,8 @@ import { prisma } from "@/lib/prisma"
 import { listarProyectos } from "@/server/proyectos"
 import { listar } from "@/server/requests"
 import { requireActor } from "@/server/session"
+import { experimentosDeEmpresa } from "@/server/growth"
+import { puedeVerGrowth } from "@/lib/growth"
 
 function conteo(items: { key: string; label: string }[]) {
   const mapa = new Map<string, { label: string; total: number }>()
@@ -37,6 +39,7 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
   const porEstado = conteo(casos.items.map((item) => ({ key: item.status, label: statusLabel(item.status) })))
   const porPrioridad = conteo(casos.items.map((item) => ({ key: item.priority, label: PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority })))
   const porArea = conteo(casos.items.map((item) => ({ key: item.areaId, label: item.area.name })))
+  const experimentos = puedeVerGrowth(actor) ? await experimentosDeEmpresa(actor, empresa.name) : []
   const lideres = await prisma.areaRole.findMany({
     where: { role: "LIDER", user: { active: true, deactivatedAt: null } },
     include: { user: { select: { name: true } } },
@@ -49,6 +52,16 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
         <Conteo titulo="Por prioridad" filas={porPrioridad} />
         <Conteo titulo="Por área" filas={porArea} />
       </div>
+      {experimentos.length > 0 ? (
+        <section className="rounded-lg border border-border bg-white p-4">
+          <h2 className="text-sm font-semibold">Experimentos de Growth</h2>
+          <ul className="mt-2 grid gap-1 text-sm">
+            {experimentos.map((item) => (
+              <li key={item.id}><Link href={`/growth/${item.id}`} className="text-[#1658B0] hover:underline">{item.nombre}</Link> · {item.ciclo.nombre} · {item.owner?.name || item.ownerName}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <section className="rounded-lg border border-border bg-white p-4">
         <h2 className="text-sm font-semibold">Líderes por área de trabajo</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">

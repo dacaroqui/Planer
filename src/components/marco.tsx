@@ -8,6 +8,7 @@ import {
   HelpCircleIcon,
   ChartColumnIcon,
   LayoutDashboardIcon,
+  TrendingUpIcon,
   UsersIcon,
   PanelLeftIcon,
   PlusIcon,
@@ -48,6 +49,7 @@ export function Marco({
   puedeCola,
   puedeTablero,
   puedeBandeja,
+  puedeGrowth,
   rendimiento,
   children,
 }: {
@@ -60,6 +62,7 @@ export function Marco({
   puedeCola: boolean
   puedeTablero: boolean
   puedeBandeja: boolean
+  puedeGrowth: boolean
   rendimiento: "equipo" | "propio" | null
   children: React.ReactNode
 }) {
@@ -123,6 +126,7 @@ export function Marco({
           {puedeTablero ? <Enlace href="/paneles" activo={path.startsWith("/paneles") || path.startsWith("/gerencia")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {actor.role !== "SOLICITANTE" ? <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
           {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedeGrowth ? <Enlace href="/growth" activo={path.startsWith("/growth")} etiqueta="Growth" icono={<TrendingUpIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeBandeja ? <Enlace href="/bandeja" activo={path.startsWith("/bandeja")} etiqueta="Bandeja de respuesta" icono={<InboxIcon className="size-4" />} compacta={!abierta} /> : null}
           <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
@@ -146,7 +150,7 @@ export function Marco({
             <SearchIcon className="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground" />
             <input id="busqueda-global" name="q" aria-label="Buscar en Planer" placeholder="Buscar en Planer…" className="h-11 w-full rounded-[10px] border border-[#D9DEE7] bg-white pr-3 pl-9 text-sm" />
           </form>
-          {puedeRadicar || puedePlanner ? (
+          {puedeRadicar || puedePlanner || puedeGrowth ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-md bg-[#1658B0] px-3 text-sm font-medium text-white hover:bg-[#222B7C]">
                 <PlusIcon className="size-4" /> Crear
@@ -154,6 +158,7 @@ export function Marco({
               <DropdownMenuContent align="end">
                 {puedeRadicar ? <DropdownMenuItem asChild><Link href="/mis-solicitudes/radicar">Requerimiento</Link></DropdownMenuItem> : null}
                 {puedePlanner ? <DropdownMenuItem asChild><Link href="/planner">Tarea en Planner</Link></DropdownMenuItem> : null}
+                {puedeGrowth ? <DropdownMenuItem asChild><Link href="/growth/nuevo">Experimento Growth</Link></DropdownMenuItem> : null}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}

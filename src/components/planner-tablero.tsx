@@ -46,6 +46,8 @@ export type TareaPlanner = {
   projectId: string
   requestCode: string | null
   sinAsociar?: boolean
+  experimentoId?: string | null
+  experimentoNombre?: string | null
   subtareas: SubtareaVista[]
 }
 
@@ -202,7 +204,7 @@ export function PlannerVista({
         onVencidas={setSoloVencidas}
         onFiltros={() => setFiltrosAbiertos((valor) => !valor)}
       />
-      {!proyectoId ? (
+      {!proyectoId && vista.length === 0 ? (
         <p className="text-sm text-muted-foreground">Este espacio no tiene proyectos en el catálogo.</p>
       ) : (
         <div className="grid gap-3 lg:grid-cols-3">
@@ -255,6 +257,11 @@ export function PlannerVista({
                         ) : null}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {tarea.experimentoId ? (
+                          <Link href={`/growth/${tarea.experimentoId}`} className="inline-flex items-center gap-1 text-xs font-medium text-[#1658B0] hover:underline">
+                            <Link2Icon className="size-3" /> {tarea.experimentoNombre || "Experimento"}
+                          </Link>
+                        ) : null}
                         {tarea.requestCode ? (
                           <Link href={`/requerimientos/${tarea.requestCode}`} className="inline-flex items-center gap-1 text-xs font-medium text-[#1658B0] hover:underline">
                             <Link2Icon className="size-3" /> {tarea.requestCode}

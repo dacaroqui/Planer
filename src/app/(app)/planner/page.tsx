@@ -1,4 +1,6 @@
 import { porcentajeTarea, tareaVencida } from "@/lib/avance"
+import { esEspacio } from "@/lib/domain"
+import { puedeVerGrowth } from "@/lib/growth"
 import { PlannerVista } from "@/components/planner-tablero"
 import { esAdmin, puedeVerPlanner } from "@/lib/permissions"
 import { puedeCrearProyecto, puedeGestionarTareas } from "@/server/proyectos"
@@ -35,11 +37,13 @@ export default async function PlannerPage({
   const catalogo = await catalogoPara(actor)
   const empresas = catalogo.empresas
   const proyectos = catalogo.proyectos
-  const empresaId = empresas.some((item) => item.id === params.empresa) ? params.empresa || "" : empresas[0]?.id ?? ""
+  const preferidas = empresas.filter((item) => esEspacio(item.name))
+  const baseEmpresas = preferidas.length ? preferidas : empresas
+  const empresaId = baseEmpresas.some((item) => item.id === params.empresa) ? params.empresa || "" : baseEmpresas[0]?.id ?? ""
   const delEspacio = proyectos.filter((item) => item.empresaId === empresaId)
   const proyectoId = delEspacio.some((item) => item.id === params.proyecto) ? params.proyecto || "" : delEspacio[0]?.id ?? ""
-  const tareas = proyectoId
-    ? await listarPlanner(actor, { empresaId, projectId: proyectoId })
+  const tareas = proyectoId || puedeVerGrowth(actor)
+    ? await listarPlanner(actor, { empresaId, ...(proyectoId ? { projectId: proyectoId } : {}) })
     : []
   const equipoProyecto = proyectoId
     ? (await prisma.proyecto.findUnique({ where: { id: proyectoId }, select: { team: true } }))?.team ?? null
@@ -71,9 +75,11 @@ export default async function PlannerPage({
           porcentaje: porcentajeTarea({ status: tarea.status, subtareas: tarea.children }),
           hechas: tarea.children.filter((item) => item.status === "HECHA").length,
           total: tarea.children.length,
-          projectId: tarea.projectId ?? proyectoId,
+          projectId: tarea.projectId ?? (tarea.experimentoId ? "" : proyectoId),
           requestCode: tarea.request?.code ?? null,
-          sinAsociar: !tarea.requestId && !tarea.projectId,
+          sinAsociar: !tarea.requestId && !tarea.projectId && !tarea.experimentoId,
+          experimentoId: tarea.experimento?.id ?? null,
+          experimentoNombre: tarea.experimento?.nombre ?? null,
           subtareas: tarea.children.map((sub) => ({
             id: sub.id,
             title: sub.title,

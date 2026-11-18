@@ -109,6 +109,8 @@ model User {
   assignedTasks Tarea[]        @relation("TaskAssignee")
   createdTasks  Tarea[]        @relation("TaskCreator")
   ultimasPublicas Request[]    @relation("LastPublic")
+  growthExperimentos GrowthExperimento[] @relation("GrowthOwner")
+  growthComentarios  GrowthComentario[]
 }
 
 model Empresa {
@@ -223,6 +225,8 @@ model Tarea {
   completedAt     DateTime?
   horasEstimadas  Decimal?    @db.Decimal(8, 2)
   horasReales     Decimal?    @db.Decimal(8, 2)
+  experimentoId   String?
+  experimento     GrowthExperimento? @relation(fields: [experimentoId], references: [id], onDelete: SetNull)
   registros       Comment[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -231,6 +235,7 @@ model Tarea {
   @@index([projectId])
   @@index([assigneeId, createdAt])
   @@index([assigneeId, completedAt])
+  @@index([experimentoId])
 }
 
 model AreaRole {
@@ -464,4 +469,124 @@ model Notification {
 
   @@unique([userId, dedupeKey])
   @@index([userId, readAt])
+}
+
+enum GrowthEstado {
+  BORRADOR
+  REVISION
+  PREPARACION
+  EN_EJECUCION
+  ANALISIS
+  CERRADO
+}
+
+enum GrowthDecision {
+  ADOPTAR
+  ITERAR
+  DESCARTAR
+  INCONCLUSO
+}
+
+enum GrowthFuente {
+  MANUAL
+  CRM
+}
+
+model GrowthCiclo {
+  id          String              @id @default(cuid())
+  nombre      String
+  brand       String
+  ilustrativo Boolean             @default(false)
+  reunion     String              @default("")
+  activo      Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  embudos     GrowthEmbudo[]
+  experimentos GrowthExperimento[]
+}
+
+model GrowthEmbudo {
+  id        String         @id @default(cuid())
+  cicloId   String
+  ciclo     GrowthCiclo    @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  brand     String
+  fuente    GrowthFuente   @default(MANUAL)
+  updatedAt DateTime       @updatedAt
+  etapas    GrowthEtapa[]
+
+  @@index([cicloId, brand])
+}
+
+model GrowthEtapa {
+  id         String       @id @default(cuid())
+  embudoId   String
+  embudo     GrowthEmbudo @relation(fields: [embudoId], references: [id], onDelete: Cascade)
+  nombre     String
+  valor      Int
+  orden      Int
+  destacado  Boolean      @default(false)
+  llamada    String       @default("")
+  subllamada String       @default("")
+
+  @@index([embudoId])
+}
+
+model GrowthExperimento {
+  id              String           @id @default(cuid())
+  nombre          String
+  brand           String
+  cicloId         String
+  ciclo           GrowthCiclo      @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  ownerId         String?
+  owner           User?            @relation("GrowthOwner", fields: [ownerId], references: [id])
+  ownerName       String           @default("")
+  etapaEmbudo     String
+  estado          GrowthEstado     @default(BORRADOR)
+  decision        GrowthDecision?
+  metrica         String           @default("")
+  valorInicial    String           @default("")
+  meta            String           @default("")
+  comparacion     String           @default("")
+  duracion        String           @default("")
+  problema        String           @default("")
+  donde           String           @default("")
+  datos           String           @default("")
+  explicacion     String           @default("")
+  referencia      String           @default("")
+  mecanismo       String           @default("")
+  porque          String           @default("")
+  queOcurrio      String           @default("")
+  evidencia       String           @default("")
+  limitaciones    String           @default("")
+  proximaRevision DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tareas          Tarea[]
+  comentarios     GrowthComentario[]
+  enlaces         GrowthEnlace[]
+
+  @@index([cicloId, estado])
+  @@index([ownerId])
+}
+
+model GrowthComentario {
+  id            String            @id @default(cuid())
+  experimentoId String
+  experimento   GrowthExperimento @relation(fields: [experimentoId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User              @relation(fields: [authorId], references: [id])
+  body          String
+  createdAt     DateTime          @default(now())
+
+  @@index([experimentoId])
+}
+
+model GrowthEnlace {
+  id            String            @id @default(cuid())
+  experimentoId String
+  experimento   GrowthExperimento @relation(fields: [experimentoId], references: [id], onDelete: Cascade)
+  titulo        String
+  url           String
+  createdAt     DateTime          @default(now())
+
+  @@index([experimentoId])
 }

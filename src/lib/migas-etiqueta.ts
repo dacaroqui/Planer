@@ -5,6 +5,8 @@ export function etiquetaMiga(
   nombre: string,
   conocidas: Record<string, string>,
 ) {
+  if (partes[index - 1] === "growth" && parte === "nuevo") return "Proponer"
+  if (partes[index - 1] === "growth" && parte === "ciclos") return "Ciclos"
   if (conocidas[parte]) return conocidas[parte]
   if (partes[index - 1] === "espacios" && nombre) return nombre
   if (index === partes.length - 1 && nombre) return nombre
