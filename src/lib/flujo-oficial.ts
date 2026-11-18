@@ -32,6 +32,43 @@ const dev = "DESARROLLO" as const
 const mkt = "MARKETING" as const
 const com = "COMERCIAL" as const
 const inn = "INNOVACION" as const
+const adm = "ADMINISTRACION" as const
+const gro = "GROWTH" as const
+
+function estadosEstandar(team: TeamName): EstadoOficial[] {
+  const filas: Array<[string, string, EstadoOficial["category"], string]> = [
+    ["NUEVO", "Nuevo", "POR_HACER", "Nuevo"],
+    ["EN_ANALISIS", "En análisis", "EN_CURSO", "En análisis"],
+    ["EN_ESPERA", "En espera de información", "EN_CURSO", "En espera"],
+    ["EN_CURSO", "En curso", "EN_CURSO", "En curso"],
+    ["EN_REVISION", "En revisión", "EN_CURSO", "En revisión"],
+    ["HECHO", "Hecho", "TERMINADO", "Hecho"],
+    ["CANCELADO", "Cancelado", "TERMINADO", "Cancelado"],
+  ]
+  return filas.map(([key, name, category, boardColumn], index) => ({
+    team,
+    key,
+    name,
+    category,
+    boardColumn,
+    sortOrder: (index + 1) * 10,
+    hiddenOnBoard: key === "CANCELADO",
+  }))
+}
+
+function transicionesEstandar(team: TeamName): TransicionOficial[] {
+  return [
+    { team, name: "Iniciar análisis", from: ["NUEVO"], to: "EN_ANALISIS", roles: ["LIDER"], slaEffect: "STOP_FIRST" },
+    { team, name: "Pedir información", from: ["EN_ANALISIS", "EN_CURSO", "EN_REVISION"], to: "EN_ESPERA", roles: ["RESPONSABLE", "LIDER"], requiresComment: true, slaEffect: "PAUSE" },
+    { team, name: "Responder información", from: ["EN_ESPERA"], to: "EN_ESPERA", roles: ["SOLICITANTE", "RESPONSABLE", "LIDER"], toPrevious: true, slaEffect: "RESUME" },
+    { team, name: "Pasar a en curso", from: ["EN_ANALISIS"], to: "EN_CURSO", roles: ["LIDER"], requiresAssignee: true, slaEffect: "CONTINUE" },
+    { team, name: "Enviar a revisión", from: ["EN_CURSO"], to: "EN_REVISION", roles: ["RESPONSABLE", "LIDER"], slaEffect: "NONE" },
+    { team, name: "Marcar hecho", from: ["EN_REVISION"], to: "HECHO", roles: ["SOLICITANTE", "LIDER"], slaEffect: "STOP", resolution: "RESUELTO" },
+    { team, name: "Devolver", from: ["EN_REVISION"], to: "EN_CURSO", roles: ["SOLICITANTE"], requiresComment: true, slaEffect: "RESUME" },
+    { team, name: "Cancelar", from: ["NUEVO", "EN_ANALISIS", "EN_CURSO"], to: "CANCELADO", roles: ["SOLICITANTE", "LIDER"], requiresComment: true, slaEffect: "STOP", resolution: "CANCELADO_SOLICITANTE" },
+    { team, name: "Reabrir", from: ["HECHO"], to: "EN_ANALISIS", roles: ["LIDER"], requiresComment: true, clearResolution: true, slaEffect: "NEW_CYCLE", reopenWithinDays: 30 },
+  ]
+}
 
 export const ESTADOS_OFICIALES: EstadoOficial[] = [
   { team: dev, key: "NUEVO", name: "Nuevo", category: "POR_HACER", sortOrder: 10, boardColumn: "Nuevo" },
@@ -77,6 +114,8 @@ export const ESTADOS_OFICIALES: EstadoOficial[] = [
   { team: inn, key: "EN_VALIDACION_RESULTADOS", name: "En validación de resultados", category: "EN_CURSO", sortOrder: 70, boardColumn: "Validación de resultados" },
   { team: inn, key: "IMPLEMENTADA", name: "Implementada", category: "TERMINADO", sortOrder: 80, boardColumn: "Implementada" },
   { team: inn, key: "DESCARTADA", name: "Descartada", category: "TERMINADO", sortOrder: 90, boardColumn: "Descartada" },
+  ...estadosEstandar(adm),
+  ...estadosEstandar(gro),
 ]
 
 export const TRANSICIONES_OFICIALES: TransicionOficial[] = [
@@ -135,10 +174,12 @@ export const TRANSICIONES_OFICIALES: TransicionOficial[] = [
   { team: inn, name: "Validar resultados", from: ["EN_VALIDACION_RESULTADOS"], to: "IMPLEMENTADA", roles: ["SOLICITANTE", "LIDER"], slaEffect: "STOP", resolution: "RESUELTO" },
   { team: inn, name: "Devolver", from: ["EN_VALIDACION_RESULTADOS"], to: "EN_PILOTO", roles: ["SOLICITANTE"], requiresComment: true, slaEffect: "RESUME" },
   { team: inn, name: "Reabrir", from: ["IMPLEMENTADA"], to: "EN_EVALUACION", roles: ["LIDER"], requiresComment: true, clearResolution: true, slaEffect: "NEW_CYCLE", reopenWithinDays: 30 },
+  ...transicionesEstandar(adm),
+  ...transicionesEstandar(gro),
 ]
 
 export const PAUSA_SLA = new Set(["EN_ESPERA", "EN_VALIDACION", "EN_APROBACION", "EN_VALIDACION_RESULTADOS"])
-export const TERMINALES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA"])
+export const TERMINALES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA", "HECHO"])
 
 export const RESOLUCION_LABEL: Record<string, string> = {
   RESUELTO: "Resuelto",
@@ -168,6 +209,14 @@ export const SLA_POR_DEFECTO: Array<{ team: TeamName; priority: string; first: n
   { team: inn, priority: "ALTA", first: 16 * 60, resolution: 10 * 8 * 60 },
   { team: inn, priority: "MEDIA", first: 24 * 60, resolution: 15 * 8 * 60 },
   { team: inn, priority: "BAJA", first: 40 * 60, resolution: 20 * 8 * 60 },
+  { team: adm, priority: "CRITICA", first: 4 * 60, resolution: 2 * 8 * 60 },
+  { team: adm, priority: "ALTA", first: 8 * 60, resolution: 3 * 8 * 60 },
+  { team: adm, priority: "MEDIA", first: 16 * 60, resolution: 5 * 8 * 60 },
+  { team: adm, priority: "BAJA", first: 24 * 60, resolution: 8 * 8 * 60 },
+  { team: gro, priority: "CRITICA", first: 4 * 60, resolution: 2 * 8 * 60 },
+  { team: gro, priority: "ALTA", first: 8 * 60, resolution: 3 * 8 * 60 },
+  { team: gro, priority: "MEDIA", first: 16 * 60, resolution: 5 * 8 * 60 },
+  { team: gro, priority: "BAJA", first: 24 * 60, resolution: 10 * 8 * 60 },
 ]
 
 export const TIPOS_OFICIALES: Array<{ team: TeamName; name: string; description: string; extra: string }> = [
@@ -190,4 +239,12 @@ export const TIPOS_OFICIALES: Array<{ team: TeamName; name: string; description:
   { team: inn, name: "Prototipo", description: "Un prototipo para probar la idea.", extra: "" },
   { team: inn, name: "Piloto", description: "Una prueba controlada con un grupo pequeño.", extra: "" },
   { team: inn, name: "Mejora de proceso", description: "Un cambio en la forma de trabajar.", extra: "" },
+  { team: adm, name: "Compra o proveedor", description: "Una compra, un pago o la gestión de un proveedor.", extra: "" },
+  { team: adm, name: "Documento interno", description: "Un acta, un formato o un documento de la casa.", extra: "" },
+  { team: adm, name: "Proceso administrativo", description: "Un trámite interno de administración.", extra: "" },
+  { team: adm, name: "Soporte de personal", description: "Una solicitud de personal, horario o dotación.", extra: "" },
+  { team: gro, name: "Experimento de crecimiento", description: "Una prueba para aumentar alcance o conversión.", extra: "" },
+  { team: gro, name: "Campaña de adquisición", description: "Una campaña para traer nuevos interesados.", extra: "canal" },
+  { team: gro, name: "Análisis de embudo", description: "Una lectura de dónde se pierde la gente en el recorrido.", extra: "" },
+  { team: gro, name: "Mejora de conversión", description: "Un ajuste para que más personas completen un paso.", extra: "" },
 ]

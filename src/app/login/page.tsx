@@ -51,7 +51,7 @@ export default async function LoginPage({
           <p className="text-xs tracking-[0.22em] text-[#4FB3DB]">CIFES · LUVANIA</p>
           <h1 className="mt-6 max-w-xl text-5xl leading-[0.95] font-semibold text-white md:text-7xl">Planer</h1>
           <p className="mt-6 max-w-md text-base leading-relaxed text-white/80">
-            CIFES · Luvania. Aquí académica, la clínica, admisiones y el resto de la casa le piden trabajo a Desarrollo y a Marketing, y pueden ver cómo se está atendiendo.
+            CIFES · Luvania. Aquí académica, la clínica, admisiones y el resto de la casa le piden trabajo a Producto, Marketing, Comercial, Innovación, Administración y Growth, y pueden ver cómo se está atendiendo.
           </p>
         </div>
         <p className="mt-10 text-sm text-white/70">Solo cuentas del dominio cifes.edu.co.</p>

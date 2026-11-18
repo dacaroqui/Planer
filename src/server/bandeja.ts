@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client"
-import type { Actor, TeamName } from "@/lib/domain"
-import { TERMINAL_STATUSES } from "@/lib/domain"
+import { TEAMS, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
 import { esPorResponder } from "@/lib/cronologia"
 import { esAdmin, puedeAsignar, puedeComentar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
@@ -115,7 +114,7 @@ async function contarPestanas(actor: Actor, filtros: FiltroBandeja, equipos: Tea
 
 export async function listarBandeja(actor: Actor, filtros: FiltroBandeja) {
   const equipos = esAdmin(actor)
-    ? (["DESARROLLO", "MARKETING", "COMERCIAL", "INNOVACION"] as TeamName[])
+    ? [...TEAMS]
     : [...new Set(actor.memberships.map((item) => item.team))]
   const equiposFiltrados = filtros.equipo && equipos.includes(filtros.equipo) ? [filtros.equipo] : equipos
   const [conteosBase, filas] = await Promise.all([

@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ClipboardListIcon, Code2Icon, HandshakeIcon, InfoIcon, LightbulbIcon, MegaphoneIcon } from "lucide-react"
+import { ArrowLeftIcon, ArrowRightIcon, Building2Icon, CheckIcon, ClipboardListIcon, Code2Icon, HandshakeIcon, InfoIcon, LightbulbIcon, MegaphoneIcon, TrendingUpIcon } from "lucide-react"
 import { toast } from "sonner"
 import { crearProyectoRadicarAction, radicarAction } from "@/server/actions"
 import { TEAM_LABEL, TEAMS, type TeamName } from "@/lib/domain"
-import { iniciales } from "@/lib/planer-ui"
+import { FileDropzone } from "@/components/file-dropzone"
 import { Elegir } from "@/components/ui/elegir"
+import { puedeSeguirConArchivos, type PiezaArchivo } from "@/lib/archivos-zona"
 import {
   erroresPaso,
   fechaEntregaRecomendada,
@@ -39,6 +40,8 @@ const ICONOS: Record<string, typeof Code2Icon> = {
   megafono: MegaphoneIcon,
   acuerdo: HandshakeIcon,
   bombilla: LightbulbIcon,
+  edificio: Building2Icon,
+  crecimiento: TrendingUpIcon,
 }
 
 const COLORES: Record<string, { fondo: string; tinta: string }> = {
@@ -46,6 +49,8 @@ const COLORES: Record<string, { fondo: string; tinta: string }> = {
   coral: { fondo: "#FDE8E6", tinta: "#E11D48" },
   verde: { fondo: "#E7F6EE", tinta: "#047857" },
   violeta: { fondo: "#F3E8FF", tinta: "#6D28D9" },
+  ambar: { fondo: "#FEF3C7", tinta: "#92400E" },
+  lima: { fondo: "#ECFDF3", tinta: "#047857" },
 }
 
 const campo = "h-11 w-full rounded-[10px] border border-[#D9DEE7] bg-white px-3 text-sm"
@@ -54,7 +59,7 @@ const area = "w-full rounded-[10px] border border-[#D9DEE7] bg-white px-3 py-2 t
 export function FormularioRadicar({
   tipos,
   area: areaNombre,
-  marcas,
+  marcas: _marcas,
   prioridades,
   empresas,
   proyectos,
@@ -89,7 +94,10 @@ export function FormularioRadicar({
   const [team, setTeam] = useState<TeamName | "">(equipos[0] ? "" : "")
   const [typeId, setTypeId] = useState("")
   const [priority, setPriority] = useState(prioridades.find((item) => item.key === "MEDIA")?.key ?? prioridades[0]?.key ?? "MEDIA")
-  const [brand, setBrand] = useState(marcas.find((item) => item.key === "CIFES")?.key ?? marcas[0]?.key ?? "CIFES")
+  const [publishAt, setPublishAt] = useState("")
+  const [piezas, setPiezas] = useState<PiezaArchivo[]>([])
+  const [archivos, setArchivos] = useState<File[]>([])
+  const [exito, setExito] = useState<{ code: string } | null>(null)
   const [empresaId, setEmpresaId] = useState(empresas.find((item) => item.name === "CIFES")?.id ?? empresas[0]?.id ?? "")
   const [projectId, setProjectId] = useState("")
   const [proyectosLocales, setProyectosLocales] = useState(proyectos)
@@ -103,12 +111,12 @@ export function FormularioRadicar({
   const [steps, setSteps] = useState("")
   const [channels, setChannels] = useState("")
   const [moduleName, setModuleName] = useState("")
-  const [assigneeId, setAssigneeId] = useState("")
   const [desiredDate, setDesiredDate] = useState("")
   const [fechaManual, setFechaManual] = useState(false)
   const [tocados, setTocados] = useState<Record<string, boolean>>({})
   const [intento, setIntento] = useState<1 | 2 | 3 | 0>(0)
-  const [archivo, setArchivo] = useState("")
+  const empresaNombre = empresas.find((item) => item.id === empresaId)?.name ?? ""
+  const brand = empresaNombre.toLowerCase().includes("luvania") ? "LUVANIA" : empresaNombre.toLowerCase().includes("ambas") || empresaNombre.toLowerCase().includes("transversal") ? "AMBAS" : "CIFES"
   const [declares, setDeclares] = useState(false)
   const [reviewed, setReviewed] = useState(false)
   const areaInicial = areas.find((item) => item.name === "Dirección") ?? areas.find((item) => item.name !== "Académico") ?? areas[0]
@@ -151,6 +159,7 @@ export function FormularioRadicar({
   function continuar(siguiente: 1 | 2 | 3) {
     setIntento(paso)
     if (Object.keys(erroresPaso(paso, datosPaso)).length > 0) return
+    if (paso === 2 && !puedeSeguirConArchivos(piezas)) return
     setIntento(0)
     setPaso(siguiente)
   }
@@ -162,6 +171,28 @@ export function FormularioRadicar({
 
   function nombreDe(lista: { key?: string; id?: string; name: string }[], valor: string) {
     return lista.find((item) => item.key === valor || item.id === valor)?.name ?? valor
+  }
+
+  if (exito && team) {
+    const lideres = personas.filter((persona) => persona.team === team && persona.role === "LIDER").map((persona) => persona.name)
+    const nombres = lideres.join(", ")
+    const puedeAhora = esAdministrador || liderazgos.includes(team)
+    return (
+      <section className="mx-auto max-w-xl space-y-4 rounded-xl border border-[#E4E7EC] bg-white p-6">
+        <p className="text-sm font-medium text-[#1658B0]">{exito.code}</p>
+        <h1 className="font-heading text-3xl">{title}</h1>
+        {puedeAhora ? (
+          <p className="text-sm">Pendiente de asignar por el líder de {TEAM_LABEL[team]}{nombres ? `: ${nombres}` : ""}.</p>
+        ) : (
+          <p className="text-sm">Tu requerimiento llegó a {TEAM_LABEL[team]}. {nombres || "El líder"} lo asignará y te avisaremos.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/requerimientos/${exito.code}`} className="inline-flex h-10 items-center rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white">Ver requerimiento</Link>
+          <button type="button" className="inline-flex h-10 items-center rounded-lg border border-[#E4E7EC] px-4 text-sm" onClick={() => { setExito(null); setPaso(1); setTitle(""); setDescription(""); enviando.current = false }}>Radicar otro</button>
+          {puedeAhora ? <Link href={`/requerimientos/${exito.code}`} className="inline-flex h-10 items-center rounded-lg border border-[#1658B0] px-4 text-sm font-medium text-[#1658B0]">Asignar ahora</Link> : null}
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -192,6 +223,13 @@ export function FormularioRadicar({
         setError(null)
         const data = new FormData(event.currentTarget)
         if (areaId) data.set("areaId", areaId)
+        data.delete("archivo")
+        for (const archivo of archivos) data.append("archivo", archivo)
+        if (!puedeSeguirConArchivos(piezas)) {
+          enviando.current = false
+          setPaso(2)
+          return
+        }
         if (enviando.current) return
         enviando.current = true
         start(async () => {
@@ -203,7 +241,7 @@ export function FormularioRadicar({
             return
           }
           toast.success(result.message || `Radicado ${result.code}.`)
-          router.push(`/requerimientos/${result.code}?confirmado=1`)
+          setExito({ code: result.code ?? "" })
         })
       }}>
         <input type="hidden" name="team" value={team} />
@@ -296,10 +334,7 @@ export function FormularioRadicar({
                 <label className="grid gap-1.5 text-sm">
                   Empresa
                   <Elegir name="empresaId" ariaLabel="Empresa" value={empresaId} onValueChange={(valor) => { setEmpresaId(valor); setProjectId("") }} opciones={empresas.map((item) => ({ value: item.id, label: item.name }))} />
-                </label>
-                <label className="grid gap-1.5 text-sm">
-                  Marca
-                  <Elegir name="brand" ariaLabel="Marca" value={brand} onValueChange={setBrand} opciones={marcas.map((item) => ({ value: item.key, label: item.name }))} />
+                  <input type="hidden" name="brand" value={brand} />
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Proyecto · Opcional
@@ -324,15 +359,16 @@ export function FormularioRadicar({
                       Recomendada según prioridad: {textoFechaIso(recomendada)}
                       {fechaManual ? <button type="button" className="ml-2 font-medium text-[#1658B0] hover:underline" onClick={() => { setFechaManual(false); setDesiredDate(recomendada) }}>Usar recomendada</button> : null}
                     </span>
+                    <span className="text-xs text-muted-foreground">Cuándo esperas recibirlo.</span>
                     {visible("desiredDate") ? <Aviso texto={errores.desiredDate} /> : null}
                   </label>
-                </div>
-                {team && (esAdministrador || liderazgos.includes(team)) ? (
-                  <label className="grid gap-1.5 text-sm">
-                    Asignar a · Opcional
-                    <Elegir name="assigneeId" ariaLabel="Asignar a" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin asignar todavía" opciones={[{ value: "", label: "Sin asignar todavía" }, ...personas.filter((persona) => persona.team === team).map((persona) => ({ value: persona.id, label: persona.name, iniciales: iniciales(persona.name) }))]} />
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    Fecha de publicación · Opcional
+                    <input name="publishAt" type="datetime-local" lang="es-CO" min={`${hoyBogota(instante)}T00:00`} value={publishAt} onChange={(event) => setPublishAt(event.target.value)} className={campo} />
+                    <span className="text-xs text-muted-foreground">Cuándo debe salir publicado. Puede quedar vacía.</span>
                   </label>
-                ) : team ? (
+                </div>
+                {team ? (
                   <p className="text-sm text-muted-foreground">
                     Llegará al líder de {TEAM_LABEL[team]} para asignar{personas.some((persona) => persona.team === team && persona.role === "LIDER") ? `: ${personas.filter((persona) => persona.team === team && persona.role === "LIDER").map((persona) => persona.name).join(", ")}` : ""}.
                   </p>
@@ -368,11 +404,10 @@ export function FormularioRadicar({
                   <input name="moduleName" value={moduleName} onChange={(event) => setModuleName(event.target.value)} placeholder="CRM, sitio web, aula virtual…" className={campo} />
                 </label>
               ) : null}
-              <label className="grid gap-1.5 text-sm">
+              <div className="grid gap-1.5 text-sm">
                 Archivo · Opcional
-                <input name="archivo" type="file" className="block w-full text-sm" onChange={(event) => setArchivo(event.target.files?.[0]?.name ?? "")} />
-                <span className="text-xs text-muted-foreground">Máximo 25 MB.{archivo ? ` ${archivo}` : ""}</span>
-              </label>
+                <FileDropzone piezas={piezas} archivos={archivos} onChange={(siguientes, lista) => { setPiezas(siguientes); setArchivos(lista) }} />
+              </div>
             </div>
             {error && paso === 2 ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">{error}</p> : null}
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E4E7EC] pt-4">
@@ -393,16 +428,21 @@ export function FormularioRadicar({
               <Resumen etiqueta="Tipo de solicitud" valor={elegido?.name ?? ""} />
               <Resumen etiqueta="Título" valor={title} />
               <Resumen etiqueta="Empresa" valor={nombreDe(empresas, empresaId)} />
-              <Resumen etiqueta="Marca" valor={nombreDe(marcas, brand)} />
               <Resumen etiqueta="Proyecto" valor={projectId ? nombreDe(proyectosLocales, projectId) : "Sin proyecto"} />
               <Resumen etiqueta="Prioridad sugerida" valor={nombreDe(prioridades, priority)} />
               <Resumen etiqueta="Fecha de entrega esperada" valor={fechaEntrega ? textoFechaIso(fechaEntrega) : "Sin fecha"} />
+              <Resumen etiqueta="Fecha de publicación" valor={publishAt ? textoFechaIso(publishAt.slice(0, 10)) + (publishAt.length > 10 ? `, ${publishAt.slice(11, 16)}` : "") : "Sin fecha"} />
               <div className="sm:col-span-2"><Resumen etiqueta="Descripción" valor={description} /></div>
               {justification ? <div className="sm:col-span-2"><Resumen etiqueta="Justificación" valor={justification} /></div> : null}
               {elegido?.extra === "pasos" ? <div className="sm:col-span-2"><Resumen etiqueta="Pasos para reproducir" valor={steps} /></div> : null}
               {elegido?.extra === "canal" ? <Resumen etiqueta="Canal" valor={channels} /> : null}
               {moduleName ? <Resumen etiqueta="Módulo o sistema" valor={moduleName} /> : null}
-              {archivo ? <Resumen etiqueta="Archivo" valor={archivo} /> : null}
+              {piezas.length > 0 ? (
+                <div className="sm:col-span-2">
+                  <FileDropzone compacto piezas={piezas} archivos={archivos} onChange={(siguientes, lista) => { setPiezas(siguientes); setArchivos(lista) }} />
+                  <button type="button" className="mt-1 text-xs font-medium text-[#1658B0] hover:underline" onClick={() => setPaso(2)}>Editar archivos</button>
+                </div>
+              ) : null}
             </dl>
             <div className="mt-4 grid gap-2">
               <label className="flex items-start gap-2 text-sm">

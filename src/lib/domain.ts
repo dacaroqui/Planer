@@ -1,5 +1,5 @@
 export const ROLES = ["SOLICITANTE", "AGENTE", "LIDER", "ADMINISTRADOR", "OBSERVADOR"] as const
-export const TEAMS = ["DESARROLLO", "MARKETING", "COMERCIAL", "INNOVACION"] as const
+export const TEAMS = ["DESARROLLO", "MARKETING", "COMERCIAL", "INNOVACION", "ADMINISTRACION", "GROWTH"] as const
 export const BRANDS = ["CIFES", "LUVANIA", "AMBAS"] as const
 export const PRIORITIES = ["BAJA", "MEDIA", "ALTA", "CRITICA"] as const
 
@@ -31,10 +31,12 @@ export const ROLE_LABEL: Record<RoleName, string> = {
 }
 
 export const TEAM_LABEL: Record<TeamName, string> = {
-  DESARROLLO: "Desarrollo",
+  DESARROLLO: "Producto",
   MARKETING: "Marketing",
   COMERCIAL: "Comercial",
   INNOVACION: "Innovación",
+  ADMINISTRACION: "Administración",
+  GROWTH: "Growth",
 }
 
 export const PREFIJO_EQUIPO: Record<TeamName, string> = {
@@ -42,6 +44,8 @@ export const PREFIJO_EQUIPO: Record<TeamName, string> = {
   MARKETING: "MKT",
   COMERCIAL: "COM",
   INNOVACION: "INN",
+  ADMINISTRACION: "ADM",
+  GROWTH: "GRO",
 }
 
 export function esTeam(valor: string): valor is TeamName {
@@ -95,6 +99,8 @@ export const STATUS_LABEL: Record<string, string> = {
   EN_PILOTO: "En piloto",
   IMPLEMENTADA: "Implementada",
   DESCARTADA: "Descartada",
+  EN_CURSO: "En curso",
+  HECHO: "Hecho",
 }
 
 export const SLA_LABEL = {
@@ -111,8 +117,8 @@ export type SlaState = keyof typeof SLA_LABEL
 
 export const PAUSE_STATUSES = new Set(["EN_ESPERA", "EN_VALIDACION", "EN_APROBACION", "EN_VALIDACION_RESULTADOS"])
 export const RESOLVED_STATUSES = new Set(["CERRADO", "RECHAZADO"])
-export const TERMINAL_STATUSES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA"])
-export const DONE_STATUSES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA"])
+export const TERMINAL_STATUSES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA", "HECHO"])
+export const DONE_STATUSES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA", "HECHO"])
 
 export function statusLabel(status: string) {
   return STATUS_LABEL[status] ?? status

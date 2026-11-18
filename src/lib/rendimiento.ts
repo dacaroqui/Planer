@@ -1,5 +1,5 @@
 import { DateTime } from "luxon"
-import { TEAM_LABEL, type Actor, type SlaState, type TeamName } from "@/lib/domain"
+import { TEAM_LABEL, esTeam, type Actor, type SlaState, type TeamName } from "@/lib/domain"
 import { snapshotSolucion } from "@/lib/sla-solicitud"
 import { ZONE } from "@/lib/time"
 
@@ -282,7 +282,7 @@ export function leerFiltros(params: Parametros, now = new Date()): FiltrosRendim
     personas: varios("persona"),
     areaId: acotar(uno("area")),
     empresaId: acotar(uno("empresa")),
-    equipo: equipo === "DESARROLLO" || equipo === "MARKETING" || equipo === "COMERCIAL" || equipo === "INNOVACION" ? equipo : undefined,
+    equipo: equipo && esTeam(equipo) ? equipo : undefined,
     tipoId: acotar(uno("tipo")),
     prioridad: prioridad === "BAJA" || prioridad === "MEDIA" || prioridad === "ALTA" || prioridad === "CRITICA" ? prioridad : undefined,
     orden,

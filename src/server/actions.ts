@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { AuthError, CredentialsSignin } from "next-auth"
 import { signIn, signOut } from "@/auth"
-import { DomainError, PermisoDenegado, esTeam, type TeamName } from "@/lib/domain"
+import { DomainError, PermisoDenegado, TEAMS, esTeam, type TeamName } from "@/lib/domain"
 import { radicarDesdeFormulario } from "@/server/radicar-formulario"
 import { crearProyectoAlRadicar, eliminarTarea, guardarEmpresa, guardarProyecto, guardarTarea } from "@/server/proyectos"
+import { desactivarPersona, reactivarPersona } from "@/server/personas-baja"
+import { aplicarPlantillaEstandar, definirLiderArea, guardarPresentacionEquipo } from "@/server/equipos-admin"
 import { rechazoEliminar } from "@/server/eliminar"
 import {
   aceptarInvitacion,
@@ -78,7 +80,7 @@ function refrescar(code?: string) {
 
 function equiposDe(formData: FormData) {
   const teams: TeamName[] = []
-  for (const team of ["DESARROLLO", "MARKETING", "COMERCIAL", "INNOVACION"] as const) {
+  for (const team of TEAMS) {
     if (formData.get(`team:${team}`) === "1") teams.push(team)
   }
   return teams
@@ -483,7 +485,13 @@ export async function vigilarSlasAction(): Promise<ActionResult> {
 export async function actualizarUsuarioAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
   const memberships: { team: TeamName; role: "AGENTE" | "LIDER" | "OBSERVADOR" }[] = []
-  for (const team of ["DESARROLLO", "MARKETING", "COMERCIAL", "INNOVACION"] as const) {
+  for (const team of TEAMS) {
+    const elegido = String(formData.get(`rol:${team}`) || "")
+    if (elegido === "AGENTE" || elegido === "LIDER" || elegido === "OBSERVADOR") {
+      memberships.push({ team, role: elegido })
+      continue
+    }
+    if (formData.has(`rol:${team}`)) continue
     for (const role of ["AGENTE", "LIDER", "OBSERVADOR"] as const) {
       if (formData.get(`${role}:${team}`) === "1") memberships.push({ team, role })
     }
@@ -508,6 +516,71 @@ export async function actualizarUsuarioAction(formData: FormData): Promise<Actio
   return { ok: true, message: "Roles actualizados. El cambio quedó en la auditoría." }
 }
 
+export async function guardarPresentacionAreaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await guardarPresentacionEquipo(actor, {
+      team: String(formData.get("team") || ""),
+      name: String(formData.get("name") || ""),
+      description: String(formData.get("description") || ""),
+      icon: String(formData.get("icon") || ""),
+      color: String(formData.get("color") || ""),
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Área actualizada. El cambio quedó en la auditoría." }
+}
+
+export async function definirLiderAreaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await definirLiderArea(actor, {
+      userId: String(formData.get("userId") || ""),
+      team: String(formData.get("team") || ""),
+      activo: formData.get("activo") === "1",
+    })
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Líderes actualizados." }
+}
+
+export async function aplicarPlantillaAreaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    const result = await aplicarPlantillaEstandar(actor, String(formData.get("team") || ""))
+    refrescar()
+    return { ok: true, message: result.agregados ? `Se agregaron ${result.agregados} estados de la plantilla.` : "La plantilla ya estaba completa." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function desactivarPersonaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await desactivarPersona(actor, String(formData.get("userId") || ""), String(formData.get("reasignarA") || "") || null)
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Persona desactivada. Ya no puede entrar y queda fuera de las listas de asignación." }
+}
+
+export async function reactivarPersonaAction(formData: FormData): Promise<ActionResult> {
+  const actor = await requireActor()
+  try {
+    await reactivarPersona(actor, String(formData.get("userId") || ""))
+  } catch (error) {
+    return fallo(error)
+  }
+  refrescar()
+  return { ok: true, message: "Persona reactivada." }
+}
+
 export async function crearAreaAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
   try {
@@ -522,7 +595,7 @@ export async function crearAreaAction(formData: FormData): Promise<ActionResult>
 export async function crearTipoAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
   const team = String(formData.get("team") || "")
-  if (team !== "DESARROLLO" && team !== "MARKETING") return { ok: false, error: "Elija el equipo." }
+  if (!esTeam(team)) return { ok: false, error: "Elija el equipo." }
   try {
     await crearTipo(actor, {
       team,
@@ -624,7 +697,7 @@ export async function trasladarAction(formData: FormData) {
   const actor = await requireActor()
   const code = String(formData.get("code") || "")
   const team = String(formData.get("team") || "")
-  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  if (!esTeam(team)) throw new Error("Elija el área.")
   try {
     const { prisma } = await import("@/lib/prisma")
     const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
@@ -639,7 +712,7 @@ export async function trasladarAction(formData: FormData) {
 export async function guardarEstadoAction(formData: FormData) {
   const actor = await requireActor()
   const team = String(formData.get("team") || "")
-  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  if (!esTeam(team)) throw new Error("Elija el área.")
   try {
     await guardarEstado(actor, {
       id: String(formData.get("id") || "") || undefined,
@@ -669,7 +742,7 @@ export async function eliminarEstadoAction(formData: FormData): Promise<ActionRe
 export async function guardarTransicionAction(formData: FormData) {
   const actor = await requireActor()
   const team = String(formData.get("team") || "")
-  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  if (!esTeam(team)) throw new Error("Elija el área.")
   try {
     await guardarTransicion(actor, {
       id: String(formData.get("id") || "") || undefined,
@@ -693,7 +766,7 @@ export async function guardarTransicionAction(formData: FormData) {
 export async function guardarSlaAction(formData: FormData) {
   const actor = await requireActor()
   const team = String(formData.get("team") || "")
-  if (team !== "DESARROLLO" && team !== "MARKETING") throw new Error("Elija el área.")
+  if (!esTeam(team)) throw new Error("Elija el área.")
   try {
     await guardarSla(actor, {
       id: String(formData.get("id") || "") || undefined,
@@ -727,6 +800,7 @@ export async function guardarTareaAction(formData: FormData): Promise<ActionResu
       projectId: opcional("projectId"),
       parentId: opcional("parentId"),
       horasEstimadas: formData.has("horasEstimadas") ? String(formData.get("horasEstimadas") || "") : undefined,
+      horasReales: formData.has("horasReales") ? String(formData.get("horasReales") || "") : undefined,
     })
   } catch (error) {
     return fallo(error)
