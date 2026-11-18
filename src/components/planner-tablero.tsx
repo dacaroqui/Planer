@@ -199,12 +199,12 @@ export function PlannerVista({
             return (
               <section
                 key={columna.key}
-                className="flex min-h-80 flex-col rounded-xl border border-[#E4E7EC] bg-[#F3F4F6] p-3"
+                className="flex min-h-80 flex-col rounded-xl border border-[#E4E7EC] bg-[#F1F3F6] p-4 shadow-[0_1px_2px_rgba(21,18,42,0.04)]"
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => soltar(event, columna.key)}
               >
                 <header className="mb-3 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium">
+                  <span className="inline-flex items-center gap-2 text-base font-semibold">
                     <span className={`size-2 rounded-full ${columna.punto}`} aria-hidden />
                     {columna.label}
                     <span className="rounded-full bg-white px-1.5 text-xs font-normal text-muted-foreground">{propias.length}</span>
@@ -227,10 +227,10 @@ export function PlannerVista({
                         }
                         event.dataTransfer.setData("text/plain", tarea.id)
                       }}
-                      className="rounded-xl border border-[#E4E7EC] bg-white p-3 text-sm shadow-sm"
+                      className="rounded-xl border border-[#E4E7EC] bg-white p-4 text-[15px] shadow-[0_1px_2px_rgba(21,18,42,0.05)]"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium">{tarea.title}</p>
+                        <p className="text-[15px] font-semibold">{tarea.title}</p>
                         {puede || puedeEliminar ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger className="inline-flex size-7 items-center justify-center rounded-md hover:bg-[#F3F4F6]" aria-label={`Acciones de ${tarea.title}`}>⋯</DropdownMenuTrigger>

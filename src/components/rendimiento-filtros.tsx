@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { XIcon } from "lucide-react"
+import { Elegir } from "@/components/ui/elegir"
 import { TEAM_LABEL, type TeamName } from "@/lib/domain"
 import { DateTime } from "luxon"
 import {
@@ -66,41 +67,15 @@ export function FiltrosRendimientoForm({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Periodo" className={selecto} value={filtros.periodo} onChange={(event) => elegirPeriodo(event.target.value as FiltrosRendimiento["periodo"])}>
-          <option value="semana">Semana</option>
-          <option value="mes">Mes</option>
-          <option value="anio">Año</option>
-          <option value="rango">Rango</option>
-        </select>
+        <Elegir className="w-36" ariaLabel="Periodo" value={filtros.periodo} onValueChange={(valor) => elegirPeriodo(valor as FiltrosRendimiento["periodo"])} opciones={[{ value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }, { value: "rango", label: "Rango" }]} />
         {ocultarPersona ? null : (
-          <select aria-label="Persona" className={selecto} value="" onChange={(event) => elegirPersona(event.target.value)}>
-            <option value="">Persona</option>
-            {opciones.personas.filter((item) => !filtros.personas.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
-          </select>
+          <Elegir className="w-44" ariaLabel="Persona" value="" onValueChange={elegirPersona} placeholder="Persona" opciones={[{ value: "", label: "Persona" }, ...opciones.personas.filter((item) => !filtros.personas.includes(item.id)).map((item) => ({ value: item.id, label: item.nombre }))]} />
         )}
-        <select aria-label="Área" className={selecto} value={filtros.areaId ?? ""} onChange={(event) => ir({ areaId: event.target.value || undefined })}>
-          <option value="">Área</option>
-          {opciones.areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
-        </select>
-        <select aria-label="Espacio" className={selecto} value={filtros.empresaId ?? ""} onChange={(event) => ir({ empresaId: event.target.value || undefined })}>
-          <option value="">Espacio</option>
-          {opciones.empresas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
-        </select>
-        <select aria-label="Equipo" className={selecto} value={filtros.equipo ?? ""} onChange={(event) => ir({ equipo: (event.target.value || undefined) as FiltrosRendimiento["equipo"] })}>
-          <option value="">Equipo</option>
-          {equipos.map((item) => <option key={item} value={item}>{TEAM_LABEL[item]}</option>)}
-        </select>
-        <select aria-label="Tipo" className={selecto} value={filtros.tipoId ?? ""} onChange={(event) => ir({ tipoId: event.target.value || undefined })}>
-          <option value="">Tipo</option>
-          {tipos.map((item) => <option key={item.id} value={item.id}>{TEAM_LABEL[item.equipo]} · {item.nombre}</option>)}
-        </select>
-        <select aria-label="Prioridad" className={selecto} value={filtros.prioridad ?? ""} onChange={(event) => ir({ prioridad: (event.target.value || undefined) as FiltrosRendimiento["prioridad"] })}>
-          <option value="">Prioridad</option>
-          <option value="BAJA">Baja</option>
-          <option value="MEDIA">Media</option>
-          <option value="ALTA">Alta</option>
-          <option value="CRITICA">Crítica</option>
-        </select>
+        <Elegir className="w-40" ariaLabel="Área" value={filtros.areaId ?? ""} onValueChange={(valor) => ir({ areaId: valor || undefined })} placeholder="Área" opciones={[{ value: "", label: "Área" }, ...opciones.areas.map((item) => ({ value: item.id, label: item.nombre }))]} />
+        <Elegir className="w-40" ariaLabel="Espacio" value={filtros.empresaId ?? ""} onValueChange={(valor) => ir({ empresaId: valor || undefined })} placeholder="Espacio" opciones={[{ value: "", label: "Espacio" }, ...opciones.empresas.map((item) => ({ value: item.id, label: item.nombre }))]} />
+        <Elegir className="w-40" ariaLabel="Equipo" value={filtros.equipo ?? ""} onValueChange={(valor) => ir({ equipo: (valor || undefined) as FiltrosRendimiento["equipo"] })} placeholder="Equipo" opciones={[{ value: "", label: "Equipo" }, ...equipos.map((item) => ({ value: item, label: TEAM_LABEL[item] }))]} />
+        <Elegir className="w-52" ariaLabel="Tipo" value={filtros.tipoId ?? ""} onValueChange={(valor) => ir({ tipoId: valor || undefined })} placeholder="Tipo" opciones={[{ value: "", label: "Tipo" }, ...tipos.map((item) => ({ value: item.id, label: `${TEAM_LABEL[item.equipo]} · ${item.nombre}` }))]} />
+        <Elegir className="w-40" ariaLabel="Prioridad" value={filtros.prioridad ?? ""} onValueChange={(valor) => ir({ prioridad: (valor || undefined) as FiltrosRendimiento["prioridad"] })} placeholder="Prioridad" opciones={[{ value: "", label: "Prioridad" }, { value: "BAJA", label: "Baja" }, { value: "MEDIA", label: "Media" }, { value: "ALTA", label: "Alta" }, { value: "CRITICA", label: "Crítica" }]} />
       </div>
       {filtros.periodo === "rango" ? (
         <div className="flex flex-wrap items-center gap-2">

@@ -7,6 +7,7 @@ import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ClipboardListIcon, Code2Icon,
 import { toast } from "sonner"
 import { radicarAction } from "@/server/actions"
 import { TEAM_LABEL, type TeamName } from "@/lib/domain"
+import { Elegir } from "@/components/ui/elegir"
 
 export type TipoOpcion = {
   id: string
@@ -34,8 +35,8 @@ const COLORES: Record<string, { fondo: string; tinta: string }> = {
   coral: { fondo: "#FDE8E6", tinta: "#E11D48" },
 }
 
-const campo = "h-10 w-full rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm"
-const area = "w-full rounded-lg border border-[#E4E7EC] bg-white px-3 py-2 text-sm"
+const campo = "h-11 w-full rounded-[10px] border border-[#D9DEE7] bg-white px-3 text-sm"
+const area = "w-full rounded-[10px] border border-[#D9DEE7] bg-white px-3 py-2 text-sm"
 
 export function FormularioRadicar({
   tipos,
@@ -174,13 +175,13 @@ export function FormularioRadicar({
                       role="radio"
                       aria-checked={activo}
                       onClick={() => { setTeam(item.key); setTypeId("") }}
-                      className={activo ? "flex items-start gap-3 rounded-xl border-2 border-[#1658B0] bg-[#F4F8FE] p-4 text-left" : "flex items-start gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 text-left hover:border-[#1658B0]"}
+                      className={activo ? "flex items-start gap-3 rounded-xl border-2 border-[#1658B0] bg-[#F4F8FE] p-5 text-left shadow-[0_8px_24px_rgba(21,18,42,0.04)]" : "flex items-start gap-3 rounded-xl border border-[#E4E7EC] bg-white p-5 text-left shadow-[0_1px_2px_rgba(21,18,42,0.04)] hover:border-[#1658B0]"}
                     >
-                      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg" style={{ background: tono.fondo, color: tono.tinta }}>
-                        <Icono className="size-5" />
+                      <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-xl" style={{ background: tono.fondo, color: tono.tinta }}>
+                        <Icono className="size-6" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block font-medium">{item.name}</span>
+                        <span className="block text-lg font-semibold">{item.name}</span>
                         <span className="mt-0.5 block text-sm text-muted-foreground">{item.description}</span>
                       </span>
                       <span className={activo ? "mt-1 inline-flex size-4 items-center justify-center rounded-full border border-[#1658B0]" : "mt-1 inline-flex size-4 rounded-full border border-[#D0D5DD]"} aria-hidden>
@@ -208,8 +209,8 @@ export function FormularioRadicar({
 
         <div className={paso === 2 ? "space-y-4" : "hidden"}>
           <EquipoActual equipo={equipo} onCambiar={() => setPaso(1)} />
-          <section className="rounded-xl border border-[#E4E7EC] bg-white p-5">
-            <div className="grid gap-6 lg:grid-cols-2">
+          <section className="rounded-xl border border-[#E4E7EC] bg-white p-5 shadow-[0_8px_24px_rgba(21,18,42,0.04)]">
+            <div className="grid gap-8 lg:grid-cols-2">
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold">¿Qué necesitas?</h2>
                 <label className="grid gap-1.5 text-sm">
@@ -234,36 +235,24 @@ export function FormularioRadicar({
                 <h2 className="text-lg font-semibold">Clasificación y contexto</h2>
                 <label className="grid gap-1.5 text-sm">
                   Tipo de solicitud
-                  <select name="typeId" value={typeId} onChange={(event) => setTypeId(event.target.value)} className={campo}>
-                    <option value="">Selecciona un tipo</option>
-                    {visibles.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.name}</option>)}
-                  </select>
+                  <Elegir name="typeId" ariaLabel="Tipo de solicitud" value={typeId} onValueChange={setTypeId} placeholder="Selecciona un tipo" opciones={[{ value: "", label: "Selecciona un tipo" }, ...visibles.map((tipo) => ({ value: tipo.id, label: tipo.name }))]} />
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Empresa
-                  <select name="empresaId" value={empresaId} onChange={(event) => { setEmpresaId(event.target.value); setProjectId("") }} className={campo}>
-                    {empresas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
+                  <Elegir name="empresaId" ariaLabel="Empresa" value={empresaId} onValueChange={(valor) => { setEmpresaId(valor); setProjectId("") }} opciones={empresas.map((item) => ({ value: item.id, label: item.name }))} />
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Marca
-                  <select name="brand" value={brand} onChange={(event) => setBrand(event.target.value)} className={campo}>
-                    {marcas.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
-                  </select>
+                  <Elegir name="brand" ariaLabel="Marca" value={brand} onValueChange={setBrand} opciones={marcas.map((item) => ({ value: item.key, label: item.name }))} />
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Proyecto · Opcional
-                  <select name="projectId" value={projectId} onChange={(event) => setProjectId(event.target.value)} className={campo}>
-                    <option value="">Sin proyecto</option>
-                    {proyectosEmpresa.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
+                  <Elegir name="projectId" ariaLabel="Proyecto" value={projectId} onValueChange={setProjectId} placeholder="Sin proyecto" opciones={[{ value: "", label: "Sin proyecto" }, ...proyectosEmpresa.map((item) => ({ value: item.id, label: item.name }))]} />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1.5 text-sm">
                     Prioridad sugerida
-                    <select name="priority" value={priority} onChange={(event) => setPriority(event.target.value)} className={campo}>
-                      {prioridades.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
-                    </select>
+                    <Elegir name="priority" ariaLabel="Prioridad sugerida" value={priority} onValueChange={setPriority} opciones={prioridades.map((item) => ({ value: item.key, label: item.name }))} />
                   </label>
                   <label className="grid gap-1.5 text-sm">
                     Fecha deseada · Opcional
@@ -274,9 +263,7 @@ export function FormularioRadicar({
                 {areas.length > 0 ? (
                   <label className="grid gap-1.5 text-sm">
                     Área de quien pide el trabajo
-                    <select name="areaId" aria-label="Área de quien pide el trabajo" value={areaId} onChange={(event) => setAreaId(event.target.value)} className={campo}>
-                      {areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
+                    <Elegir name="areaId" ariaLabel="Área de quien pide el trabajo" value={areaId} onValueChange={setAreaId} opciones={areas.map((item) => ({ value: item.id, label: item.name }))} />
                     <span className="text-xs text-muted-foreground">Como administrador, elija el área. No queda radicado en Académico por defecto.</span>
                   </label>
                 ) : <p className="text-xs text-muted-foreground">Se radica desde {areaNombre}.</p>}
@@ -384,7 +371,7 @@ function Pasos({ paso }: { paso: 1 | 2 | 3 }) {
           return (
             <li key={item.label} className="flex items-center gap-2">
               {index > 0 ? <span className="hidden h-px w-8 bg-[#E4E7EC] sm:block" /> : null}
-              <span className={hecho || activo ? "inline-flex size-6 items-center justify-center rounded-full bg-[#1658B0] text-xs font-medium text-white" : "inline-flex size-6 items-center justify-center rounded-full bg-[#E5E7EB] text-xs text-[#667085]"}>
+              <span className={hecho || activo ? "inline-flex size-7 items-center justify-center rounded-full bg-[#1658B0] text-sm font-semibold text-white" : "inline-flex size-7 items-center justify-center rounded-full bg-[#E5E7EB] text-sm text-[#667085]"}>
                 {hecho ? <CheckIcon className="size-3.5" /> : item.n}
               </span>
               <span className={activo ? "text-sm font-medium" : "text-sm text-muted-foreground"}>{item.label}</span>

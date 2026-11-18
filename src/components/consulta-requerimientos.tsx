@@ -7,6 +7,7 @@ import { BookmarkIcon, FilterIcon, SearchIcon, XIcon } from "lucide-react"
 import { AccionesMasivas } from "@/components/acciones-masivas"
 import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
 import { EstadoBadge, SlaBadge } from "@/components/insignias"
+import { Elegir } from "@/components/ui/elegir"
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { PRIORITY_LABEL, STATUS_LABEL, statusLabel, type PriorityName, type SlaState } from "@/lib/domain"
 import { ZONE } from "@/lib/time"
@@ -268,11 +269,7 @@ export function ConsultaRequerimientos({
 }
 
 function Selecto({ etiqueta, valor, opciones, onChange }: { etiqueta: string; valor: string; opciones: Opcion[]; onChange: (valor: string) => void }) {
-  return (
-    <select aria-label={etiqueta} className="h-10 rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm" value={valor} onChange={(event) => onChange(event.target.value)}>
-      {opciones.map((opcion) => <option key={opcion.value || "vacio"} value={opcion.value}>{opcion.label}</option>)}
-    </select>
-  )
+  return <Elegir className="w-44" ariaLabel={etiqueta} value={valor} onValueChange={onChange} placeholder={etiqueta} opciones={opciones} />
 }
 
 function Paginador({ page, pages, onPage }: { page: number; pages: number; onPage: (page: number) => void }) {
