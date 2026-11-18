@@ -7,6 +7,7 @@ import {
   BellIcon,
   ChevronDownIcon,
   HelpCircleIcon,
+  ChartColumnIcon,
   LayoutDashboardIcon,
   PanelLeftIcon,
   PlusIcon,
@@ -40,6 +41,7 @@ export function Marco({
   puedePlanner,
   puedeCola,
   puedeTablero,
+  rendimiento,
   children,
 }: {
   actor: Actor
@@ -50,6 +52,7 @@ export function Marco({
   puedePlanner: boolean
   puedeCola: boolean
   puedeTablero: boolean
+  rendimiento: "equipo" | "propio" | null
   children: React.ReactNode
 }) {
   const path = usePathname()
@@ -110,6 +113,7 @@ export function Marco({
           </div>
           <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Filtros" icono={<FilterIcon className="size-4" />} compacta={!abierta} />
           {puedeTablero ? <Enlace href="/gerencia" activo={path.startsWith("/gerencia") || path.startsWith("/paneles")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+          {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
           {puedeCola ? <Enlace href="/cola" activo={path.startsWith("/cola")} etiqueta="Cola de entrada" icono={<FilterIcon className="size-4" />} compacta={!abierta} /> : null}
