@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { DomainError, type Actor, type Membership, type TeamName } from "@/lib/domain"
+import { DomainError, TEAM_LABEL, type Actor, type Membership, type TeamName } from "@/lib/domain"
 import { puedeAdministrar } from "@/lib/permissions"
 import { isInternalEmail } from "@/lib/time"
 import { hashClave, validarClave, verificarClave } from "@/lib/clave"
@@ -139,7 +139,7 @@ export async function crearInvitacion(
     },
   })
   const enlace = `${appBaseUrl()}/invitar/${token}`
-  const equipos = input.teams.length ? input.teams.map((team) => team === "DESARROLLO" ? "Desarrollo" : "Marketing").join(" y ") : "sin equipo"
+  const equipos = input.teams.length ? input.teams.map((team) => TEAM_LABEL[team]).join(" y ") : "sin equipo"
   const resumen = `${email} · ${input.rol} · ${equipos}`
   let enviado = false
   try {

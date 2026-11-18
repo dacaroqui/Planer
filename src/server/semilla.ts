@@ -84,6 +84,8 @@ export async function asegurarCatalogo(client: PrismaClient = prisma) {
   const equipos = [
     { key: "DESARROLLO", name: "Desarrollo", description: "Errores, soporte técnico y mejoras en plataformas.", icon: "codigo", color: "azul", sortOrder: 1 },
     { key: "MARKETING", name: "Marketing", description: "Diseño, contenidos y piezas de comunicación.", icon: "megafono", color: "coral", sortOrder: 2 },
+    { key: "COMERCIAL", name: "Comercial", description: "Cotizaciones, propuestas y seguimiento de clientes.", icon: "acuerdo", color: "verde", sortOrder: 3 },
+    { key: "INNOVACION", name: "Innovación", description: "Ideas, prototipos y pilotos para mejorar la operación.", icon: "bombilla", color: "violeta", sortOrder: 4 },
   ]
   for (const item of equipos) {
     await client.catalogItem.upsert({

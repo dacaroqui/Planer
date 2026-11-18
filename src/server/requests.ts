@@ -9,6 +9,9 @@ import { assertAllowedFile, safeFilename } from "@/lib/files"
 import { pareceDatoPersonal } from "@/lib/datos-personales"
 import {
   DONE_STATUSES,
+  PREFIJO_EQUIPO,
+  esTeam,
+  estadoInicial,
   DomainError,
   PermisoDenegado,
   PAUSE_STATUSES,
@@ -26,6 +29,7 @@ import {
   puedeAsignar,
   puedeAutoasignarse,
   puedeCambiarPrioridad,
+  puedeClasificar,
   puedeComentar,
   puedeEditarCampos,
   puedeRadicar,
@@ -36,7 +40,7 @@ import {
   esAdmin,
   rolEn,
 } from "@/lib/permissions"
-import { esEntradaPublica, horasDeMinutos, notaResolucionOpcional, visibilidadDefecto, type TipoComentario } from "@/lib/cronologia"
+import { adjuntoVisible, esEntradaPublica, horasDeMinutos, notaResolucionOpcional, visibilidadDefecto, type TipoComentario } from "@/lib/cronologia"
 import { snapshotSolucion } from "@/lib/sla-solicitud"
 import { addBusinessMinutes, describeWindows } from "@/lib/sla"
 import { ZONE } from "@/lib/time"
@@ -52,9 +56,9 @@ const detailInclude = {
   empresa: true,
   project: true,
   tasks: { include: { assignee: true }, orderBy: { createdAt: "asc" as const } },
-  comments: { include: { author: { include: { areaRoles: true } }, tarea: { select: { title: true } } }, orderBy: { createdAt: "asc" as const } },
+  comments: { include: { author: { include: { areaRoles: true } }, tarea: { select: { title: true } }, adjuntos: { select: { id: true, filename: true, mimeType: true, sizeBytes: true } } }, orderBy: { createdAt: "asc" as const } },
   activities: { include: { actor: { include: { areaRoles: true } } }, orderBy: { createdAt: "asc" as const } },
-  attachments: { include: { uploadedBy: true }, orderBy: { createdAt: "asc" as const } },
+  attachments: { include: { uploadedBy: true, comment: { select: { kind: true } } }, orderBy: { createdAt: "asc" as const } },
   pauses: { orderBy: { startedAt: "asc" as const } },
 } satisfies Prisma.RequestInclude
 
@@ -145,7 +149,7 @@ async function leaderIds(tx: Tx, team: Team) {
 }
 
 async function nextCode(tx: Tx, team: TeamName) {
-  const prefix = team === "DESARROLLO" ? "DES" : "MKT"
+  const prefix = PREFIJO_EQUIPO[team]
   const rows = await tx.$queryRaw<Array<{ last: number }>>`
     INSERT INTO "CodeSequence" ("prefix", "last") VALUES (${prefix}, 1)
     ON CONFLICT ("prefix") DO UPDATE SET "last" = "CodeSequence"."last" + 1
@@ -235,6 +239,7 @@ export async function radicar(
     declares: boolean
     reviewedPersonalData?: boolean
     areaId?: string
+    assigneeId?: string | null
   },
   deps?: Deps,
 ) {
@@ -252,8 +257,8 @@ export async function radicar(
   if (type.extra === "pasos" && (input.stepsToReproduce ?? "").trim().length < 8) {
     throw new DomainError("Describa los pasos para reproducir el error, con datos de prueba.")
   }
-  if (type.extra === "canal" && ((input.channels ?? "").trim().length < 2 || !(input.publishAt ?? "").trim())) {
-    throw new DomainError("Indique el canal y la fecha de publicación.")
+  if (type.extra === "canal" && (input.channels ?? "").trim().length < 2) {
+    throw new DomainError("Indique el canal.")
   }
   const areaElegida = actor.isAdmin && input.areaId ? input.areaId : actor.areaId
   const area = await prisma.area.findFirst({ where: { id: areaElegida, active: true } })
@@ -264,6 +269,9 @@ export async function radicar(
         where: { name: input.brand === "LUVANIA" ? "Luvania" : "CIFES", active: true },
       }) ?? await prisma.empresa.findFirst({ where: { active: true }, orderBy: { name: "asc" } })
   if (!empresa) throw new DomainError("Elija una empresa activa.")
+  if (input.assigneeId && !esAdmin(actor) && rolEn(actor, input.team) !== "LIDER") {
+    throw new DomainError("Solo el líder del área asigna el responsable.")
+  }
   let projectId: string | null = null
   if (input.projectId) {
     const proyecto = await prisma.proyecto.findFirst({ where: { id: input.projectId, empresaId: empresa.id } })
@@ -274,9 +282,9 @@ export async function radicar(
   let desired: Date | null = null
   if (input.desiredDate) {
     const parsed = DateTime.fromISO(input.desiredDate, { zone: ZONE }).startOf("day")
-    if (!parsed.isValid) throw new DomainError("La fecha deseada no es válida.")
+    if (!parsed.isValid) throw new DomainError("La fecha de entrega esperada no es válida.")
     if (parsed < DateTime.fromJSDate(now).setZone(ZONE).startOf("day")) {
-      throw new DomainError("La fecha deseada no puede ser anterior a la radicación.")
+      throw new DomainError("La fecha no puede ser anterior a hoy")
     }
     desired = parsed.toJSDate()
   }
@@ -300,7 +308,7 @@ export async function radicar(
         priority: input.priority,
         prioritySuggested: input.priority,
         team: input.team,
-        status: "NUEVO",
+        status: estadoInicial(input.team),
         desiredDate: desired,
         typeId: type.id,
         areaId: area.id,
@@ -325,7 +333,7 @@ export async function radicar(
         actorId: actor.id,
         kind: "CREATED",
         message: "Radicó el requerimiento.",
-        toValue: "NUEVO",
+        toValue: estadoInicial(input.team),
         createdAt: now,
       },
     })
@@ -344,6 +352,7 @@ export async function radicar(
     return created
   })
   void deliver(email, messages)
+  if (input.assigneeId) await asignar(actor, request.id, input.assigneeId, deps)
   return request
 }
 
@@ -409,7 +418,7 @@ export async function transicionar(
     if (salePausa) await tx.slaPause.updateMany({ where: { requestId: current.id, endedAt: null }, data: { endedAt: now } })
     const resoluciones = new Set(["RESUELTO", "NO_SE_HARA", "DUPLICADO", "CANCELADO_SOLICITANTE"])
     const resolucionElegida = extra?.resolution && resoluciones.has(extra.resolution) ? extra.resolution : null
-    const cierra = destino === "CERRADO" || destino === "RECHAZADO" || destino === "CANCELADO"
+    const cierra = TERMINAL_STATUSES.has(destino)
     if (transition.resolution || (resolucionElegida && cierra)) {
       data.resolution = resolucionElegida || transition.resolution
       data.resolvedAt = now
@@ -534,6 +543,12 @@ export async function registrarEntrada(
   const current = await prisma.request.findUnique({ where: { id: requestId } })
   if (!current) throw new DomainError("El requerimiento no existe.")
   const interno = input.kind !== "PUBLICA"
+  if (actor.id === current.requesterId && input.kind === "SOLICITUD_INFO") {
+    throw new DomainError("No puede pedirse información a sí mismo.")
+  }
+  if (actor.id === current.requesterId && input.kind === "PUBLICA" && puedeVerNotaInterna(actor, current.team)) {
+    throw new DomainError("No puede responderse a sí mismo. Use una nota interna o registre el trabajo.")
+  }
   if (input.kind !== "PUBLICA" && !puedeVerNotaInterna(actor, current.team)) {
     throw new DomainError("Esa entrada es solo del equipo del área.")
   }
@@ -714,6 +729,25 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
   return updated
 }
 
+export async function guardarFechaEntrega(actor: Actor, code: string, valor: string, deps?: Deps) {
+  const current = await prisma.request.findUnique({ where: { code } })
+  if (!current || !puedeVer(actor, current)) throw new DomainError("El requerimiento no existe.")
+  if (!puedeAsignar(actor, current) && !puedeEditarCampos(actor, current)) {
+    throw new DomainError("No puede cambiar la fecha de entrega esperada.")
+  }
+  const ahora = clock(deps)
+  let desired: Date | null = null
+  if (valor.trim()) {
+    const parsed = DateTime.fromISO(valor, { zone: ZONE }).startOf("day")
+    if (!parsed.isValid) throw new DomainError("La fecha de entrega esperada no es válida.")
+    if (parsed < DateTime.fromJSDate(ahora).setZone(ZONE).startOf("day")) {
+      throw new DomainError("La fecha no puede ser anterior a hoy")
+    }
+    desired = parsed.toJSDate()
+  }
+  await prisma.request.update({ where: { id: current.id }, data: { desiredDate: desired, updatedAt: ahora } })
+}
+
 export async function editarCampos(
   actor: Actor,
   requestId: string,
@@ -737,38 +771,36 @@ export async function editarCampos(
     data.description = input.description.trim()
     cambios.push({ field: "descripcion", from: current.description, to: input.description.trim(), message: "Cambió la descripción." })
   }
+  if ((input.typeId && input.typeId !== current.typeId) || (input.priority && input.priority !== current.priority) || (input.brand && input.brand !== current.brand) || (input.projectId !== undefined && input.projectId !== current.projectId)) {
+    if (!puedeClasificar(actor)) throw new DomainError("Solo el administrador cambia la clasificación.")
+  }
   if (input.typeId && input.typeId !== current.typeId) {
-    if (!puedeCambiarPrioridad(actor, current.team)) throw new DomainError("Solo el líder cambia el tipo.")
     const type = await prisma.requestType.findFirst({ where: { id: input.typeId, team: current.team, active: true } })
     if (!type) throw new DomainError("Ese tipo no pertenece al área.")
+    const anterior = await prisma.requestType.findUnique({ where: { id: current.typeId } })
     data.type = { connect: { id: type.id } }
-    cambios.push({ field: "tipo", from: current.typeId, to: type.id, message: `Cambió el tipo a ${type.name}.` })
+    cambios.push({ field: "tipo", from: anterior?.name ?? current.typeId, to: type.name, message: `${actor.name} cambió el tipo de ${anterior?.name ?? "el anterior"} a ${type.name}.` })
   }
   if (input.brand && input.brand !== current.brand) {
-    if (!puedeCambiarPrioridad(actor, current.team)) throw new DomainError("Solo el líder cambia la marca.")
     data.brand = input.brand
-    cambios.push({ field: "marca", from: current.brand, to: input.brand, message: "Cambió la marca." })
+    cambios.push({ field: "marca", from: current.brand, to: input.brand, message: `${actor.name} cambió la marca de ${current.brand} a ${input.brand}.` })
   }
   if (input.priority && input.priority !== current.priority) {
-    if (!puedeCambiarPrioridad(actor, current.team)) throw new DomainError("Solo el líder cambia la prioridad.")
     data.priority = input.priority
-    cambios.push({ field: "prioridad", from: current.priority, to: input.priority, message: "Cambió la prioridad." })
+    cambios.push({ field: "prioridad", from: current.priority, to: input.priority, message: `${actor.name} cambió prioridad de ${current.priority} a ${input.priority}.` })
   }
-  if (input.committedDate !== undefined && puedeCambiarPrioridad(actor, current.team)) {
+  if (input.committedDate !== undefined && (esAdmin(actor) || rolEn(actor, current.team) === "LIDER")) {
     const parsed = input.committedDate ? DateTime.fromISO(input.committedDate, { zone: ZONE }).startOf("day").toJSDate() : null
     data.committedDate = parsed
     cambios.push({ field: "fecha_comprometida", from: current.committedDate?.toISOString() ?? "", to: parsed?.toISOString() ?? "", message: "Definió la fecha comprometida." })
   }
   if (input.moduleName !== undefined) data.moduleName = input.moduleName
   if (input.projectId !== undefined && input.projectId !== current.projectId) {
-    if (!puedeCambiarPrioridad(actor, current.team) && !esAdmin(actor)) {
-      throw new DomainError("Solo el líder asocia el proyecto al clasificar.")
-    }
     if (input.projectId) {
       const proyecto = await prisma.proyecto.findFirst({ where: { id: input.projectId, empresaId: current.empresaId } })
       if (!proyecto) throw new DomainError("El proyecto no pertenece a la empresa del requerimiento.")
       data.project = { connect: { id: proyecto.id } }
-      cambios.push({ field: "proyecto", from: current.projectId ?? "", to: proyecto.id, message: `Asoció el proyecto ${proyecto.name}.` })
+      cambios.push({ field: "proyecto", from: current.projectId ?? "", to: proyecto.name, message: `${actor.name} cambió el proyecto a ${proyecto.name}.` })
     }
   }
   if (puedeCambiarPrioridad(actor, current.team) && cambios.length > 0) {
@@ -779,6 +811,15 @@ export async function editarCampos(
     }
   }
   if (cambios.length === 0 && input.moduleName === undefined) return current
+  if (cambios.some((cambio) => cambio.field === "tipo" || cambio.field === "prioridad")) {
+    const policy = await politica(current.team, input.typeId && input.typeId !== current.typeId ? input.typeId : current.typeId, input.priority && input.priority !== current.priority ? input.priority : current.priority)
+    if (policy) {
+      data.slaTargetMinutes = policy.resolutionMinutes
+      data.resolutionMinutes = policy.resolutionMinutes
+      data.firstResponseMinutes = policy.firstResponseMinutes
+      if (!current.firstResponseStoppedAt) data.firstResponseDueAt = addBusinessMinutes(current.slaStartedAt, policy.firstResponseMinutes)
+    }
+  }
   return prisma.$transaction(async (tx) => {
     const saved = await tx.request.update({ where: { id: requestId }, data })
     for (const cambio of cambios) {
@@ -786,7 +827,7 @@ export async function editarCampos(
         data: {
           requestId,
           actorId: actor.id,
-          kind: "FIELD",
+          kind: cambio.field === "fecha_comprometida" || cambio.field === "titulo" || cambio.field === "descripcion" ? "FIELD" : "REGISTRO",
           field: cambio.field,
           message: cambio.message,
           fromValue: cambio.from,
@@ -802,7 +843,7 @@ export async function editarCampos(
 export async function trasladar(actor: Actor, requestId: string, team: TeamName, deps?: Deps) {
   const current = await prisma.request.findUnique({ where: { id: requestId } })
   if (!current) throw new DomainError("El requerimiento no existe.")
-  if (!puedeTrasladar(actor, current.team)) throw new DomainError("Solo el líder puede trasladar el requerimiento.")
+  if (!puedeTrasladar(actor, current.team)) throw new DomainError("Solo el administrador cambia el equipo.")
   if (team === current.team) throw new DomainError("El requerimiento ya está en esa área.")
   const now = clock(deps)
   const email = mailer(deps)
@@ -816,9 +857,9 @@ export async function trasladar(actor: Actor, requestId: string, team: TeamName,
       data: {
         requestId,
         actorId: actor.id,
-        kind: "FIELD",
-        field: "area",
-        message: `Trasladó el requerimiento a ${TEAM_LABEL[team]}.`,
+        kind: "REGISTRO",
+        field: "equipo",
+        message: `${actor.name} cambió el equipo de ${TEAM_LABEL[current.team]} a ${TEAM_LABEL[team]}.`,
         fromValue: current.team,
         toValue: team,
         createdAt: now,
@@ -839,7 +880,7 @@ export async function adjuntar(
   actor: Actor,
   requestId: string,
   file: { name: string; type: string; bytes: Buffer },
-  deps?: Deps,
+  deps?: Deps & { commentId?: string },
 ) {
   const current = await prisma.request.findUnique({ where: { id: requestId } })
   if (!current) throw new DomainError("El requerimiento no existe.")
@@ -855,6 +896,12 @@ export async function adjuntar(
   const almacen = await obtenerAlmacen()
   await almacen.guardar(storedName, file.bytes, file.type || "application/octet-stream")
   const filename = safeFilename(file.name)
+  let commentId: string | null = null
+  if (deps?.commentId) {
+    const entrada = await prisma.comment.findFirst({ where: { id: deps.commentId, requestId } })
+    if (!entrada) throw new DomainError("El comentario no pertenece a este requerimiento.")
+    commentId = entrada.id
+  }
   return prisma.$transaction(async (tx) => {
     const attachment = await tx.attachment.create({
       data: {
@@ -864,19 +911,22 @@ export async function adjuntar(
         storedName,
         mimeType: file.type || "application/octet-stream",
         sizeBytes: file.bytes.length,
+        commentId,
         createdAt: now,
       },
     })
-    await tx.activity.create({
-      data: {
-        requestId,
-        actorId: actor.id,
-        kind: "ATTACHMENT",
-        message: `Adjuntó ${filename}.`,
-        toValue: filename,
-        createdAt: now,
-      },
-    })
+    if (!commentId) {
+      await tx.activity.create({
+        data: {
+          requestId,
+          actorId: actor.id,
+          kind: "ATTACHMENT",
+          message: `Adjuntó ${filename}.`,
+          toValue: filename,
+          createdAt: now,
+        },
+      })
+    }
     await tx.request.update({ where: { id: requestId }, data: { updatedAt: now } })
     return attachment
   })
@@ -945,6 +995,7 @@ export async function getDetalle(actor: Actor, code: string) {
     request: {
       ...request,
       comments: request.comments.filter((comment) => seeInternal || esEntradaPublica(comment.kind)),
+      attachments: request.attachments.filter((file) => adjuntoVisible(seeInternal, file.comment?.kind ?? null)),
       activities: request.activities.filter((activity) => seeInternal || !activity.internal),
     },
     sla: evaluarSla(request),
@@ -954,8 +1005,8 @@ export async function getDetalle(actor: Actor, code: string) {
     canAssign: puedeAsignar(actor, request),
     canAttach: puedeAdjuntar(actor, request),
     canEdit: puedeEditarCampos(actor, request),
-    canPriority: puedeCambiarPrioridad(actor, request.team),
-    canMove: puedeTrasladar(actor, request.team),
+    canPriority: puedeClasificar(actor),
+    canMove: puedeClasificar(actor),
     seeInternal,
     agents,
     states: await estadosDe(request.team),
@@ -1028,6 +1079,7 @@ export type ListQuery = {
   requesterId?: string
   mine?: boolean
   assignedToMe?: boolean
+  unassigned?: boolean
   from?: string
   to?: string
   sla?: string
@@ -1065,7 +1117,7 @@ export async function listar(actor: Actor, query: ListQuery) {
       ],
     })
   }
-  if (query.team === "DESARROLLO" || query.team === "MARKETING") and.push({ team: query.team })
+  if (query.team && esTeam(query.team)) and.push({ team: query.team })
   if (query.status) and.push({ status: query.status })
   if (query.priority) and.push({ priority: query.priority })
   if (query.brand) and.push({ brand: query.brand })
@@ -1077,8 +1129,9 @@ export async function listar(actor: Actor, query: ListQuery) {
   if (query.requesterId) and.push({ requesterId: query.requesterId })
   if (query.mine) and.push({ requesterId: actor.id })
   if (query.assignedToMe) and.push({ assigneeId: actor.id })
+  if (query.unassigned) and.push({ assigneeId: null })
   if (query.queueTeam) and.push({ team: query.queueTeam })
-  if (query.onlyNew) and.push({ status: "NUEVO" })
+  if (query.onlyNew) and.push({ status: { in: ["NUEVO", "NUEVA_IDEA"] } })
   if (query.openOnly) and.push({ status: { notIn: [...TERMINAL_STATUSES] } })
   if (query.closedOnly) and.push({ status: { in: [...TERMINAL_STATUSES] } })
   if (query.from || query.to) {
@@ -1404,15 +1457,35 @@ export async function guardarEstado(
 
 export async function cambiarPrioridadMasiva(actor: Actor, codes: string[], priority: string) {
   if (!["BAJA", "MEDIA", "ALTA", "CRITICA"].includes(priority)) throw new DomainError("Elija una prioridad.")
-  if (!esAdmin(actor) && !actor.memberships.some((item) => item.role === "LIDER")) {
-    throw new DomainError("Solo un líder o el administrador cambia la prioridad de varios requerimientos.")
-  }
+  if (!puedeClasificar(actor)) throw new DomainError("Solo el administrador cambia la clasificación.")
   let cambiados = 0
   for (const code of codes) {
     const request = await prisma.request.findUnique({ where: { code } })
-    if (!request || !puedeVer(actor, request)) continue
-    if (!esAdmin(actor) && !puedeCambiarPrioridad(actor, request.team)) continue
-    await prisma.request.update({ where: { id: request.id }, data: { priority } })
+    if (!request || !puedeVer(actor, request) || request.priority === priority) continue
+    const policy = await politica(request.team, request.typeId, priority)
+    await prisma.request.update({
+      where: { id: request.id },
+      data: {
+        priority,
+        ...(policy ? {
+          slaTargetMinutes: policy.resolutionMinutes,
+          resolutionMinutes: policy.resolutionMinutes,
+          firstResponseMinutes: policy.firstResponseMinutes,
+          ...(!request.firstResponseStoppedAt ? { firstResponseDueAt: addBusinessMinutes(request.slaStartedAt, policy.firstResponseMinutes) } : {}),
+        } : {}),
+      },
+    })
+    await prisma.activity.create({
+      data: {
+        requestId: request.id,
+        actorId: actor.id,
+        kind: "REGISTRO",
+        field: "prioridad",
+        message: `${actor.name} cambió prioridad de ${request.priority} a ${priority}.`,
+        fromValue: request.priority,
+        toValue: priority,
+      },
+    })
     cambiados += 1
   }
   return cambiados

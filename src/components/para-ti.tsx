@@ -15,6 +15,8 @@ export type ItemParaTi = {
   marca: string
   actualizado: string
   assigneeId: string | null
+  href?: string
+  pedido?: string | null
 }
 
 const TABS = [
@@ -100,9 +102,12 @@ function Grupo({ titulo, items, marcados, onMarcar }: { titulo: string; items: I
           <li key={item.code} className="flex items-center gap-3 px-3 py-2.5">
             <button type="button" aria-label={marcados.includes(item.code) ? "Quitar de marcados" : "Marcar"} className={marcados.includes(item.code) ? "text-[#EE876B]" : "text-muted-foreground"} onClick={() => onMarcar(item.code)}>★</button>
             <IconoTipo nombre={item.tipo} />
-            <Link href={`/requerimientos/${item.code}`} className="min-w-0 flex-1" onClick={() => recordarVisto(item.code)}>
-              <span className="block truncate font-medium text-[#1658B0] hover:underline">{item.title}</span>
-              <span className="block truncate text-xs text-muted-foreground">{item.tipo} · {item.code} · {item.espacio}</span>
+            <Link href={item.href ?? `/requerimientos/${item.code}`} className="min-w-0 flex-1" onClick={() => recordarVisto(item.pedido || item.code)}>
+              <span className="flex items-center gap-2 truncate font-medium text-[#1658B0] hover:underline">
+                {item.pedido ? <span className="rounded-full bg-[#E7F0FB] px-2 py-0.5 text-[11px] font-medium">{item.pedido}</span> : null}
+                <span className="truncate">{item.title}</span>
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">{item.tipo} · {item.pedido ? "Tarea" : item.code} · {item.espacio}</span>
             </Link>
             {item.asignado ? <Avatar nombre={item.asignado} marca={item.marca} /> : <span className="text-xs text-muted-foreground">Sin asignar</span>}
             <time className="w-24 text-right text-xs text-muted-foreground" dateTime={item.actualizado}>{tiempoRelativo(new Date(item.actualizado), ahora)}</time>

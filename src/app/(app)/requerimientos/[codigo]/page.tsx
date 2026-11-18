@@ -20,6 +20,8 @@ import { RESOLUCION_LABEL } from "@/lib/flujo-oficial"
 import { FormularioClasificar } from "@/components/formulario-clasificar"
 import { puedeGestionarTareas } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
+import { DateTime } from "luxon"
+import { ZONE } from "@/lib/time"
 
 export default async function DetallePage({
   params,
@@ -63,6 +65,7 @@ export default async function DetallePage({
       cuerpo: item.body,
       minutos: item.minutes,
       tarea: item.tarea?.title ?? null,
+      adjuntos: item.adjuntos.map((archivo) => ({ id: archivo.id, filename: archivo.filename, mimeType: archivo.mimeType })),
     })),
     ...request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({
       tipo: "estado" as const,
@@ -93,7 +96,7 @@ export default async function DetallePage({
           <SlaBadge state={sla.state} />
           <EquipoBadge team={request.team} />
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">Radicado {formatDateTime(request.createdAt)} por {request.requester.name}. Responsable: {request.assignee?.name ?? "Sin asignar"}.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Radicado el {formatDateTime(request.createdAt)} por {request.requester.name}.</p>
         {request.resolutionNote ? <p className="mt-3 rounded-lg bg-[#F4F8FE] px-3 py-2 text-sm"><span className="font-medium">Qué se hizo. </span>{request.resolutionNote}</p> : null}
         {principal ? <p className="mt-3 text-sm">Siguiente paso: <a href="#gestion" className="font-medium text-[#1658B0] hover:underline">{principal.name}</a></p> : null}
         <div className="mt-4 rounded-xl border border-[#dfe1e6] bg-white p-4">
@@ -119,8 +122,8 @@ export default async function DetallePage({
         texto: item.fromValue && item.toValue ? `${statusLabel(item.fromValue)} → ${statusLabel(item.toValue)}. ${item.message}` : item.message,
         autor: item.actor?.name ?? "Planer",
       }))} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="order-2 space-y-8 lg:order-1">
           <section aria-labelledby="pedido" className="space-y-3">
             <h2 id="pedido" className="font-heading text-2xl">Lo pedido</h2>
             <Card>
@@ -155,14 +158,39 @@ export default async function DetallePage({
               puedePublica={detail.canCommentPublic}
               puedeNota={detail.canCommentInternal}
               puedeAdjuntar={detail.canAttach}
+              esSolicitante={actor.id === request.requesterId}
               tareas={tareasRaiz.map((tarea) => ({ id: tarea.id, title: tarea.title }))}
             />
           </section>
         </div>
-        <div className="space-y-4">
-          <h2 id="gestion" className="font-heading text-2xl">Gestión</h2>
+        <div className="order-1 space-y-4 lg:order-2">
           <Card>
-            <CardHeader><CardTitle title={TEXTO_AVANCE_REQUERIMIENTO}>Tareas · {avance.porcentaje}%</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Gestión</CardTitle></CardHeader>
+            <CardContent>
+              <Gestion
+                panel
+                code={request.code}
+                transiciones={detail.transitions.map((item) => transicionDeDetalle(item))}
+                puedeAsignar={detail.canAssign}
+                agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name }))}
+                asignadoId={request.assigneeId}
+                fechaComprometida={request.committedDate ? DateTime.fromJSDate(request.committedDate).setZone(ZONE).toISODate() : null}
+                puedeComentar={detail.canCommentPublic}
+                puedeNota={detail.canCommentInternal}
+                puedeAdjuntar={detail.canAttach}
+                notaPrefill={notaPrefill}
+                soloTransiciones
+                estado={request.status}
+                prioridad={PRIORITY_LABEL[request.priority as PriorityName] ?? request.priority}
+                sla={sla.state}
+                responsable={request.assignee?.name ?? ""}
+                fechaEntrega={request.desiredDate ? DateTime.fromJSDate(request.desiredDate).setZone(ZONE).toISODate() ?? "" : ""}
+                hoy={DateTime.now().setZone(ZONE).toISODate() ?? ""}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle title={TEXTO_AVANCE_REQUERIMIENTO}>Tareas</CardTitle></CardHeader>
             <CardContent>
               <TareasPanel
                 porcentaje={avance.porcentaje}
@@ -208,7 +236,7 @@ export default async function DetallePage({
               <Fila etiqueta="Área" valor={request.area.name} />
               <Fila etiqueta="Solicitante" valor={request.requester.name} />
               <Fila etiqueta="Asignado" valor={request.assignee?.name ?? "Sin asignar"} />
-              <Fila etiqueta="Fecha deseada" valor={formatDate(request.desiredDate)} />
+              <Fila etiqueta="Fecha de entrega esperada" valor={formatDate(request.desiredDate)} />
               <Fila etiqueta="Resolución" valor={request.resolution ? (RESOLUCION_LABEL[request.resolution] ?? request.resolution) : "—"} />
               <Fila etiqueta="Fecha comprometida" valor={formatDate(request.committedDate)} />
             </CardContent>
@@ -237,24 +265,6 @@ export default async function DetallePage({
               </CardContent>
             </Card>
           ) : null}
-          <Card>
-            <CardHeader><CardTitle>Gestionar</CardTitle></CardHeader>
-            <CardContent>
-              <Gestion
-                code={request.code}
-                transiciones={detail.transitions.map((item) => transicionDeDetalle(item))}
-                puedeAsignar={detail.canAssign}
-                agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name }))}
-                asignadoId={request.assigneeId}
-                fechaComprometida={request.committedDate ? request.committedDate.toISOString().slice(0, 10) : null}
-                puedeComentar={detail.canCommentPublic}
-                puedeNota={detail.canCommentInternal}
-                puedeAdjuntar={detail.canAttach}
-                notaPrefill={notaPrefill}
-                soloTransiciones
-              />
-            </CardContent>
-          </Card>
           <Card>
             <CardHeader><CardTitle>Otras solicitudes de este solicitante</CardTitle></CardHeader>
             <CardContent className="grid gap-2 text-sm">

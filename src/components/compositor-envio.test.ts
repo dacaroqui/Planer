@@ -9,14 +9,14 @@ describe("publicar un comentario desde el compositor", () => {
     evento.currentTarget = null
     const refrescar = vi.fn()
     const avisos: string[] = []
-    await publicarComposicion({
+    const ok = await publicarComposicion({
       form: capturado!,
       data: new FormData(),
-      adjuntar: async () => ({ ok: true }),
       comentar: async () => ({ ok: true, message: "Publicado." }),
       avisar: (tipo, texto) => avisos.push(`${tipo}:${texto}`),
       refrescar,
     })
+    expect(ok).toBe(true)
     expect(evento.currentTarget).toBeNull()
     expect(form.reset).toHaveBeenCalledOnce()
     expect(refrescar).toHaveBeenCalledOnce()
@@ -27,33 +27,21 @@ describe("publicar un comentario desde el compositor", () => {
     const form = { reset: vi.fn() }
     const refrescar = vi.fn()
     const avisos: string[] = []
-    await publicarComposicion({
+    const data = new FormData()
+    data.append("archivo", new File(["demo"], "nota.png", { type: "image/png" }))
+    const ok = await publicarComposicion({
       form,
-      data: new FormData(),
-      adjuntar: async () => ({ ok: true }),
-      comentar: async () => ({ ok: false, error: "No se pudo publicar." }),
+      data,
+      comentar: async (enviado) => {
+        expect(enviado.getAll("archivo")).toHaveLength(1)
+        return { ok: false, error: "No se pudo publicar." }
+      },
       avisar: (tipo, texto) => avisos.push(`${tipo}:${texto}`),
       refrescar,
     })
+    expect(ok).toBe(false)
     expect(form.reset).not.toHaveBeenCalled()
     expect(refrescar).not.toHaveBeenCalled()
     expect(avisos).toEqual(["error:No se pudo publicar."])
-  })
-
-  it("no publica el comentario cuando el adjunto falla", async () => {
-    const form = { reset: vi.fn() }
-    const comentar = vi.fn(async () => ({ ok: true as const, message: "Publicado." }))
-    const data = new FormData()
-    data.set("archivo", new File(["demo"], "nota.txt", { type: "text/plain" }))
-    await publicarComposicion({
-      form,
-      data,
-      adjuntar: async () => ({ ok: false, error: "Archivo no admitido." }),
-      comentar,
-      avisar: () => {},
-      refrescar: () => {},
-    })
-    expect(comentar).not.toHaveBeenCalled()
-    expect(form.reset).not.toHaveBeenCalled()
   })
 })

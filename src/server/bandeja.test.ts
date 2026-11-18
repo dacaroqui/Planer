@@ -176,4 +176,24 @@ describe("bandeja y cronología", () => {
     expect(espera.conteos.vencer).toBe(0)
     expect(espera.filas.map((fila) => fila.code)).toEqual([request.code])
   })
+
+  it("quien es el solicitante no se responde ni queda pendiente por su propio mensaje", async () => {
+    const { ana, valentina, request, email, now } = await escena()
+    const admin = toActor(await prisma.user.create({
+      data: { name: "Admin Ejemplo", email: "admin.ejemplo@cifes.edu.co", role: "ADMINISTRADOR", areaId: ana.areaId },
+      include: { areaRoles: true },
+    }))
+    await prisma.request.update({ where: { id: request.id }, data: { requesterId: admin.id, assigneeId: admin.id } })
+    await expect(registrarEntrada(admin, request.id, { kind: "PUBLICA", body: "Me respondo en público." }, { email, now })).rejects.toThrow(/sí mismo/)
+    await expect(registrarEntrada(admin, request.id, { kind: "SOLICITUD_INFO", body: "Me pido datos." }, { email, now })).rejects.toThrow(/sí mismo/)
+    await registrarEntrada(admin, request.id, { kind: "INTERNA", body: "Nota para el equipo, no para mí." }, { email, now })
+    expect(await prisma.notification.count({ where: { userId: admin.id } })).toBe(0)
+    await prisma.request.update({ where: { id: request.id }, data: { lastPublicActorId: admin.id, lastPublicAt: now } })
+    const propia = await listarBandeja(admin, { tab: "responder" })
+    expect(propia.filas.map((fila) => fila.code)).not.toContain(request.code)
+    expect(propia.conteos.responder).toBe(0)
+    const delEquipo = await listarBandeja(valentina, { tab: "responder" })
+    expect(delEquipo.filas.map((fila) => fila.code)).toContain(request.code)
+    expect(delEquipo.conteos.responder).toBe(1)
+  })
 })

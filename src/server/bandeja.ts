@@ -97,7 +97,7 @@ async function contarPestanas(actor: Actor, filtros: FiltroBandeja, equipos: Tea
     espera: number
   }>>(Prisma.sql`
     SELECT
-      (COUNT(*) FILTER (WHERE "lastPublicActorId" IS NULL OR "lastPublicActorId" = "requesterId"))::int AS responder,
+      (COUNT(*) FILTER (WHERE ("lastPublicActorId" IS NULL OR "lastPublicActorId" = "requesterId") AND "lastPublicActorId" IS DISTINCT FROM ${actor.id}))::int AS responder,
       (COUNT(*) FILTER (WHERE "assigneeId" IS NULL))::int AS sin_asignar,
       (COUNT(*) FILTER (WHERE "assigneeId" = ${actor.id}))::int AS mios,
       (COUNT(*) FILTER (WHERE status = 'EN_ESPERA'))::int AS espera
@@ -115,7 +115,7 @@ async function contarPestanas(actor: Actor, filtros: FiltroBandeja, equipos: Tea
 
 export async function listarBandeja(actor: Actor, filtros: FiltroBandeja) {
   const equipos = esAdmin(actor)
-    ? (["DESARROLLO", "MARKETING"] as TeamName[])
+    ? (["DESARROLLO", "MARKETING", "COMERCIAL", "INNOVACION"] as TeamName[])
     : [...new Set(actor.memberships.map((item) => item.team))]
   const equiposFiltrados = filtros.equipo && equipos.includes(filtros.equipo) ? [filtros.equipo] : equipos
   const [conteosBase, filas] = await Promise.all([
@@ -131,7 +131,7 @@ export async function listarBandeja(actor: Actor, filtros: FiltroBandeja) {
   }).sort((a, b) => a.sla.remainingMinutes - b.sla.remainingMinutes || a.fila.code.localeCompare(b.fila.code, "es"))
   const porVencer = (item: (typeof decoradas)[number]) => item.sla.state === "VENCIDO" || item.sla.state === "EN_RIESGO" || (item.sla.remainingMinutes > 0 && item.sla.remainingMinutes <= 30)
   const coincide = (tab: TabBandeja, item: (typeof decoradas)[number]) => {
-    if (tab === "responder") return esPorResponder({ requesterId: item.fila.requesterId, lastPublicActorId: item.fila.lastPublicActorId })
+    if (tab === "responder") return esPorResponder({ requesterId: item.fila.requesterId, lastPublicActorId: item.fila.lastPublicActorId }, actor.id)
     if (tab === "sin-asignar") return !item.fila.assigneeId
     if (tab === "mios") return item.fila.assigneeId === actor.id
     if (tab === "espera") return item.fila.status === "EN_ESPERA"

@@ -56,6 +56,7 @@ export function BandejaPanel({
     puedePublica: boolean
     puedeNota: boolean
     puedeAdjuntar: boolean
+    esSolicitante: boolean
     tareas: { id: string; title: string }[]
     agentes: { id: string; name: string }[]
     puedeAsignar: boolean
@@ -135,7 +136,7 @@ export function BandejaPanel({
               <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
                 <Cronologia entradas={detalle.entradas} />
                 {detalle.puedeAsignar && detalle.agentes.length > 0 ? <AsignarRapido code={detalle.code} agentes={detalle.agentes} /> : null}
-                <Compositor code={detalle.code} puedePublica={detalle.puedePublica && !soloLectura} puedeNota={detalle.puedeNota && !soloLectura} puedeAdjuntar={detalle.puedeAdjuntar && !soloLectura} tareas={detalle.tareas} />
+                <Compositor code={detalle.code} puedePublica={detalle.puedePublica && !soloLectura} puedeNota={detalle.puedeNota && !soloLectura} puedeAdjuntar={detalle.puedeAdjuntar && !soloLectura} esSolicitante={detalle.esSolicitante} tareas={detalle.tareas} />
               </div>
             </>
           ) : null}

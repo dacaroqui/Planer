@@ -2,11 +2,39 @@ import { DateTime } from "luxon"
 import { prisma } from "@/lib/prisma"
 import { agruparTareas, avanceProyecto, avanceRequerimiento, tareaVencida } from "@/lib/avance"
 import { DomainError, PermisoDenegado, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
-import { esAdmin, puedeAdministrar, puedeVer, rolEn } from "@/lib/permissions"
+import { esAdmin, puedeAdministrar, puedeAsignar, puedeAutoasignarse, puedeRadicar, puedeVer, rolEn } from "@/lib/permissions"
 import { ZONE } from "@/lib/time"
 
 export function puedeCrearProyecto(actor: Actor) {
   return actor.active && (esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER"))
+}
+
+export function puedeCrearProyectoAlRadicar(actor: Actor) {
+  return puedeRadicar(actor)
+}
+
+export async function crearProyectoAlRadicar(
+  actor: Actor,
+  input: { empresaId: string; name: string; description?: string; team: TeamName },
+) {
+  if (!puedeCrearProyectoAlRadicar(actor)) throw new DomainError("Su perfil no puede crear un proyecto al radicar.")
+  const name = input.name.trim()
+  if (name.length < 3) throw new DomainError("El nombre del proyecto es muy corto.")
+  const empresa = await prisma.empresa.findFirst({ where: { id: input.empresaId, active: true } })
+  if (!empresa) throw new DomainError("Elija una empresa activa.")
+  const hoy = DateTime.now().setZone(ZONE).startOf("day")
+  return prisma.proyecto.create({
+    data: {
+      empresaId: empresa.id,
+      name,
+      description: (input.description ?? "").trim(),
+      leaderId: actor.id,
+      startsAt: hoy.toJSDate(),
+      targetAt: hoy.plus({ days: 30 }).toJSDate(),
+      status: "PLANIFICADO",
+      team: input.team,
+    },
+  })
 }
 
 export function puedeGestionarEmpresa(actor: Actor) {
@@ -76,7 +104,7 @@ export async function guardarProyecto(
 
 async function contextoTarea(input: { requestId?: string | null; projectId?: string | null }) {
   const request = input.requestId
-    ? await prisma.request.findUnique({ where: { id: input.requestId }, include: { empresa: true } })
+    ? await prisma.request.findUnique({ where: { id: input.requestId }, include: { empresa: true, area: true } })
     : null
   const project = input.projectId ? await prisma.proyecto.findUnique({ where: { id: input.projectId } }) : null
   if (input.requestId && !request) throw new DomainError("El requerimiento no existe.")
@@ -129,10 +157,28 @@ export async function guardarTarea(
   if (!request && !puedeCrearProyecto(actor)) {
     throw new DomainError("Solo un líder o el administrador crea tareas sueltas del proyecto.")
   }
+  const nuevoResponsable = input.assigneeId !== undefined ? (input.assigneeId || null) : (existente?.assigneeId ?? null)
+  const previoResponsable = existente?.assigneeId ?? null
+  if (nuevoResponsable !== previoResponsable) {
+    if (!nuevoResponsable) {
+      if (request && !puedeAsignar(actor, request)) throw new DomainError("Solo el líder del área quita el responsable.")
+    } else if (nuevoResponsable === actor.id && request) {
+      if (!puedeAsignar(actor, request) && !puedeAutoasignarse(actor, request, request.area.allowSelfAssign)) {
+        throw new DomainError("No puede asignarse esta tarea.")
+      }
+    } else if (request && !puedeAsignar(actor, request)) {
+      throw new DomainError("Solo el líder del área asigna el responsable.")
+    } else if (request) {
+      const miembro = await prisma.user.findFirst({
+        where: { id: nuevoResponsable, active: true, areaRoles: { some: { team: request.team, role: { in: ["AGENTE", "LIDER"] } } } },
+      })
+      if (!miembro) throw new DomainError("Esa persona no es agente ni líder del equipo.")
+    }
+  }
   const completedAt = input.status === "HECHA" ? (existente?.completedAt ?? new Date()) : null
   const data = {
     title,
-    assigneeId: input.assigneeId !== undefined ? (input.assigneeId || null) : (existente?.assigneeId ?? null),
+    assigneeId: nuevoResponsable,
     dueDate: input.dueDate !== undefined ? (input.dueDate ? fecha(input.dueDate) : null) : (existente?.dueDate ?? null),
     status: input.status,
     requestId: requestId || null,
@@ -146,6 +192,19 @@ export async function guardarTarea(
   const tarea = input.id
     ? await prisma.tarea.update({ where: { id: input.id }, data })
     : await prisma.tarea.create({ data: { ...data, createdById: actor.id } })
+  if (nuevoResponsable && nuevoResponsable !== previoResponsable && nuevoResponsable !== actor.id) {
+    await prisma.notification.create({
+      data: {
+        userId: nuevoResponsable,
+        requestId: request?.id ?? null,
+        subject: request ? `${request.code} · Se te asignó una tarea` : "Se te asignó una tarea",
+        body: request
+          ? `Se te asignó la tarea «${title}» en ${request.code}.`
+          : `Se te asignó la tarea «${title}».`,
+        dedupeKey: `tarea-${tarea.id}-${nuevoResponsable}`,
+      },
+    }).catch(() => undefined)
+  }
   if (request) {
     await prisma.activity.create({
       data: {

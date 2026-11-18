@@ -1,9 +1,10 @@
 import { z } from "zod"
+import { TEAMS } from "@/lib/domain"
 
 export const radicarSchema = z.object({
   title: z.string().trim().min(5, "El título debe tener entre 5 y 120 caracteres.").max(120, "El título admite máximo 120 caracteres."),
   description: z.string().trim().min(20, "La descripción debe tener al menos 20 caracteres.").max(8000, "La descripción es demasiado larga."),
-  team: z.enum(["DESARROLLO", "MARKETING"], { error: "Elija el área antes de continuar." }),
+  team: z.enum(TEAMS, { error: "Elija el área antes de continuar." }),
   typeId: z.string().min(1, "Elija un tipo de requerimiento."),
   priority: z.string().min(1, "Elija la prioridad sugerida."),
   brand: z.string().min(1, "Elija la marca."),

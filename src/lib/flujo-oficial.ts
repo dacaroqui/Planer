@@ -30,6 +30,8 @@ export type TransicionOficial = {
 
 const dev = "DESARROLLO" as const
 const mkt = "MARKETING" as const
+const com = "COMERCIAL" as const
+const inn = "INNOVACION" as const
 
 export const ESTADOS_OFICIALES: EstadoOficial[] = [
   { team: dev, key: "NUEVO", name: "Nuevo", category: "POR_HACER", sortOrder: 10, boardColumn: "Nuevo" },
@@ -55,6 +57,26 @@ export const ESTADOS_OFICIALES: EstadoOficial[] = [
   { team: mkt, key: "CERRADO", name: "Cerrado", category: "TERMINADO", sortOrder: 90, boardColumn: "Cerrado" },
   { team: mkt, key: "RECHAZADO", name: "Rechazado", category: "TERMINADO", sortOrder: 100, boardColumn: "Cerrado", hiddenOnBoard: true },
   { team: mkt, key: "CANCELADO", name: "Cancelado", category: "TERMINADO", sortOrder: 110, boardColumn: "Cerrado", hiddenOnBoard: true },
+
+  { team: com, key: "NUEVO", name: "Nuevo", category: "POR_HACER", sortOrder: 10, boardColumn: "Nuevo" },
+  { team: com, key: "EN_REVISION", name: "En revisión", category: "EN_CURSO", sortOrder: 20, boardColumn: "En revisión" },
+  { team: com, key: "EN_COTIZACION", name: "En cotización/propuesta", category: "EN_CURSO", sortOrder: 30, boardColumn: "En cotización" },
+  { team: com, key: "EN_NEGOCIACION", name: "En negociación", category: "EN_CURSO", sortOrder: 40, boardColumn: "En negociación" },
+  { team: com, key: "EN_ESPERA", name: "En espera de información", category: "EN_CURSO", sortOrder: 50, boardColumn: "En revisión" },
+  { team: com, key: "EN_APROBACION", name: "En aprobación del solicitante", category: "EN_CURSO", sortOrder: 60, boardColumn: "Aprobación del solicitante" },
+  { team: com, key: "CERRADO_GANADO", name: "Cerrado ganado", category: "TERMINADO", sortOrder: 70, boardColumn: "Cerrado" },
+  { team: com, key: "CERRADO_PERDIDO", name: "Cerrado perdido", category: "TERMINADO", sortOrder: 80, boardColumn: "Cerrado" },
+  { team: com, key: "CANCELADO", name: "Cancelado", category: "TERMINADO", sortOrder: 90, boardColumn: "Cerrado", hiddenOnBoard: true },
+
+  { team: inn, key: "NUEVA_IDEA", name: "Nueva idea", category: "POR_HACER", sortOrder: 10, boardColumn: "Nueva idea" },
+  { team: inn, key: "EN_EVALUACION", name: "En evaluación", category: "EN_CURSO", sortOrder: 20, boardColumn: "En evaluación" },
+  { team: inn, key: "APROBADA", name: "Aprobada", category: "POR_HACER", sortOrder: 30, boardColumn: "Aprobada" },
+  { team: inn, key: "EN_ESPERA", name: "En espera de información", category: "EN_CURSO", sortOrder: 40, boardColumn: "En evaluación" },
+  { team: inn, key: "EN_EXPLORACION", name: "En exploración/prototipo", category: "EN_CURSO", sortOrder: 50, boardColumn: "En exploración" },
+  { team: inn, key: "EN_PILOTO", name: "En piloto", category: "EN_CURSO", sortOrder: 60, boardColumn: "En piloto" },
+  { team: inn, key: "EN_VALIDACION_RESULTADOS", name: "En validación de resultados", category: "EN_CURSO", sortOrder: 70, boardColumn: "Validación de resultados" },
+  { team: inn, key: "IMPLEMENTADA", name: "Implementada", category: "TERMINADO", sortOrder: 80, boardColumn: "Implementada" },
+  { team: inn, key: "DESCARTADA", name: "Descartada", category: "TERMINADO", sortOrder: 90, boardColumn: "Descartada" },
 ]
 
 export const TRANSICIONES_OFICIALES: TransicionOficial[] = [
@@ -89,10 +111,34 @@ export const TRANSICIONES_OFICIALES: TransicionOficial[] = [
   { team: mkt, name: "Aprobar sin publicación", from: ["EN_APROBACION"], to: "CERRADO", roles: ["SOLICITANTE"], slaEffect: "STOP", resolution: "RESUELTO" },
   { team: mkt, name: "Cancelar", from: ["NUEVO", "EN_REVISION_BRIEF", "APROBADO"], to: "CANCELADO", roles: ["SOLICITANTE", "LIDER"], requiresComment: true, slaEffect: "STOP", resolution: "CANCELADO_SOLICITANTE" },
   { team: mkt, name: "Reabrir", from: ["CERRADO"], to: "EN_REVISION_BRIEF", roles: ["LIDER"], requiresComment: true, clearResolution: true, slaEffect: "NEW_CYCLE", reopenWithinDays: 30 },
+
+  { team: com, name: "Iniciar revisión", from: ["NUEVO"], to: "EN_REVISION", roles: ["LIDER"], slaEffect: "STOP_FIRST" },
+  { team: com, name: "Pasar a cotización", from: ["EN_REVISION"], to: "EN_COTIZACION", roles: ["LIDER"], requiresAssignee: true, requiresCommittedDate: true, slaEffect: "CONTINUE" },
+  { team: com, name: "Perder", from: ["NUEVO", "EN_REVISION"], to: "CERRADO_PERDIDO", roles: ["LIDER"], requiresComment: true, slaEffect: "STOP", resolution: "NO_SE_HARA" },
+  { team: com, name: "Pedir información", from: ["EN_REVISION", "EN_COTIZACION", "EN_NEGOCIACION"], to: "EN_ESPERA", roles: ["RESPONSABLE", "LIDER"], requiresComment: true, slaEffect: "PAUSE" },
+  { team: com, name: "Responder información", from: ["EN_ESPERA"], to: "EN_ESPERA", roles: ["SOLICITANTE", "RESPONSABLE", "LIDER"], toPrevious: true, slaEffect: "RESUME" },
+  { team: com, name: "Iniciar negociación", from: ["EN_COTIZACION"], to: "EN_NEGOCIACION", roles: ["RESPONSABLE", "LIDER"], slaEffect: "CONTINUE" },
+  { team: com, name: "Enviar a aprobación", from: ["EN_NEGOCIACION"], to: "EN_APROBACION", roles: ["RESPONSABLE", "LIDER"], slaEffect: "PAUSE" },
+  { team: com, name: "Ganar", from: ["EN_APROBACION"], to: "CERRADO_GANADO", roles: ["SOLICITANTE", "LIDER"], slaEffect: "STOP", resolution: "RESUELTO" },
+  { team: com, name: "Cerrar como perdido", from: ["EN_COTIZACION", "EN_NEGOCIACION", "EN_APROBACION"], to: "CERRADO_PERDIDO", roles: ["LIDER"], requiresComment: true, slaEffect: "STOP", resolution: "NO_SE_HARA" },
+  { team: com, name: "Cancelar", from: ["NUEVO", "EN_REVISION", "EN_COTIZACION"], to: "CANCELADO", roles: ["SOLICITANTE", "LIDER"], requiresComment: true, slaEffect: "STOP", resolution: "CANCELADO_SOLICITANTE" },
+  { team: com, name: "Reabrir", from: ["CERRADO_GANADO", "CERRADO_PERDIDO"], to: "EN_REVISION", roles: ["LIDER"], requiresComment: true, clearResolution: true, slaEffect: "NEW_CYCLE", reopenWithinDays: 30 },
+
+  { team: inn, name: "Evaluar idea", from: ["NUEVA_IDEA"], to: "EN_EVALUACION", roles: ["LIDER"], slaEffect: "STOP_FIRST" },
+  { team: inn, name: "Aprobar idea", from: ["EN_EVALUACION"], to: "APROBADA", roles: ["LIDER"], requiresAssignee: true, requiresCommittedDate: true, slaEffect: "CONTINUE" },
+  { team: inn, name: "Descartar", from: ["NUEVA_IDEA", "EN_EVALUACION"], to: "DESCARTADA", roles: ["LIDER"], requiresComment: true, slaEffect: "STOP", resolution: "NO_SE_HARA" },
+  { team: inn, name: "Pedir información", from: ["EN_EVALUACION", "APROBADA", "EN_EXPLORACION", "EN_PILOTO"], to: "EN_ESPERA", roles: ["RESPONSABLE", "LIDER"], requiresComment: true, slaEffect: "PAUSE" },
+  { team: inn, name: "Responder información", from: ["EN_ESPERA"], to: "EN_ESPERA", roles: ["SOLICITANTE", "RESPONSABLE", "LIDER"], toPrevious: true, slaEffect: "RESUME" },
+  { team: inn, name: "Iniciar exploración", from: ["APROBADA"], to: "EN_EXPLORACION", roles: ["RESPONSABLE", "LIDER"], slaEffect: "CONTINUE" },
+  { team: inn, name: "Pasar a piloto", from: ["EN_EXPLORACION"], to: "EN_PILOTO", roles: ["RESPONSABLE"], requiresComment: true, slaEffect: "NONE" },
+  { team: inn, name: "Enviar a validación", from: ["EN_PILOTO"], to: "EN_VALIDACION_RESULTADOS", roles: ["RESPONSABLE", "LIDER"], requiresDelivery: true, slaEffect: "PAUSE" },
+  { team: inn, name: "Validar resultados", from: ["EN_VALIDACION_RESULTADOS"], to: "IMPLEMENTADA", roles: ["SOLICITANTE", "LIDER"], slaEffect: "STOP", resolution: "RESUELTO" },
+  { team: inn, name: "Devolver", from: ["EN_VALIDACION_RESULTADOS"], to: "EN_PILOTO", roles: ["SOLICITANTE"], requiresComment: true, slaEffect: "RESUME" },
+  { team: inn, name: "Reabrir", from: ["IMPLEMENTADA"], to: "EN_EVALUACION", roles: ["LIDER"], requiresComment: true, clearResolution: true, slaEffect: "NEW_CYCLE", reopenWithinDays: 30 },
 ]
 
-export const PAUSA_SLA = new Set(["EN_ESPERA", "EN_VALIDACION", "EN_APROBACION"])
-export const TERMINALES = new Set(["CERRADO", "RECHAZADO", "CANCELADO"])
+export const PAUSA_SLA = new Set(["EN_ESPERA", "EN_VALIDACION", "EN_APROBACION", "EN_VALIDACION_RESULTADOS"])
+export const TERMINALES = new Set(["CERRADO", "RECHAZADO", "CANCELADO", "CERRADO_GANADO", "CERRADO_PERDIDO", "IMPLEMENTADA", "DESCARTADA"])
 
 export const RESOLUCION_LABEL: Record<string, string> = {
   RESUELTO: "Resuelto",
@@ -114,6 +160,14 @@ export const SLA_POR_DEFECTO: Array<{ team: TeamName; priority: string; first: n
   { team: mkt, priority: "ALTA", first: 8 * 60, resolution: 3 * 8 * 60 },
   { team: mkt, priority: "MEDIA", first: 16 * 60, resolution: 5 * 8 * 60 },
   { team: mkt, priority: "BAJA", first: 24 * 60, resolution: 10 * 8 * 60 },
+  { team: com, priority: "CRITICA", first: 4 * 60, resolution: 2 * 8 * 60 },
+  { team: com, priority: "ALTA", first: 8 * 60, resolution: 3 * 8 * 60 },
+  { team: com, priority: "MEDIA", first: 16 * 60, resolution: 5 * 8 * 60 },
+  { team: com, priority: "BAJA", first: 24 * 60, resolution: 8 * 8 * 60 },
+  { team: inn, priority: "CRITICA", first: 8 * 60, resolution: 5 * 8 * 60 },
+  { team: inn, priority: "ALTA", first: 16 * 60, resolution: 10 * 8 * 60 },
+  { team: inn, priority: "MEDIA", first: 24 * 60, resolution: 15 * 8 * 60 },
+  { team: inn, priority: "BAJA", first: 40 * 60, resolution: 20 * 8 * 60 },
 ]
 
 export const TIPOS_OFICIALES: Array<{ team: TeamName; name: string; description: string; extra: string }> = [
@@ -128,4 +182,12 @@ export const TIPOS_OFICIALES: Array<{ team: TeamName; name: string; description:
   { team: mkt, name: "Publicación en redes", description: "Un texto o una pieza para redes.", extra: "canal" },
   { team: mkt, name: "Contenido web/landing", description: "Una página o un ajuste del sitio.", extra: "canal" },
   { team: mkt, name: "Evento o activación", description: "Una activación o un evento.", extra: "" },
+  { team: com, name: "Cotización", description: "Una cotización de productos o servicios.", extra: "" },
+  { team: com, name: "Propuesta comercial", description: "Una propuesta para un cliente o aliado.", extra: "" },
+  { team: com, name: "Convenio/alianza", description: "Un convenio o una alianza comercial.", extra: "" },
+  { team: com, name: "Seguimiento de cliente", description: "El seguimiento de una cuenta o una oportunidad.", extra: "" },
+  { team: inn, name: "Idea nueva", description: "Una idea que todavía no está en marcha.", extra: "" },
+  { team: inn, name: "Prototipo", description: "Un prototipo para probar la idea.", extra: "" },
+  { team: inn, name: "Piloto", description: "Una prueba controlada con un grupo pequeño.", extra: "" },
+  { team: inn, name: "Mejora de proceso", description: "Un cambio en la forma de trabajar.", extra: "" },
 ]

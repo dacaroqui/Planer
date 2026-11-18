@@ -3,11 +3,20 @@
 import { useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ClipboardListIcon, Code2Icon, InfoIcon, MegaphoneIcon } from "lucide-react"
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ClipboardListIcon, Code2Icon, HandshakeIcon, InfoIcon, LightbulbIcon, MegaphoneIcon } from "lucide-react"
 import { toast } from "sonner"
-import { radicarAction } from "@/server/actions"
-import { TEAM_LABEL, type TeamName } from "@/lib/domain"
+import { crearProyectoRadicarAction, radicarAction } from "@/server/actions"
+import { TEAM_LABEL, TEAMS, type TeamName } from "@/lib/domain"
+import { iniciales } from "@/lib/planer-ui"
 import { Elegir } from "@/components/ui/elegir"
+import {
+  erroresPaso,
+  fechaEntregaRecomendada,
+  hoyBogota,
+  minutosDePolitica,
+  textoFechaIso,
+  type PoliticaEntrega,
+} from "@/lib/fecha-entrega"
 
 export type TipoOpcion = {
   id: string
@@ -28,11 +37,15 @@ export type EquipoOpcion = {
 const ICONOS: Record<string, typeof Code2Icon> = {
   codigo: Code2Icon,
   megafono: MegaphoneIcon,
+  acuerdo: HandshakeIcon,
+  bombilla: LightbulbIcon,
 }
 
 const COLORES: Record<string, { fondo: string; tinta: string }> = {
   azul: { fondo: "#E7F0FB", tinta: "#1658B0" },
   coral: { fondo: "#FDE8E6", tinta: "#E11D48" },
+  verde: { fondo: "#E7F6EE", tinta: "#047857" },
+  violeta: { fondo: "#F3E8FF", tinta: "#6D28D9" },
 }
 
 const campo = "h-11 w-full rounded-[10px] border border-[#D9DEE7] bg-white px-3 text-sm"
@@ -47,6 +60,11 @@ export function FormularioRadicar({
   proyectos,
   areas = [],
   equipos,
+  politicas = [],
+  ahora,
+  personas = [],
+  esAdministrador = false,
+  liderazgos = [],
   volverHref = "/mis-solicitudes",
   embebido = false,
 }: {
@@ -58,6 +76,11 @@ export function FormularioRadicar({
   proyectos: { id: string; empresaId: string; name: string }[]
   areas?: { id: string; name: string }[]
   equipos: EquipoOpcion[]
+  politicas?: PoliticaEntrega[]
+  ahora: string
+  personas?: { id: string; name: string; team: TeamName; role: "AGENTE" | "LIDER" }[]
+  esAdministrador?: boolean
+  liderazgos?: TeamName[]
   volverHref?: string
   embebido?: boolean
 }) {
@@ -69,14 +92,22 @@ export function FormularioRadicar({
   const [brand, setBrand] = useState(marcas.find((item) => item.key === "CIFES")?.key ?? marcas[0]?.key ?? "CIFES")
   const [empresaId, setEmpresaId] = useState(empresas.find((item) => item.name === "CIFES")?.id ?? empresas[0]?.id ?? "")
   const [projectId, setProjectId] = useState("")
+  const [proyectosLocales, setProyectosLocales] = useState(proyectos)
+  const [crearProyecto, setCrearProyecto] = useState(false)
+  const [nombreProyecto, setNombreProyecto] = useState("")
+  const [detalleProyecto, setDetalleProyecto] = useState("")
+  const [equipoProyecto, setEquipoProyecto] = useState<TeamName | "">("")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [justification, setJustification] = useState("")
   const [steps, setSteps] = useState("")
   const [channels, setChannels] = useState("")
-  const [publishAt, setPublishAt] = useState("")
   const [moduleName, setModuleName] = useState("")
+  const [assigneeId, setAssigneeId] = useState("")
   const [desiredDate, setDesiredDate] = useState("")
+  const [fechaManual, setFechaManual] = useState(false)
+  const [tocados, setTocados] = useState<Record<string, boolean>>({})
+  const [intento, setIntento] = useState<1 | 2 | 3 | 0>(0)
   const [archivo, setArchivo] = useState("")
   const [declares, setDeclares] = useState(false)
   const [reviewed, setReviewed] = useState(false)
@@ -88,28 +119,46 @@ export function FormularioRadicar({
   const visibles = useMemo(() => tipos.filter((tipo) => tipo.team === team), [tipos, team])
   const elegido = visibles.find((tipo) => tipo.id === typeId) ?? null
   const equipo = equipos.find((item) => item.key === team) ?? null
-  const proyectosEmpresa = proyectos.filter((item) => item.empresaId === empresaId)
+  const proyectosEmpresa = proyectosLocales.filter((item) => item.empresaId === empresaId)
+  const instante = useMemo(() => new Date(ahora), [ahora])
+  const recomendada = useMemo(() => fechaEntregaRecomendada({
+    ahora: instante,
+    prioridad: priority,
+    minutosTipo: minutosDePolitica(politicas, team, typeId, priority),
+  }), [instante, politicas, team, typeId, priority])
+  const fechaEntrega = fechaManual ? desiredDate : recomendada
+  const datosPaso = {
+    team,
+    title,
+    description,
+    typeId,
+    extra: elegido?.extra ?? "",
+    steps,
+    channels,
+    priority,
+    justification,
+    desiredDate: fechaEntrega,
+    declares,
+    ahora: instante,
+  }
+  const errores = erroresPaso(paso, datosPaso)
+  function visible(campo: string) {
+    return Boolean(tocados[campo] || intento === paso)
+  }
+  function tocar(campo: string) {
+    setTocados((prev) => ({ ...prev, [campo]: true }))
+  }
+  function continuar(siguiente: 1 | 2 | 3) {
+    setIntento(paso)
+    if (Object.keys(erroresPaso(paso, datosPaso)).length > 0) return
+    setIntento(0)
+    setPaso(siguiente)
+  }
   const subtitulo = paso === 2
     ? "Describe lo que necesitas para que el equipo pueda revisarlo."
     : paso === 3
       ? "Revisa los datos antes de radicar la solicitud."
       : "Cuéntanos qué necesitas y elige el equipo que puede ayudarte."
-
-  function validar() {
-    if (title.trim().length < 5 || title.trim().length > 120) return "El título debe tener entre 5 y 120 caracteres."
-    if (description.trim().length < 20) return "La descripción debe tener al menos 20 caracteres."
-    if (!typeId) return "Elija un tipo de requerimiento."
-    if (elegido?.extra === "pasos" && steps.trim().length < 8) return "Describa los pasos para reproducir el error, con datos de prueba."
-    if (elegido?.extra === "canal" && (channels.trim().length < 2 || !publishAt.trim())) return "Indique el canal y la fecha de publicación."
-    if (priority === "CRITICA" && justification.trim().length < 8) return "Si la prioridad es crítica, explique la justificación y qué pasa si no se hace."
-    return null
-  }
-
-  function revisar() {
-    const mensaje = validar()
-    setError(mensaje)
-    if (!mensaje) setPaso(3)
-  }
 
   function nombreDe(lista: { key?: string; id?: string; name: string }[], valor: string) {
     return lista.find((item) => item.key === valor || item.id === valor)?.name ?? valor
@@ -130,15 +179,17 @@ export function FormularioRadicar({
       <form onSubmit={(event) => {
         event.preventDefault()
         if (paso === 2) {
-          revisar()
+          continuar(3)
           return
         }
         if (paso !== 3) return
-        setError(null)
-        if (!declares) {
-          setError("Confirme que este requerimiento no contiene datos personales sensibles.")
+        setIntento(3)
+        const pendientes = erroresPaso(3, datosPaso)
+        if (Object.keys(pendientes).length > 0) {
+          setError(pendientes.declares ?? null)
           return
         }
+        setError(null)
         const data = new FormData(event.currentTarget)
         if (areaId) data.set("areaId", areaId)
         if (enviando.current) return
@@ -195,9 +246,10 @@ export function FormularioRadicar({
             <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
               <InfoIcon className="size-4" /> El formulario se adaptará al equipo que selecciones.
             </p>
+            {visible("team") ? <Aviso texto={errores.team} /> : null}
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E4E7EC] pt-4">
               <Link href={volverHref} className="inline-flex h-10 items-center rounded-lg border border-[#E4E7EC] bg-white px-4 text-sm">Cancelar</Link>
-              <button type="button" disabled={!team} onClick={() => setPaso(2)} className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white disabled:opacity-50">
+              <button type="button" onClick={() => continuar(2)} className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white">
                 Continuar <ArrowRightIcon className="size-4" />
               </button>
             </div>
@@ -215,16 +267,19 @@ export function FormularioRadicar({
                 <h2 className="text-lg font-semibold">¿Qué necesitas?</h2>
                 <label className="grid gap-1.5 text-sm">
                   Título
-                  <input name="title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder="Resume tu solicitud en una frase" className={campo} />
+                  <input name="title" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => tocar("title")} maxLength={120} placeholder="Resume tu solicitud en una frase" className={campo} aria-invalid={visible("title") && Boolean(errores.title)} />
+                  {visible("title") ? <Aviso texto={errores.title} /> : null}
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Descripción
-                  <textarea name="description" value={description} onChange={(event) => setDescription(event.target.value)} rows={5} placeholder="Explica el contexto, qué ocurre y qué resultado esperas." className={area} />
+                  <textarea name="description" value={description} onChange={(event) => setDescription(event.target.value)} onBlur={() => tocar("description")} rows={5} placeholder="Explica el contexto, qué ocurre y qué resultado esperas." className={area} aria-invalid={visible("description") && Boolean(errores.description)} />
                   <span className="text-xs text-muted-foreground">Si reportas un error, indica los pasos para reproducirlo.</span>
+                  {visible("description") ? <Aviso texto={errores.description} /> : null}
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Justificación · Opcional
-                  <textarea name="justification" value={justification} onChange={(event) => setJustification(event.target.value)} rows={3} placeholder="¿Por qué es importante resolver esta solicitud?" className={area} />
+                  <textarea name="justification" value={justification} onChange={(event) => setJustification(event.target.value)} onBlur={() => tocar("justification")} rows={3} placeholder="¿Por qué es importante resolver esta solicitud?" className={area} aria-invalid={visible("justification") && Boolean(errores.justification)} />
+                  {visible("justification") ? <Aviso texto={errores.justification} /> : null}
                 </label>
                 <p className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                   <InfoIcon className="mt-0.5 size-4 shrink-0" />
@@ -235,7 +290,8 @@ export function FormularioRadicar({
                 <h2 className="text-lg font-semibold">Clasificación y contexto</h2>
                 <label className="grid gap-1.5 text-sm">
                   Tipo de solicitud
-                  <Elegir name="typeId" ariaLabel="Tipo de solicitud" value={typeId} onValueChange={setTypeId} placeholder="Selecciona un tipo" opciones={[{ value: "", label: "Selecciona un tipo" }, ...visibles.map((tipo) => ({ value: tipo.id, label: tipo.name }))]} />
+                  <Elegir name="typeId" ariaLabel="Tipo de solicitud" value={typeId} onValueChange={(valor) => { setTypeId(valor); tocar("typeId") }} placeholder="Selecciona un tipo" opciones={[{ value: "", label: "Selecciona un tipo" }, ...visibles.map((tipo) => ({ value: tipo.id, label: tipo.name }))]} />
+                  {visible("typeId") ? <Aviso texto={errores.typeId} /> : null}
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Empresa
@@ -247,7 +303,14 @@ export function FormularioRadicar({
                 </label>
                 <label className="grid gap-1.5 text-sm">
                   Proyecto · Opcional
-                  <Elegir name="projectId" ariaLabel="Proyecto" value={projectId} onValueChange={setProjectId} placeholder="Sin proyecto" opciones={[{ value: "", label: "Sin proyecto" }, ...proyectosEmpresa.map((item) => ({ value: item.id, label: item.name }))]} />
+                  <Elegir name="projectId" ariaLabel="Proyecto" value={projectId} onValueChange={(valor) => {
+                    if (valor === "__crear__") {
+                      setEquipoProyecto(team)
+                      setCrearProyecto(true)
+                      return
+                    }
+                    setProjectId(valor)
+                  }} placeholder="Sin proyecto" opciones={[{ value: "", label: "Sin proyecto" }, ...proyectosEmpresa.map((item) => ({ value: item.id, label: item.name })), { value: "__crear__", label: "+ Crear proyecto" }]} />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1.5 text-sm">
@@ -255,10 +318,25 @@ export function FormularioRadicar({
                     <Elegir name="priority" ariaLabel="Prioridad sugerida" value={priority} onValueChange={setPriority} opciones={prioridades.map((item) => ({ value: item.key, label: item.name }))} />
                   </label>
                   <label className="grid gap-1.5 text-sm">
-                    Fecha deseada · Opcional
-                    <input name="desiredDate" type="date" lang="es-CO" value={desiredDate} onChange={(event) => setDesiredDate(event.target.value)} className={campo} />
+                    Fecha de entrega esperada
+                    <input name="desiredDate" type="date" lang="es-CO" min={hoyBogota(instante)} value={fechaEntrega} onChange={(event) => { setFechaManual(true); setDesiredDate(event.target.value); tocar("desiredDate") }} onBlur={() => tocar("desiredDate")} className={campo} aria-invalid={visible("desiredDate") && Boolean(errores.desiredDate)} />
+                    <span className="text-xs text-muted-foreground">
+                      Recomendada según prioridad: {textoFechaIso(recomendada)}
+                      {fechaManual ? <button type="button" className="ml-2 font-medium text-[#1658B0] hover:underline" onClick={() => { setFechaManual(false); setDesiredDate(recomendada) }}>Usar recomendada</button> : null}
+                    </span>
+                    {visible("desiredDate") ? <Aviso texto={errores.desiredDate} /> : null}
                   </label>
                 </div>
+                {team && (esAdministrador || liderazgos.includes(team)) ? (
+                  <label className="grid gap-1.5 text-sm">
+                    Asignar a · Opcional
+                    <Elegir name="assigneeId" ariaLabel="Asignar a" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin asignar todavía" opciones={[{ value: "", label: "Sin asignar todavía" }, ...personas.filter((persona) => persona.team === team).map((persona) => ({ value: persona.id, label: persona.name, iniciales: iniciales(persona.name) }))]} />
+                  </label>
+                ) : team ? (
+                  <p className="text-sm text-muted-foreground">
+                    Llegará al líder de {TEAM_LABEL[team]} para asignar{personas.some((persona) => persona.team === team && persona.role === "LIDER") ? `: ${personas.filter((persona) => persona.team === team && persona.role === "LIDER").map((persona) => persona.name).join(", ")}` : ""}.
+                  </p>
+                ) : null}
                 <p className="text-xs text-muted-foreground">El equipo confirmará la prioridad y la fecha de atención.</p>
                 {areas.length > 0 ? (
                   <label className="grid gap-1.5 text-sm">
@@ -273,20 +351,16 @@ export function FormularioRadicar({
               {elegido?.extra === "pasos" ? (
                 <label className="grid gap-1.5 text-sm">
                   Pasos para reproducir
-                  <textarea name="stepsToReproduce" value={steps} onChange={(event) => setSteps(event.target.value)} rows={4} placeholder="Use datos de prueba, nunca datos reales de una persona." className={area} />
+                  <textarea name="stepsToReproduce" value={steps} onChange={(event) => setSteps(event.target.value)} onBlur={() => tocar("steps")} rows={4} placeholder="Use datos de prueba, nunca datos reales de una persona." className={area} aria-invalid={visible("steps") && Boolean(errores.steps)} />
+                  {visible("steps") ? <Aviso texto={errores.steps} /> : null}
                 </label>
               ) : null}
               {elegido?.extra === "canal" ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="grid gap-1.5 text-sm">
-                    Canal
-                    <input name="channels" value={channels} onChange={(event) => setChannels(event.target.value)} placeholder="Instagram, sitio web, WhatsApp…" className={campo} />
-                  </label>
-                  <label className="grid gap-1.5 text-sm">
-                    Fecha de publicación
-                    <input name="publishAt" type="datetime-local" lang="es-CO" value={publishAt} onChange={(event) => setPublishAt(event.target.value)} className={campo} />
-                  </label>
-                </div>
+                <label className="grid gap-1.5 text-sm">
+                  Canal
+                  <input name="channels" value={channels} onChange={(event) => setChannels(event.target.value)} onBlur={() => tocar("channels")} placeholder="Instagram, sitio web, WhatsApp…" className={campo} aria-invalid={visible("channels") && Boolean(errores.channels)} />
+                  {visible("channels") ? <Aviso texto={errores.channels} /> : null}
+                </label>
               ) : null}
               {team === "DESARROLLO" ? (
                 <label className="grid gap-1.5 text-sm">
@@ -303,7 +377,7 @@ export function FormularioRadicar({
             {error && paso === 2 ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">{error}</p> : null}
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E4E7EC] pt-4">
               <button type="button" onClick={() => setPaso(1)} className="inline-flex h-10 items-center rounded-lg border border-[#E4E7EC] bg-white px-4 text-sm">Volver</button>
-              <button type="button" onClick={revisar} className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white">
+              <button type="button" onClick={() => continuar(3)} className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white">
                 Revisar solicitud <ArrowRightIcon className="size-4" />
               </button>
             </div>
@@ -320,22 +394,22 @@ export function FormularioRadicar({
               <Resumen etiqueta="Título" valor={title} />
               <Resumen etiqueta="Empresa" valor={nombreDe(empresas, empresaId)} />
               <Resumen etiqueta="Marca" valor={nombreDe(marcas, brand)} />
-              <Resumen etiqueta="Proyecto" valor={projectId ? nombreDe(proyectos, projectId) : "Sin proyecto"} />
+              <Resumen etiqueta="Proyecto" valor={projectId ? nombreDe(proyectosLocales, projectId) : "Sin proyecto"} />
               <Resumen etiqueta="Prioridad sugerida" valor={nombreDe(prioridades, priority)} />
-              <Resumen etiqueta="Fecha deseada" valor={desiredDate || "Sin fecha"} />
+              <Resumen etiqueta="Fecha de entrega esperada" valor={fechaEntrega ? textoFechaIso(fechaEntrega) : "Sin fecha"} />
               <div className="sm:col-span-2"><Resumen etiqueta="Descripción" valor={description} /></div>
               {justification ? <div className="sm:col-span-2"><Resumen etiqueta="Justificación" valor={justification} /></div> : null}
               {elegido?.extra === "pasos" ? <div className="sm:col-span-2"><Resumen etiqueta="Pasos para reproducir" valor={steps} /></div> : null}
               {elegido?.extra === "canal" ? <Resumen etiqueta="Canal" valor={channels} /> : null}
-              {elegido?.extra === "canal" ? <Resumen etiqueta="Fecha de publicación" valor={publishAt} /> : null}
               {moduleName ? <Resumen etiqueta="Módulo o sistema" valor={moduleName} /> : null}
               {archivo ? <Resumen etiqueta="Archivo" valor={archivo} /> : null}
             </dl>
             <div className="mt-4 grid gap-2">
               <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" name="declares" value="1" checked={declares} onChange={(event) => setDeclares(event.target.checked)} className="mt-1" />
+                <input type="checkbox" name="declares" value="1" checked={declares} onChange={(event) => { setDeclares(event.target.checked); tocar("declares") }} className="mt-1" />
                 <span>Confirmo que este requerimiento no contiene datos personales sensibles.</span>
               </label>
+              {visible("declares") ? <Aviso texto={errores.declares} /> : null}
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" name="reviewedPersonalData" value="1" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} className="mt-1" />
                 <span>Si el sistema detecta algo parecido a una cédula o un celular, confirmo que ya lo revisé.</span>
@@ -351,8 +425,58 @@ export function FormularioRadicar({
           </section>
         </div>
       </form>
+      {crearProyecto ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#15122A]/40 p-4" role="dialog" aria-modal="true" aria-labelledby="crear-proyecto-titulo">
+          <div className="w-full max-w-md rounded-xl border border-[#E4E7EC] bg-white p-5 shadow-xl">
+            <h2 id="crear-proyecto-titulo" className="font-heading text-xl">Crear proyecto</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Queda a su nombre y se selecciona en esta solicitud.</p>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-1.5 text-sm">
+                Nombre
+                <input value={nombreProyecto} onChange={(event) => setNombreProyecto(event.target.value)} className={campo} placeholder="Nombre del proyecto" />
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                Equipo
+                <Elegir ariaLabel="Equipo del proyecto" value={equipoProyecto} onValueChange={(valor) => setEquipoProyecto(valor as TeamName)} opciones={TEAMS.map((item) => ({ value: item, label: TEAM_LABEL[item] }))} />
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                Descripción · Opcional
+                <textarea value={detalleProyecto} onChange={(event) => setDetalleProyecto(event.target.value)} rows={3} className={area} />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="h-10 rounded-lg border border-[#E4E7EC] px-4 text-sm" onClick={() => setCrearProyecto(false)}>Cancelar</button>
+              <button type="button" disabled={pending || nombreProyecto.trim().length < 3 || !equipoProyecto} className="h-10 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white disabled:opacity-50" onClick={() => {
+                const data = new FormData()
+                data.set("empresaId", empresaId)
+                data.set("name", nombreProyecto)
+                data.set("description", detalleProyecto)
+                data.set("team", equipoProyecto)
+                start(async () => {
+                  const result = await crearProyectoRadicarAction(data)
+                  if (!result.ok || !result.id) {
+                    toast.error(result.ok ? "No se pudo crear el proyecto." : result.error)
+                    return
+                  }
+                  setProyectosLocales((prev) => [...prev, { id: result.id!, empresaId, name: result.resumen || nombreProyecto.trim() }])
+                  setProjectId(result.id)
+                  setNombreProyecto("")
+                  setDetalleProyecto("")
+                  setCrearProyecto(false)
+                  toast.success(result.message || "Proyecto creado.")
+                })
+              }}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
+}
+
+function Aviso({ texto }: { texto?: string }) {
+  if (!texto) return null
+  return <span className="text-xs text-red-700">{texto}</span>
 }
 
 function Pasos({ paso }: { paso: 1 | 2 | 3 }) {

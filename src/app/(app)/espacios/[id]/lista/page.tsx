@@ -12,7 +12,15 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
   const { id } = await params
   const empresa = await prisma.empresa.findUnique({ where: { id } })
   if (!empresa) notFound()
-  const casos = await listar(actor, { empresaId: id, pageSize: 100, conPausas: false, conTareas: false })
+  const [casos, tareas] = await Promise.all([
+    listar(actor, { empresaId: id, pageSize: 100, conPausas: false, conTareas: false }),
+    prisma.tarea.findMany({
+      where: { status: { not: "HECHA" }, OR: [{ request: { empresaId: id } }, { project: { empresaId: id } }] },
+      orderBy: { updatedAt: "desc" },
+      take: 40,
+      select: { id: true, title: true, status: true, assignee: { select: { name: true } }, request: { select: { code: true } } },
+    }),
+  ])
   const puedeEliminar = actor.isAdmin
   return (
     <div className="overflow-hidden rounded-md border border-[#dfe1e6] bg-white">
@@ -52,5 +60,19 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
       </table>
       <p className="border-t border-[#dfe1e6] px-3 py-2 text-xs text-[#44546f]">{casos.items.length} de {casos.total}</p>
     </div>
+    <section className="mt-4 rounded-md border border-[#dfe1e6] bg-white">
+      <h2 className="border-b border-[#dfe1e6] px-3 py-2 text-sm font-semibold">Tareas</h2>
+      {tareas.length === 0 ? <p className="px-3 py-4 text-sm text-muted-foreground">Este espacio no tiene tareas abiertas.</p> : (
+        <ul className="divide-y divide-[#dfe1e6]">
+          {tareas.map((tarea) => (
+            <li key={tarea.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+              {tarea.request ? <Link href={`/requerimientos/${tarea.request.code}`} className="rounded-full bg-[#E7F0FB] px-2 py-0.5 text-xs font-medium text-[#1658B0]">{tarea.request.code}</Link> : <span className="text-xs text-muted-foreground">Sin solicitud</span>}
+              <span>{tarea.title}</span>
+              <span className="text-xs text-muted-foreground">{tarea.status === "EN_CURSO" ? "En curso" : "Pendiente"} · {tarea.assignee?.name ?? "Sin responsable"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

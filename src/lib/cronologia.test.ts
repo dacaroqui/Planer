@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { esEntradaPublica, esPorResponder, horasDeMinutos, internoDe, notaResolucionOpcional, visibilidadDefecto } from "@/lib/cronologia"
+import { adjuntoVisible, esEntradaPublica, esImagenAdjunto, esPorResponder, horasDeMinutos, internoDe, notaResolucionOpcional, pestanasPara, visibilidadDefecto } from "@/lib/cronologia"
 
 describe("cronología", () => {
   it("deriva la nota interna y la entrada pública", () => {
@@ -23,9 +23,25 @@ describe("cronología", () => {
     expect(horasDeMinutos(90)).toBe(1.5)
   })
 
+  it("oculta al solicitante los adjuntos de la nota interna y del registro", () => {
+    expect(adjuntoVisible(false, null)).toBe(true)
+    expect(adjuntoVisible(false, "PUBLICA")).toBe(true)
+    expect(adjuntoVisible(false, "SOLICITUD_INFO")).toBe(true)
+    expect(adjuntoVisible(false, "INTERNA")).toBe(false)
+    expect(adjuntoVisible(false, "REGISTRO")).toBe(false)
+    expect(adjuntoVisible(true, "INTERNA")).toBe(true)
+    expect(esImagenAdjunto("image/png", "captura.png")).toBe(true)
+    expect(esImagenAdjunto("application/pdf", "brief.pdf")).toBe(false)
+  })
+
   it("por responder es la última entrada del solicitante o la ausencia de respuesta", () => {
     expect(esPorResponder({ requesterId: "ana", lastPublicActorId: null })).toBe(true)
     expect(esPorResponder({ requesterId: "ana", lastPublicActorId: "ana" })).toBe(true)
     expect(esPorResponder({ requesterId: "ana", lastPublicActorId: "valentina" })).toBe(false)
+    expect(esPorResponder({ requesterId: "ana", lastPublicActorId: "ana" }, "ana")).toBe(false)
+    expect(esPorResponder({ requesterId: "ana", lastPublicActorId: "ana" }, "valentina")).toBe(true)
+    expect(pestanasPara({ esSolicitante: true, puedePublica: true, puedeNota: true })).toEqual(["INTERNA", "REGISTRO"])
+    expect(pestanasPara({ esSolicitante: true, puedePublica: true, puedeNota: false })).toEqual(["PUBLICA"])
+    expect(pestanasPara({ esSolicitante: false, puedePublica: true, puedeNota: true })).toEqual(["PUBLICA", "INTERNA", "REGISTRO", "SOLICITUD_INFO"])
   })
 })

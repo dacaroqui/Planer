@@ -24,6 +24,7 @@ function entradasDe(detail: NonNullable<Awaited<ReturnType<typeof getDetalle>>>)
       cuerpo: item.body,
       minutos: item.minutes,
       tarea: item.tarea?.title ?? null,
+      adjuntos: item.adjuntos.map((archivo) => ({ id: archivo.id, filename: archivo.filename, mimeType: archivo.mimeType })),
       orden: item.createdAt.getTime(),
     })),
     ...detail.request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({
@@ -37,7 +38,7 @@ function entradasDe(detail: NonNullable<Awaited<ReturnType<typeof getDetalle>>>)
   lineas.sort((a, b) => a.orden - b.orden)
   return lineas.map((entrada) => entrada.tipo === "estado"
     ? { tipo: entrada.tipo, id: entrada.id, cuando: entrada.cuando, texto: entrada.texto }
-    : { tipo: entrada.tipo, id: entrada.id, autor: entrada.autor, cuando: entrada.cuando, cuerpo: entrada.cuerpo, minutos: entrada.minutos, tarea: entrada.tarea })
+    : { tipo: entrada.tipo, id: entrada.id, autor: entrada.autor, cuando: entrada.cuando, cuerpo: entrada.cuerpo, minutos: entrada.minutos, tarea: entrada.tarea, adjuntos: entrada.adjuntos })
 }
 
 export default async function BandejaPage({
@@ -99,6 +100,7 @@ export default async function BandejaPage({
           puedePublica: detail.canCommentPublic,
           puedeNota: detail.canCommentInternal,
           puedeAdjuntar: detail.canAttach,
+          esSolicitante: actor.id === detail.request.requesterId,
           tareas: detail.request.tasks.filter((tarea) => !tarea.parentId).map((tarea) => ({ id: tarea.id, title: tarea.title })),
           agentes: detail.agents.map((agente) => ({ id: agente.id, name: agente.name })),
           puedeAsignar: detail.canAssign,

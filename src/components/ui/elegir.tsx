@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import { ChevronDownIcon, XIcon } from "lucide-react"
 import { cn } from "cn"
 
-export type Opcion = { value: string; label: string }
+export type Opcion = { value: string; label: string; iniciales?: string }
 
 export function Elegir({
   value,
@@ -50,7 +50,10 @@ export function Elegir({
           : "flex h-11 w-full items-center justify-between gap-2 rounded-[10px] border border-[#D9DEE7] bg-white px-3 text-sm font-medium shadow-[0_1px_2px_rgba(21,18,42,0.04)]"}
         onClick={() => setAbierto((valor) => !valor)}
       >
-        <span className={cn("truncate", !actual && "font-normal text-muted-foreground")}>{actual?.label ?? placeholder}</span>
+        <span className={cn("flex min-w-0 items-center gap-2 truncate", !actual && "font-normal text-muted-foreground")}>
+          {actual?.iniciales ? <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[#1658B0] text-[10px] font-semibold text-white">{actual.iniciales}</span> : null}
+          <span className="truncate">{actual?.label ?? placeholder}</span>
+        </span>
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
       </button>
       {abierto ? (
@@ -61,9 +64,10 @@ export function Elegir({
                 type="button"
                 role="option"
                 aria-selected={opcion.value === value}
-                className={cn("flex w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#F4F7FC]", opcion.value === value && "bg-[#E7F0FB] font-medium text-[#1658B0]")}
+                className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-[#F4F7FC]", opcion.value === value && "bg-[#E7F0FB] font-medium text-[#1658B0]")}
                 onClick={() => { onValueChange(opcion.value); setAbierto(false) }}
               >
+                {opcion.iniciales ? <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[#1658B0] text-[10px] font-semibold text-white">{opcion.iniciales}</span> : null}
                 {opcion.label}
               </button>
             </li>

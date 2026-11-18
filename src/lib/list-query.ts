@@ -24,6 +24,7 @@ export function consultaDesde(
     areaId: one("area"),
     mine: one("mine") === "1",
     assignedToMe: one("assigned") === "1",
+    unassigned: one("sin") === "1",
     from: one("from"),
     to: one("to"),
     sla: one("sla"),

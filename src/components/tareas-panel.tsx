@@ -4,11 +4,13 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { EliminarTarea } from "@/components/confirmar-eliminar"
+import { Avatar } from "@/components/iconos-planer"
 import { guardarTareaAction } from "@/server/actions"
 import { Barra } from "@/components/barra"
+import { Elegir } from "@/components/ui/elegir"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { iniciales } from "@/lib/planer-ui"
 
 export type TareaVista = {
   id: string
@@ -46,15 +48,23 @@ export function TareasPanel({
   const [pending, start] = useTransition()
   const [status, setStatus] = useState<"PENDIENTE" | "EN_CURSO" | "HECHA">("PENDIENTE")
   const [assigneeId, setAssigneeId] = useState("")
+  const [agregar, setAgregar] = useState(false)
 
   function enviar(data: FormData) {
+    const responsable = String(data.get("assigneeId") || "")
+    const nombre = agentes.find((agente) => agente.id === responsable)?.name
     start(async () => {
       const result = await guardarTareaAction(data)
       if (!result.ok) {
         toast.error(result.error)
         return
       }
-      toast.success(result.message || "Tarea actualizada.")
+      if (nombre && responsable) {
+        toast.success(`Asignado a ${nombre}`, {
+          description: <a className="font-medium text-[#1658B0] underline" href={`/personas?persona=${responsable}`}>Ver en sus tareas</a>,
+        })
+      } else toast.success(result.message || "Tarea actualizada.")
+      setAgregar(false)
       router.refresh()
     })
   }
@@ -62,48 +72,41 @@ export function TareasPanel({
   return (
     <div className="grid gap-3">
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span>{porcentaje}% de avance</span>
+        <span className="font-medium">Avance {porcentaje}%</span>
         <span className="text-muted-foreground">{tareas.filter((tarea) => tarea.status === "HECHA").length}/{tareas.length || 0} hechas</span>
       </div>
       <Barra porcentaje={porcentaje} />
-      {tareas.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay tareas.</p> : tareas.map((tarea) => (
-        <div key={tarea.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-          <div>
-            <p className={tarea.status === "HECHA" ? "line-through" : ""}>{tarea.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {tarea.assignee} · {ETIQUETA[tarea.status]}
-              {tarea.dueDate ? ` · vence ${tarea.dueDate}` : ""}
-              {tarea.vencida ? " · vencida" : ""}
-              {` · est. ${tarea.horasEstimadas ?? "—"} h · real ${tarea.horasReales ?? 0} h`}
-            </p>
-            {puede ? (
-              <form className="mt-1 flex items-center gap-2" action={(data) => enviar(data)}>
+      {tareas.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay tareas en esta solicitud.</p> : tareas.map((tarea) => (
+        <div key={tarea.id} className="grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className={tarea.status === "HECHA" ? "font-medium line-through" : "font-medium"}>{tarea.title}</p>
+            <span className={tarea.status === "HECHA" ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800" : tarea.status === "EN_CURSO" ? "rounded-full bg-[#E7F0FB] px-2 py-0.5 text-xs font-medium text-[#1658B0]" : "rounded-full bg-[#F3F4F6] px-2 py-0.5 text-xs font-medium text-[#3d4a63]"}>{ETIQUETA[tarea.status]}</span>
+          </div>
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Avatar nombre={tarea.assignee === "Sin responsable" ? "?" : tarea.assignee} />
+            <span>{tarea.assignee}</span>
+            <span>{tarea.dueDate ? `Fecha ${tarea.dueDate}` : "Sin fecha"}</span>
+            {tarea.vencida ? <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">Vencida</span> : null}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {puede && tarea.status !== "HECHA" ? (
+              <form action={(data) => enviar(data)}>
                 <input type="hidden" name="id" value={tarea.id} />
                 <input type="hidden" name="title" value={tarea.title} />
-                <input type="hidden" name="status" value={tarea.status} />
+                <input type="hidden" name="status" value="HECHA" />
                 {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
                 {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
-                <input name="horasEstimadas" type="number" min="0" step="0.5" defaultValue={tarea.horasEstimadas ?? ""} aria-label={`Horas estimadas de ${tarea.title}`} className="h-8 w-20 rounded-lg border border-[#E4E7EC] px-2 text-xs" placeholder="Est." />
-                <Button type="submit" size="sm" variant="outline" disabled={pending}>Guardar estimación</Button>
+                <Button type="submit" size="sm" disabled={pending}>Marcar hecha</Button>
               </form>
             ) : null}
+            {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
           </div>
-          <span className="flex flex-wrap items-center gap-2">
-          {puede && tarea.status !== "HECHA" ? (
-            <form action={(data) => enviar(data)}>
-              <input type="hidden" name="id" value={tarea.id} />
-              <input type="hidden" name="title" value={tarea.title} />
-              <input type="hidden" name="status" value="HECHA" />
-              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-              {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
-              <Button type="submit" size="sm" disabled={pending}>Marcar hecha</Button>
-            </form>
-          ) : null}
-          {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
-          </span>
         </div>
       ))}
-      {puede ? (
+      {puede && !agregar ? (
+        <button type="button" className="h-11 rounded-lg border border-dashed border-[#1658B0] text-sm font-medium text-[#1658B0]" onClick={() => setAgregar(true)}>+ Agregar tarea</button>
+      ) : null}
+      {puede && agregar ? (
         <form className="grid gap-2 border-t border-border pt-3" onSubmit={(event) => {
           event.preventDefault()
           const data = new FormData(event.currentTarget)
@@ -117,24 +120,14 @@ export function TareasPanel({
         }}>
           <Input name="title" placeholder={parentId ? "Subtarea" : "Nueva tarea"} required minLength={3} />
           <div className="grid gap-2 sm:grid-cols-3">
-            <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
-              <SelectTrigger className="w-full" aria-label="Estado"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PENDIENTE">Pendiente</SelectItem>
-                <SelectItem value="EN_CURSO">En curso</SelectItem>
-                <SelectItem value="HECHA">Hecha</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={assigneeId || "NADIE"} onValueChange={(value) => setAssigneeId(value === "NADIE" ? "" : value)}>
-              <SelectTrigger className="w-full" aria-label="Responsable"><SelectValue placeholder="Sin responsable" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NADIE">Sin responsable</SelectItem>
-                {agentes.map((agente) => <SelectItem key={agente.id} value={agente.id}>{agente.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Elegir ariaLabel="Estado" value={status} onValueChange={(valor) => setStatus(valor as typeof status)} opciones={[{ value: "PENDIENTE", label: "Pendiente" }, { value: "EN_CURSO", label: "En curso" }, { value: "HECHA", label: "Hecha" }]} />
+            <Elegir ariaLabel="Responsable" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin responsable" opciones={[{ value: "", label: "Sin responsable" }, ...agentes.map((agente) => ({ value: agente.id, label: agente.name, iniciales: iniciales(agente.name) }))]} />
             <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" />
           </div>
-          <Button type="submit" size="sm" disabled={pending}>Agregar tarea</Button>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={pending}>Agregar tarea</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setAgregar(false)}>Cancelar</Button>
+          </div>
         </form>
       ) : null}
     </div>

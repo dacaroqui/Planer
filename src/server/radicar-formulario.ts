@@ -55,6 +55,7 @@ export async function radicarDesdeFormulario(actor: Actor, formData: FormData): 
       empresaId: String(formData.get("empresaId") || "") || undefined,
       projectId: String(formData.get("projectId") || "") || null,
       areaId: String(formData.get("areaId") || "") || undefined,
+      assigneeId: String(formData.get("assigneeId") || "") || null,
     })
     if (file) await adjuntar(actor, request.id, file)
     return { ok: true, code: request.code }

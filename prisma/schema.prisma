@@ -20,6 +20,8 @@ enum Role {
 enum Team {
   DESARROLLO
   MARKETING
+  COMERCIAL
+  INNOVACION
 }
 
 enum TipoComentario {
@@ -187,6 +189,7 @@ model Proyecto {
   startsAt    DateTime
   targetAt    DateTime
   status      EstadoProyecto @default(PLANIFICADO)
+  team        Team?
   requests    Request[]
   tasks       Tarea[]
   createdAt   DateTime       @default(now())
@@ -399,6 +402,7 @@ model Comment {
   compartir  Boolean        @default(false)
   internal   Boolean        @default(false)
   createdAt  DateTime       @default(now())
+  adjuntos   Attachment[]
 
   @@index([requestId])
   @@index([tareaId])
@@ -415,7 +419,11 @@ model Attachment {
   storedName   String
   mimeType     String
   sizeBytes    Int
+  commentId    String?
+  comment      Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
+
+  @@index([commentId])
 }
 
 model Activity {

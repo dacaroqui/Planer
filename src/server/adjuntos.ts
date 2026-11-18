@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { toActor } from "@/lib/actor"
-import { puedeVer } from "@/lib/permissions"
+import { puedeVer, puedeVerNotaInterna } from "@/lib/permissions"
+import { adjuntoVisible } from "@/lib/cronologia"
 
 export type AccesoAdjunto =
   | { status: 401 }
@@ -14,8 +15,13 @@ export async function resolverAdjunto(email: string | null, id: string): Promise
   if (!user?.active) return { status: 403 }
   const file = await prisma.attachment.findUnique({
     where: { id },
-    include: { request: { select: { team: true, requesterId: true } } },
+    include: {
+      request: { select: { team: true, requesterId: true } },
+      comment: { select: { kind: true } },
+    },
   })
-  if (!file || !puedeVer(toActor(user), file.request)) return { status: 404 }
+  const actor = toActor(user)
+  if (!file || !puedeVer(actor, file.request)) return { status: 404 }
+  if (!adjuntoVisible(puedeVerNotaInterna(actor, file.request.team), file.comment?.kind ?? null)) return { status: 404 }
   return { status: 200, filename: file.filename, mimeType: file.mimeType, storedName: file.storedName }
 }
