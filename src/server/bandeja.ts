@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client"
 import type { Actor, TeamName } from "@/lib/domain"
 import { TERMINAL_STATUSES } from "@/lib/domain"
 import { esPorResponder } from "@/lib/cronologia"
@@ -34,42 +35,109 @@ export function puedeEscribirBandeja(actor: Actor) {
   return actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")
 }
 
+const seleccionBandeja = {
+  id: true,
+  code: true,
+  title: true,
+  team: true,
+  status: true,
+  requesterId: true,
+  assigneeId: true,
+  lastPublicActorId: true,
+  lastPublicAt: true,
+  slaStartedAt: true,
+  slaTargetMinutes: true,
+  resolutionMinutes: true,
+  resolvedAt: true,
+  firstResponseMinutes: true,
+  firstResponseDueAt: true,
+  firstResponseStoppedAt: true,
+  firstResponseMet: true,
+  requester: { select: { name: true } },
+  assignee: { select: { id: true, name: true } },
+  lastPublicActor: { select: { name: true } },
+  empresa: { select: { id: true, name: true } },
+  pauses: { select: { startedAt: true, endedAt: true } },
+} satisfies Prisma.RequestSelect
+
+function responsableDe(actor: Actor, filtros: FiltroBandeja) {
+  if (filtros.soloMios) return actor.id
+  return filtros.responsable
+}
+
+function clausulaBandeja(actor: Actor, filtros: FiltroBandeja, equipos: TeamName[]) {
+  const partes: Prisma.Sql[] = [
+    Prisma.sql`status NOT IN (${Prisma.join([...TERMINAL_STATUSES])})`,
+  ]
+  if (equipos.length === 0) partes.push(Prisma.sql`FALSE`)
+  else partes.push(Prisma.sql`team::text IN (${Prisma.join(equipos)})`)
+  if (filtros.empresaId) partes.push(Prisma.sql`"empresaId" = ${filtros.empresaId}`)
+  if (filtros.prioridad) partes.push(Prisma.sql`priority = ${filtros.prioridad}`)
+  const responsable = responsableDe(actor, filtros)
+  if (responsable) partes.push(Prisma.sql`"assigneeId" = ${responsable}`)
+  return Prisma.join(partes, " AND ")
+}
+
+function whereBandeja(actor: Actor, filtros: FiltroBandeja, equipos: TeamName[]) {
+  const responsable = responsableDe(actor, filtros)
+  return {
+    status: { notIn: [...TERMINAL_STATUSES] },
+    ...(equipos.length ? { team: { in: equipos } } : { id: "ninguno" }),
+    ...(filtros.empresaId ? { empresaId: filtros.empresaId } : {}),
+    ...(filtros.prioridad ? { priority: filtros.prioridad } : {}),
+    ...(responsable ? { assigneeId: responsable } : {}),
+  }
+}
+
+async function contarPestanas(actor: Actor, filtros: FiltroBandeja, equipos: TeamName[]) {
+  const rows = await prisma.$queryRaw<Array<{
+    responder: number
+    sin_asignar: number
+    mios: number
+    espera: number
+  }>>(Prisma.sql`
+    SELECT
+      (COUNT(*) FILTER (WHERE "lastPublicActorId" IS NULL OR "lastPublicActorId" = "requesterId"))::int AS responder,
+      (COUNT(*) FILTER (WHERE "assigneeId" IS NULL))::int AS sin_asignar,
+      (COUNT(*) FILTER (WHERE "assigneeId" = ${actor.id}))::int AS mios,
+      (COUNT(*) FILTER (WHERE status = 'EN_ESPERA'))::int AS espera
+    FROM "Request"
+    WHERE ${clausulaBandeja(actor, filtros, equipos)}
+  `)
+  const row = rows[0]
+  return {
+    responder: Number(row?.responder ?? 0),
+    "sin-asignar": Number(row?.sin_asignar ?? 0),
+    mios: Number(row?.mios ?? 0),
+    espera: Number(row?.espera ?? 0),
+  }
+}
+
 export async function listarBandeja(actor: Actor, filtros: FiltroBandeja) {
   const equipos = esAdmin(actor)
     ? (["DESARROLLO", "MARKETING"] as TeamName[])
     : [...new Set(actor.memberships.map((item) => item.team))]
   const equiposFiltrados = filtros.equipo && equipos.includes(filtros.equipo) ? [filtros.equipo] : equipos
-  const filas = await prisma.request.findMany({
-    where: {
-      status: { notIn: [...TERMINAL_STATUSES] },
-      ...(equiposFiltrados.length ? { team: { in: equiposFiltrados } } : { id: "ninguno" }),
-      ...(filtros.empresaId ? { empresaId: filtros.empresaId } : {}),
-      ...(filtros.prioridad ? { priority: filtros.prioridad } : {}),
-      ...(filtros.responsable ? { assigneeId: filtros.responsable } : {}),
-      ...(filtros.soloMios ? { assigneeId: actor.id } : {}),
-    },
-    include: {
-      requester: { select: { id: true, name: true } },
-      assignee: { select: { id: true, name: true } },
-      lastPublicActor: { select: { id: true, name: true } },
-      empresa: { select: { id: true, name: true } },
-      pauses: true,
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 250,
-  })
+  const [conteosBase, filas] = await Promise.all([
+    contarPestanas(actor, filtros, equiposFiltrados),
+    prisma.request.findMany({
+      where: whereBandeja(actor, filtros, equiposFiltrados),
+      select: seleccionBandeja,
+    }),
+  ])
   const decoradas = filas.map((fila) => {
     const sla = evaluarSla(fila)
     return { fila, sla }
   }).sort((a, b) => a.sla.remainingMinutes - b.sla.remainingMinutes || a.fila.code.localeCompare(b.fila.code, "es"))
+  const porVencer = (item: (typeof decoradas)[number]) => item.sla.state === "VENCIDO" || item.sla.state === "EN_RIESGO" || (item.sla.remainingMinutes > 0 && item.sla.remainingMinutes <= 30)
   const coincide = (tab: TabBandeja, item: (typeof decoradas)[number]) => {
     if (tab === "responder") return esPorResponder({ requesterId: item.fila.requesterId, lastPublicActorId: item.fila.lastPublicActorId })
     if (tab === "sin-asignar") return !item.fila.assigneeId
     if (tab === "mios") return item.fila.assigneeId === actor.id
     if (tab === "espera") return item.fila.status === "EN_ESPERA"
-    return item.sla.state === "VENCIDO" || item.sla.state === "EN_RIESGO" || (item.sla.remainingMinutes > 0 && item.sla.remainingMinutes <= 30)
+    return porVencer(item)
   }
-  const conteos = Object.fromEntries(TABS.map((tab) => [tab, decoradas.filter((item) => coincide(tab, item)).length])) as Record<TabBandeja, number>
+  const conteos: Record<TabBandeja, number> = { ...conteosBase, vencer: decoradas.filter(porVencer).length }
   const visibles = decoradas.filter((item) => coincide(filtros.tab, item)).slice(0, 80)
   return {
     conteos,

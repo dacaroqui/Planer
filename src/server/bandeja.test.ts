@@ -135,4 +135,45 @@ describe("bandeja y cronología", () => {
     const aviso = await prisma.notification.findFirst({ where: { userId: valentina.id, subject: { contains: "El solicitante respondió" } } })
     expect(aviso).not.toBeNull()
   })
+
+  it("cuenta las pestañas en una consulta agrupada y lista solo los campos de la fila", async () => {
+    const { valentina, request, email, now } = await escena()
+    await prisma.request.update({
+      where: { id: request.id },
+      data: {
+        assigneeId: null,
+        slaStartedAt: new Date("2020-01-06T13:00:00.000Z"),
+        slaTargetMinutes: 30,
+        resolutionMinutes: 30,
+      },
+    })
+    const vencidas = await listarBandeja(valentina, { tab: "vencer" })
+    expect(vencidas.conteos).toEqual({ responder: 1, "sin-asignar": 1, mios: 0, espera: 0, vencer: 1 })
+    expect(vencidas.filas).toEqual([expect.objectContaining({
+      code: request.code,
+      title: "El aula de prueba no abre",
+      requester: "Ana Ejemplo",
+      assignee: "Sin asignar",
+      sla: "VENCIDO",
+    })])
+    await prisma.request.update({ where: { id: request.id }, data: { assigneeId: valentina.id } })
+    const mias = await listarBandeja(valentina, { tab: "mios" })
+    expect(mias.conteos.mios).toBe(1)
+    expect(mias.conteos["sin-asignar"]).toBe(0)
+    expect(mias.filas).toHaveLength(1)
+    await registrarEntrada(valentina, request.id, { kind: "PUBLICA", body: "Listo el arreglo en el ambiente demo." }, { email, now })
+    const respondidas = await listarBandeja(valentina, { tab: "responder" })
+    expect(respondidas.conteos.responder).toBe(0)
+    expect(respondidas.filas).toEqual([])
+    expect(respondidas.conteos.vencer).toBe(1)
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { status: "EN_ESPERA", slaStartedAt: now, slaTargetMinutes: 1440, resolutionMinutes: 1440 },
+    })
+    await prisma.slaPause.create({ data: { requestId: request.id, startedAt: now, reason: "EN_ESPERA" } })
+    const espera = await listarBandeja(valentina, { tab: "espera" })
+    expect(espera.conteos.espera).toBe(1)
+    expect(espera.conteos.vencer).toBe(0)
+    expect(espera.filas.map((fila) => fila.code)).toEqual([request.code])
+  })
 })
