@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Avatar, IconoTipo } from "@/components/iconos-planer"
 import { EstadoVacio } from "@/components/estado-vacio"
+import { esEspacio } from "@/lib/domain"
 import { enUltimaSemana, tiempoRelativo } from "@/lib/planer-ui"
 
 export type ItemParaTi = {
@@ -90,7 +91,7 @@ export function ParaTi({
           <Link href="/proyectos" className="text-sm text-[#1658B0] hover:underline">Ver todos los espacios</Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {espacios.slice(0, 3).map((espacio) => (
+          {espacios.filter((espacio) => esEspacio(espacio.name)).slice(0, 3).map((espacio) => (
             <Link key={espacio.id} href={`/espacios/${espacio.id}`} className="flex items-center gap-3 rounded-lg border border-border bg-white p-4 hover:border-[#1658B0]">
               <span className="inline-flex size-10 items-center justify-center rounded-md text-sm font-semibold text-white" style={{ background: espacio.name.toLowerCase().includes("luvania") ? "#EE876B" : "#1658B0" }}>{espacio.name.slice(0, 1)}</span>
               <span>

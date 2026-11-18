@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ROLE_LABEL, type Actor } from "@/lib/domain"
+import { ROLE_LABEL, esEspacio, type Actor } from "@/lib/domain"
 import { cn } from "@/lib/utils"
 
 export type EspacioNav = { id: string; name: string }
@@ -107,7 +107,7 @@ export function Marco({
             </button>
             {espaciosAbiertos && abierta ? (
               <div className="mt-1 grid gap-0.5">
-                {espacios.length === 0 ? <p className="px-2 text-xs text-muted-foreground">Todavía no hay espacios.</p> : espacios.map((espacio) => (
+                {espacios.filter((espacio) => esEspacio(espacio.name)).length === 0 ? <p className="px-2 text-xs text-muted-foreground">Todavía no hay espacios.</p> : espacios.filter((espacio) => esEspacio(espacio.name)).map((espacio) => (
                   <div key={espacio.id}>
                     <Link href={`/espacios/${espacio.id}`} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent", path.startsWith(`/espacios/${espacio.id}`) && "bg-sidebar-accent font-medium text-[#1658B0]")}>
                       <span className="inline-flex size-5 items-center justify-center rounded text-[10px] font-semibold text-white" style={{ background: espacio.name.toLowerCase().includes("luvania") ? "#EE876B" : "#1658B0" }}>{espacio.name.slice(0, 1)}</span>

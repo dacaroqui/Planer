@@ -217,21 +217,21 @@ export async function guardarTarea(
   if (nuevoResponsable && nuevoResponsable !== previoResponsable && nuevoResponsable !== actor.id) {
     avisos.push({
       userId: nuevoResponsable,
-      subject: request ? `${request.code} · Se te asignó una tarea` : "Se te asignó una tarea",
-      body: request ? `Se te asignó la tarea «${title}» en ${request.code}.` : `Se te asignó la tarea «${title}».`,
+      subject: "",
+      body: request ? `se te asignó ${request.code}: ${title}.` : `se te asignó la tarea «${title}».`,
     })
   }
   if (previoResponsable && nuevoResponsable !== previoResponsable && previoResponsable !== actor.id) {
     avisos.push({
       userId: previoResponsable,
-      subject: request ? `${request.code} · Ya no tienes la tarea` : "Ya no tienes la tarea",
-      body: `La tarea «${title}» quedó en manos de otra persona.`,
+      subject: "",
+      body: `ya no tienes la tarea «${title}».`,
     })
   }
   if (avisos.length) {
     const destino = await prisma.user.findMany({
       where: { id: { in: avisos.map((item) => item.userId) }, active: true, deactivatedAt: null },
-      select: { id: true, email: true },
+      select: { id: true, name: true, email: true },
     })
     const porId = new Map(destino.map((item) => [item.id, item]))
     const correo = correoAsignacionHabilitado()
@@ -243,8 +243,8 @@ export async function guardarTarea(
         data: {
           userId: persona.id,
           requestId: request?.id ?? null,
-          subject: aviso.subject,
-          body: aviso.body,
+          subject: `${persona.name}, ${aviso.body}`,
+          body: `${persona.name}, ${aviso.body}`,
           href,
           dedupeKey: `tarea-${tarea.id}-${persona.id}-${Date.now()}`,
         },
@@ -252,7 +252,7 @@ export async function guardarTarea(
       if (correo) {
         const enlace = `${appBaseUrl()}${href}`
         try {
-          await createEmailProvider().send({ to: persona.email, subject: aviso.subject, text: `${aviso.body}\n${enlace}` })
+          await createEmailProvider().send({ to: persona.email, subject: `${persona.name}, ${aviso.body}`, text: `${persona.name}, ${aviso.body}\n${enlace}` })
         } catch (error) {
           console.error("[correo] No se pudo enviar", persona.email, error)
         }

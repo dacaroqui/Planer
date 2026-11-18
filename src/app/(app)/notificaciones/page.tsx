@@ -31,8 +31,8 @@ export default async function AvisosPage() {
         <div className="grid gap-3">
           {items.map((item) => (
             <article key={item.id} className={`rounded-xl border border-border bg-card px-4 py-3 ${item.readAt ? "opacity-70" : ""}`}>
-              <p className="font-medium">{item.subject}</p>
-              <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{item.body}</p>
+              <p className="font-medium">{item.href ? <Link href={item.href}>{item.subject}</Link> : item.subject}</p>
+              {item.body && item.body !== item.subject ? <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{item.body}</p> : null}
               <p className="mt-2 text-xs text-muted-foreground">
                 {formatDateTime(item.createdAt)}
                 {item.request ? (

@@ -15,7 +15,7 @@ import { getDetalle } from "@/server/requests"
 import { personasAsignables } from "@/server/asignacion"
 import { TEXTO_AVANCE_REQUERIMIENTO, avanceDesdeLista, tareaVencida } from "@/lib/avance"
 import { transicionDeDetalle } from "@/lib/tablero-movimiento"
-import { BRAND_LABEL, PRIORITY_LABEL, TEAM_LABEL, TEAMS, statusLabel, type BrandName, type PriorityName } from "@/lib/domain"
+import { PRIORITY_LABEL, TEAM_LABEL, TEAMS, statusLabel, type PriorityName } from "@/lib/domain"
 import { armarEtapas, pasoEsperado } from "@/lib/seguimiento"
 import { RESOLUCION_LABEL, TRANSICIONES_OFICIALES } from "@/lib/flujo-oficial"
 import { FormularioClasificar } from "@/components/formulario-clasificar"
@@ -74,8 +74,9 @@ export default async function DetallePage({
   ].sort((a, b) => a.cuando.localeCompare(b.cuando))
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="space-y-6 lg:col-start-1">
+        <div>
         {consulta.guardado === "1" ? (
           <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">Clasificación guardada.</p>
         ) : null}
@@ -138,8 +139,7 @@ export default async function DetallePage({
         texto: item.fromValue && item.toValue ? `${statusLabel(item.fromValue)} → ${statusLabel(item.toValue)}. ${item.message}` : item.message,
         autor: item.actor?.name ?? "Planer",
       }))} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="order-2 space-y-8 lg:order-1">
+        <div className="space-y-8">
           <section aria-labelledby="pedido" className="space-y-3">
             <h2 id="pedido" className="font-heading text-2xl">Lo pedido</h2>
             <Card>
@@ -149,7 +149,7 @@ export default async function DetallePage({
                 {request.stepsToReproduce ? <p className="whitespace-pre-wrap"><span className="font-medium">Pasos. </span>{request.stepsToReproduce}</p> : null}
                 {request.channels ? <p><span className="font-medium">Canal. </span>{request.channels}</p> : null}
                 {request.expectedResult ? <p className="whitespace-pre-wrap"><span className="font-medium">Resultado esperado. </span>{request.expectedResult}</p> : null}
-                <p className="text-xs text-muted-foreground">Empresa es la entidad del caso ({request.empresa.name}). Marca es la línea de comunicación ({BRAND_LABEL[request.brand as BrandName] ?? request.brand}).</p>
+                <p className="text-xs text-muted-foreground">Empresa: {request.empresa.name}.</p>
               </CardContent>
             </Card>
           </section>
@@ -179,7 +179,8 @@ export default async function DetallePage({
             />
           </section>
         </div>
-        <div className="order-1 space-y-4 lg:order-2">
+      </div>
+      <div className="space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <Card>
             <CardHeader><CardTitle>Gestión</CardTitle></CardHeader>
             <CardContent>
@@ -250,7 +251,6 @@ export default async function DetallePage({
               {request.priority !== request.prioritySuggested ? <Fila etiqueta="Prioridad sugerida" valor={PRIORITY_LABEL[request.prioritySuggested as PriorityName] ?? request.prioritySuggested} /> : null}
               <Fila etiqueta="Empresa" valor={request.empresa.name} />
               <Fila etiqueta="Proyecto" valor={request.project?.name ?? "Sin proyecto"} />
-              <Fila etiqueta="Marca" valor={BRAND_LABEL[request.brand as BrandName] ?? request.brand} />
               <Fila etiqueta="Área" valor={request.area.name} />
               <Fila etiqueta="Solicitante" valor={request.requester.name} />
               <Fila etiqueta="Asignado" valor={request.assignee?.name ?? "Sin asignar"} />
@@ -294,7 +294,6 @@ export default async function DetallePage({
                 <span className="rounded-full bg-[#E7F0FB] px-2.5 py-1 text-[#1658B0]">{TEAM_LABEL[request.team]}</span>
                 <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{request.type.name}</span>
                 <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{PRIORITY_LABEL[request.priority as PriorityName] ?? request.priority}</span>
-                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{BRAND_LABEL[request.brand as BrandName] ?? request.brand}</span>
                 <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{request.project?.name ?? "Sin proyecto"}</span>
                 <p className="w-full text-xs text-muted-foreground">Solo el administrador cambia la clasificación.</p>
               </CardContent>
@@ -309,7 +308,6 @@ export default async function DetallePage({
             </CardContent>
           </Card>
         </div>
-      </div>
     </div>
   )
 }

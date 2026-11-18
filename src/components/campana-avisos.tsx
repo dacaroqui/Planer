@@ -99,7 +99,7 @@ export function CampanaAvisos({ inicial }: { inicial: number }) {
                 <li key={item.id}>
                   <button type="button" onClick={() => void abrir(item)} className={item.readAt ? "w-full rounded-lg px-2 py-2 text-left text-sm opacity-70 hover:bg-[#F4F7FC]" : "w-full rounded-lg bg-[#F4F8FE] px-2 py-2 text-left text-sm hover:bg-[#E7F0FB]"}>
                     <span className="block font-medium">{item.subject}</span>
-                    <span className="mt-0.5 block line-clamp-2 text-xs text-muted-foreground">{item.body}</span>
+                    {item.body && item.body !== item.subject ? <span className="mt-0.5 block line-clamp-2 text-xs text-muted-foreground">{item.body}</span> : null}
                   </button>
                 </li>
               ))}

@@ -132,7 +132,7 @@ describe("bandeja y cronología", () => {
     expect(esPorResponder(fresco)).toBe(true)
     const bandeja = await listarBandeja(valentina, { tab: "responder" })
     expect(bandeja.filas.map((item) => item.code)).toContain(request.code)
-    const aviso = await prisma.notification.findFirst({ where: { userId: valentina.id, subject: { contains: "El solicitante respondió" } } })
+    const aviso = await prisma.notification.findFirst({ where: { userId: valentina.id, subject: { contains: "respondió" } } })
     expect(aviso).not.toBeNull()
   })
 

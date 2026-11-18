@@ -61,11 +61,7 @@ export function FormularioClasificar({
         <option value="">Sin proyecto</option>
         {proyectos.map((proyecto) => <option key={proyecto.id} value={proyecto.id}>{proyecto.name}</option>)}
       </select>
-      <select name="brand" defaultValue={brand} className="h-9 rounded-lg border border-input px-2" aria-label="Marca">
-        <option value="CIFES">CIFES</option>
-        <option value="LUVANIA">Luvania</option>
-        <option value="AMBAS">Ambas/Transversal</option>
-      </select>
+      <input type="hidden" name="brand" value={brand} />
       <input name="committedDate" type="date" lang="es-CO" defaultValue={committedDate} className="h-9 rounded-lg border border-input px-2" aria-label="Fecha comprometida" />
       <Button type="submit" variant="secondary" disabled={pending}>{pending ? "Guardando…" : "Guardar clasificación"}</Button>
       {error ? <p className="text-sm text-red-800">{error}</p> : null}

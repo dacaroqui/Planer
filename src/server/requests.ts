@@ -110,7 +110,7 @@ export function evaluarSla(request: {
 async function fanout(
   tx: Tx,
   userIds: Array<string | null | undefined>,
-  payload: { requestId: string; subject: string; body: string; dedupeKey?: string; href?: string },
+  payload: { requestId: string; subject: string; body: string; correo?: string; aviso?: (nombre: string) => string; dedupeKey?: string; href?: string },
   bucket: EmailMessage[],
   exceptId?: string,
   opciones?: { correo?: boolean },
@@ -130,12 +130,13 @@ async function fanout(
       if (existing) continue
     }
     try {
+      const frase = (payload.aviso ? payload.aviso(user.name) : textoAviso(payload.body)).replace(/\s+/g, " ").trim()
       await tx.notification.create({
         data: {
           userId: user.id,
           requestId: payload.requestId,
-          subject: payload.subject,
-          body: payload.body,
+          subject: frase,
+          body: frase,
           dedupeKey: payload.dedupeKey,
           href,
         },
@@ -144,8 +145,16 @@ async function fanout(
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue
       throw error
     }
-    if (enviarCorreo) bucket.push({ to: user.email, subject: payload.subject, text: payload.body })
+    if (enviarCorreo) bucket.push({ to: user.email, subject: payload.subject, text: payload.correo ?? payload.body })
   }
+}
+
+function textoAviso(body: string) {
+  return body
+    .split("\n")
+    .map((linea) => linea.trim())
+    .filter((linea) => linea && !/^https?:\/\//i.test(linea) && !/este correo/i.test(linea) && !/consulte el detalle/i.test(linea) && !/abra el requerimiento/i.test(linea))
+    .join(" ")
 }
 
 async function deliver(email: EmailProvider, messages: EmailMessage[]) {
@@ -374,6 +383,8 @@ export async function radicar(
       requestId: created.id,
       subject: `${code} · requerimiento radicado`,
       body,
+      correo: body,
+      aviso: (nombre) => `${nombre}, ${actor.name} radicó ${code}: ${input.title}.`,
     }, messages, actor.id)
     return created
   })
@@ -505,6 +516,8 @@ export async function transicionar(
       requestId: current.id,
       subject: `${current.code} · ${nombreEstado(current.team, destino)}`,
       body,
+      correo: body,
+      aviso: (nombre) => `${nombre}, ${current.code} pasó a ${nombreEstado(current.team, destino)}: ${current.title}.`,
     }, messages, actor.id)
     return saved
   })
@@ -559,6 +572,7 @@ export async function deshacerTransicion(actor: Actor, requestId: string, deps?:
       requestId,
       subject: `${current.code} · ${nombreEstado(current.team, destino)}`,
       body: `${actor.name} deshizo el cambio de estado en ${current.code}.\n${link(current.code)}`,
+      aviso: (nombre) => `${nombre}, ${actor.name} deshizo el cambio de ${current.code}: ${current.title}.`,
     }, messages, actor.id)
   })
   await deliver(email, messages)
@@ -696,6 +710,9 @@ export async function registrarEntrada(
       requestId,
       subject: asunto,
       body: `${actor.name} escribió en ${current.code}. Abra el requerimiento con su sesión; este correo no incluye el texto de notas internas ni adjuntos.\n${link(current.code)}`,
+      aviso: (nombre) => publicoDelSolicitante
+        ? `${nombre}, ${actor.name} respondió en ${current.code}: ${current.title}.`
+        : `${nombre}, ${actor.name} escribió en ${current.code}: ${current.title}.`,
     }, messages, actor.id)
     return created
   })
@@ -751,17 +768,20 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
         requestId,
         subject: `${current.code} · Ya no eres el responsable`,
         body: `${actor.name} reasignó ${current.code} a ${assignee.name}.\n${link(current.code)}`,
+        aviso: (nombre) => `${nombre}, ${actor.name} reasignó ${current.code}: ${current.title} a ${assignee.name}.`,
       }, messages, actor.id, { correo })
     }
     await fanout(tx, [assignee.id], {
       requestId,
       subject: `${current.code} · Se te asignó`,
       body: `Se te asignó ${current.code}.\n${link(current.code)}`,
+      aviso: (nombre) => `${nombre}, se te asignó ${current.code}: ${current.title}.`,
     }, messages, actor.id, { correo })
     await fanout(tx, [current.requesterId], {
       requestId,
       subject: `Tu requerimiento ${current.code} ya tiene responsable: ${assignee.name}`,
       body: `Tu requerimiento ${current.code} ya tiene responsable: ${assignee.name}.\n${link(current.code)}`,
+      aviso: (nombre) => `${nombre}, tu requerimiento ${current.code} ya tiene responsable: ${assignee.name}.`,
     }, messages, actor.id, { correo })
     return saved
   })
@@ -909,6 +929,7 @@ export async function trasladar(actor: Actor, requestId: string, team: TeamName,
       requestId,
       subject: `${current.code} · trasladado a ${TEAM_LABEL[team]}`,
       body: `${current.code} pasó a la cola de ${TEAM_LABEL[team]}.\n${link(current.code)}`,
+      aviso: (nombre) => `${nombre}, ${current.code} pasó a ${TEAM_LABEL[team]}: ${current.title}.`,
     }, messages, actor.id)
     return saved
   })

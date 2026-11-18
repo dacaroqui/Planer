@@ -48,6 +48,11 @@ export const PREFIJO_EQUIPO: Record<TeamName, string> = {
   GROWTH: "GRO",
 }
 
+export function esEspacio(nombre: string) {
+  const texto = nombre.trim().toLowerCase()
+  return !texto.includes("ambas") && !texto.includes("transversal")
+}
+
 export function esTeam(valor: string): valor is TeamName {
   return (TEAMS as readonly string[]).includes(valor)
 }
