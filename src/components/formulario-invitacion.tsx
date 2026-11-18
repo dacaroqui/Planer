@@ -6,6 +6,7 @@ import { aceptarInvitacionAction } from "@/server/actions"
 import { pistasClave } from "@/lib/clave"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 
 export function FormularioInvitacionAceptar({
@@ -72,14 +73,14 @@ export function FormularioInvitacionAceptar({
       </div>
       <div className="grid gap-1">
         <Label htmlFor="clave">Contraseña</Label>
-        <Input id="clave" name="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <PasswordInput id="clave" name="password" required minLength={8} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
         <ul className="text-xs text-muted-foreground">
           {pistas.map((pista) => <li key={pista.texto}>{pista.ok ? "✓" : "·"} {pista.texto}</li>)}
         </ul>
       </div>
       <div className="grid gap-1">
         <Label htmlFor="confirma">Confirme la contraseña</Label>
-        <Input id="confirma" name="confirm" type="password" required minLength={8} autoComplete="new-password" />
+        <PasswordInput id="confirma" name="confirm" required minLength={8} autoComplete="new-password" />
       </div>
       <div className="grid gap-1">
         <Label htmlFor="foto">Foto</Label>

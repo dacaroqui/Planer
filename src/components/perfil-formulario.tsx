@@ -6,6 +6,7 @@ import { actualizarPerfilAction, cambiarClavePropiaAction } from "@/server/actio
 import { pistasClave } from "@/lib/clave"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 
 export function PerfilFormulario({
@@ -81,16 +82,16 @@ export function PerfilFormulario({
         <h2 className="text-lg font-semibold">Cambiar contraseña</h2>
         <div className="grid gap-1">
           <Label htmlFor="actual">Contraseña actual</Label>
-          <Input id="actual" name="actual" type="password" required autoComplete="current-password" />
+          <PasswordInput id="actual" name="actual" required autoComplete="current-password" />
         </div>
         <div className="grid gap-1">
           <Label htmlFor="nueva">Nueva contraseña</Label>
-          <Input id="nueva" name="password" type="password" required minLength={8} autoComplete="new-password" value={clave} onChange={(event) => setClave(event.target.value)} />
+          <PasswordInput id="nueva" name="password" required minLength={8} autoComplete="new-password" value={clave} onChange={(event) => setClave(event.target.value)} />
           <ul className="text-xs text-muted-foreground">{pistas.map((pista) => <li key={pista.texto}>{pista.ok ? "✓" : "·"} {pista.texto}</li>)}</ul>
         </div>
         <div className="grid gap-1">
           <Label htmlFor="confirma">Confirme la contraseña</Label>
-          <Input id="confirma" name="confirm" type="password" required minLength={8} autoComplete="new-password" />
+          <PasswordInput id="confirma" name="confirm" required minLength={8} autoComplete="new-password" />
         </div>
         <Button type="submit" variant="outline" disabled={pending}>Actualizar contraseña</Button>
       </form>
