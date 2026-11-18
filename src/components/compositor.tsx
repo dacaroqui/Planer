@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { publicarComposicion } from "@/components/compositor-envio"
 import { adjuntarAction, comentarAction } from "@/server/actions"
 
 const TABS = [
@@ -35,27 +36,18 @@ export function Compositor({
   return (
     <form className="rounded-xl border border-[#E4E7EC] bg-white p-4" onSubmit={(event) => {
       event.preventDefault()
-      const data = new FormData(event.currentTarget)
+      const form = event.currentTarget
+      const data = new FormData(form)
       data.set("code", code)
       data.set("kind", tab)
-      const archivo = data.get("archivo")
-      start(async () => {
-        if (archivo instanceof File && archivo.size > 0) {
-          const adjunto = await adjuntarAction(data)
-          if (!adjunto.ok) {
-            toast.error(adjunto.error)
-            return
-          }
-        }
-        const result = await comentarAction(data)
-        if (!result.ok) {
-          toast.error(result.error)
-          return
-        }
-        toast.success(result.message || "Publicado.")
-        event.currentTarget.reset()
-        router.refresh()
-      })
+      start(() => publicarComposicion({
+        form,
+        data,
+        adjuntar: adjuntarAction,
+        comentar: comentarAction,
+        avisar: (tipo, texto) => tipo === "ok" ? toast.success(texto) : toast.error(texto),
+        refrescar: () => router.refresh(),
+      }))
     }}>
       <div className="mb-3 flex flex-wrap gap-1" role="tablist">
         {disponibles.map((item) => (

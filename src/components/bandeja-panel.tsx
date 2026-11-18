@@ -7,6 +7,7 @@ import { asignarAction } from "@/server/actions"
 import { Compositor } from "@/components/compositor"
 import { Cronologia, hace, type EntradaLinea } from "@/components/cronologia-vista"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Elegir } from "@/components/ui/elegir"
 import { SLA_LABEL, type SlaState, type TeamName } from "@/lib/domain"
 
 export type FilaBandeja = {
@@ -80,25 +81,10 @@ export function BandejaPanel({
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
-        <select aria-label="Equipo" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" value={query.equipo ?? ""} onChange={(event) => ir({ equipo: event.target.value || undefined })}>
-          <option value="">Equipo</option>
-          {equipos.map((equipo) => <option key={equipo} value={equipo}>{equipo === "DESARROLLO" ? "Desarrollo" : "Marketing"}</option>)}
-        </select>
-        <select aria-label="Empresa" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" value={query.empresa ?? ""} onChange={(event) => ir({ empresa: event.target.value || undefined })}>
-          <option value="">Empresa</option>
-          {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.name}</option>)}
-        </select>
-        <select aria-label="Prioridad" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" value={query.prioridad ?? ""} onChange={(event) => ir({ prioridad: event.target.value || undefined })}>
-          <option value="">Prioridad</option>
-          <option value="CRITICA">Crítica</option>
-          <option value="ALTA">Alta</option>
-          <option value="MEDIA">Media</option>
-          <option value="BAJA">Baja</option>
-        </select>
-        <select aria-label="Responsable" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" value={query.responsable ?? ""} onChange={(event) => ir({ responsable: event.target.value || undefined })}>
-          <option value="">Responsable</option>
-          {responsables.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}
-        </select>
+        <Elegir className="w-40" ariaLabel="Equipo" value={query.equipo ?? ""} onValueChange={(valor) => ir({ equipo: valor || undefined })} placeholder="Equipo" opciones={[{ value: "", label: "Equipo" }, ...equipos.map((equipo) => ({ value: equipo, label: equipo === "DESARROLLO" ? "Desarrollo" : "Marketing" }))]} />
+        <Elegir className="w-44" ariaLabel="Empresa" value={query.empresa ?? ""} onValueChange={(valor) => ir({ empresa: valor || undefined })} placeholder="Empresa" opciones={[{ value: "", label: "Empresa" }, ...empresas.map((empresa) => ({ value: empresa.id, label: empresa.name }))]} />
+        <Elegir className="w-40" ariaLabel="Prioridad" value={query.prioridad ?? ""} onValueChange={(valor) => ir({ prioridad: valor || undefined })} placeholder="Prioridad" opciones={[{ value: "", label: "Prioridad" }, { value: "CRITICA", label: "Crítica" }, { value: "ALTA", label: "Alta" }, { value: "MEDIA", label: "Media" }, { value: "BAJA", label: "Baja" }]} />
+        <Elegir className="w-48" ariaLabel="Responsable" value={query.responsable ?? ""} onValueChange={(valor) => ir({ responsable: valor || undefined })} placeholder="Responsable" opciones={[{ value: "", label: "Responsable" }, ...responsables.map((persona) => ({ value: persona.id, label: persona.name }))]} />
         <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm">
           <input type="checkbox" checked={query.mios === "1"} onChange={(event) => ir({ mios: event.target.checked ? "1" : undefined })} /> Solo míos
         </label>

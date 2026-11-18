@@ -1,8 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-
-const selecto = "h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm text-[#15122A]"
+import { Elegir } from "@/components/ui/elegir"
 
 export function FiltrosPersonas({
   base,
@@ -40,19 +39,10 @@ export function FiltrosPersonas({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         {ocultarEspacio ? null : (
-          <select aria-label="Espacio" className={selecto} value={espacio} onChange={(event) => ir("espacio", event.target.value)}>
-            <option value="">Espacio</option>
-            {espacios.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <Elegir className="w-44" ariaLabel="Espacio" value={espacio} onValueChange={(valor) => ir("espacio", valor)} placeholder="Espacio" opciones={[{ value: "", label: "Espacio" }, ...espacios.map((item) => ({ value: item.id, label: item.name }))]} />
         )}
-        <select aria-label="Equipo" className={selecto} value={equipo} onChange={(event) => ir("equipo", event.target.value)}>
-          <option value="">Equipo</option>
-          {equipos.map((item) => <option key={item} value={item}>{item === "DESARROLLO" ? "Desarrollo" : "Marketing"}</option>)}
-        </select>
-        <select aria-label="Área" className={selecto} value={area} onChange={(event) => ir("area", event.target.value)}>
-          <option value="">Área</option>
-          {areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
+        <Elegir className="w-40" ariaLabel="Equipo" value={equipo} onValueChange={(valor) => ir("equipo", valor)} placeholder="Equipo" opciones={[{ value: "", label: "Equipo" }, ...equipos.map((item) => ({ value: item, label: item === "DESARROLLO" ? "Desarrollo" : "Marketing" }))]} />
+        <Elegir className="w-44" ariaLabel="Área" value={area} onValueChange={(valor) => ir("area", valor)} placeholder="Área" opciones={[{ value: "", label: "Área" }, ...areas.map((item) => ({ value: item.id, label: item.name }))]} />
         <button type="button" aria-pressed={vacias} className={vacias ? "h-10 rounded-lg bg-[#1658B0] px-3 text-sm font-medium text-white" : "h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm"} onClick={() => ir("vacias", vacias ? "0" : "1")}>
           Solo sin asignaciones
         </button>

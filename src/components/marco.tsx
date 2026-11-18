@@ -17,6 +17,9 @@ import {
   FilterIcon,
   HomeIcon,
   InboxIcon,
+  SearchIcon,
+  BookOpenIcon,
+  WorkflowIcon,
 } from "lucide-react"
 import { Atajos, BotonAtajos } from "@/components/atajos"
 import { Migas } from "@/components/migas"
@@ -95,9 +98,9 @@ export function Marco({
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto pb-6 text-sm" aria-label="Principal">
           {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel" activo={path === "/panel"} etiqueta="Para ti" icono={<HomeIcon className="size-4" />} compacta={!abierta} />}
           <Recientes items={recientes} compacta={!abierta} destino={inicio} />
-          {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel?tab=marcado" activo={path === "/panel"} etiqueta="Marcados como favoritos" icono={<StarIcon className="size-4" />} compacta={!abierta} />}
+          {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel?tab=marcado" activo={false} etiqueta="Favoritos" icono={<StarIcon className="size-4" />} compacta={!abierta} />}
           <div className="mt-3">
-            <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent" onClick={() => setEspaciosAbiertos((v) => !v)} aria-expanded={espaciosAbiertos}>
+            <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase hover:bg-sidebar-accent" onClick={() => setEspaciosAbiertos((v) => !v)} aria-expanded={espaciosAbiertos}>
               <ChevronDownIcon className={cn("size-3", espaciosAbiertos ? "" : "-rotate-90")} />
               {abierta ? "Espacios" : <span className="sr-only">Espacios</span>}
             </button>
@@ -126,10 +129,10 @@ export function Marco({
           {puedeTablero ? <Enlace href="/tablero" activo={path.startsWith("/tablero")} etiqueta="Tablero" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeAdmin ? (
             <div className="mt-4 border-t border-sidebar-border pt-3">
-              {abierta ? <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Administración</p> : null}
-              <Enlace href="/admin/usuarios" activo={path.startsWith("/admin/usuarios")} etiqueta="Usuarios" icono={<span className="size-4" />} compacta={!abierta} />
-              <Enlace href="/admin/catalogos" activo={path.startsWith("/admin/catalogos")} etiqueta="Catálogos" icono={<span className="size-4" />} compacta={!abierta} />
-              <Enlace href="/admin/flujos" activo={path.startsWith("/admin/flujos")} etiqueta="Flujos y SLA" icono={<span className="size-4" />} compacta={!abierta} />
+              {abierta ? <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">Administración</p> : null}
+              <Enlace href="/admin/usuarios" activo={path.startsWith("/admin/usuarios")} etiqueta="Usuarios" icono={<UsersIcon className="size-4" />} compacta={!abierta} />
+              <Enlace href="/admin/catalogos" activo={path.startsWith("/admin/catalogos")} etiqueta="Catálogos" icono={<BookOpenIcon className="size-4" />} compacta={!abierta} />
+              <Enlace href="/admin/flujos" activo={path.startsWith("/admin/flujos")} etiqueta="Flujos y SLA" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
             </div>
           ) : null}
         </nav>
@@ -137,8 +140,9 @@ export function Marco({
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-white px-3 py-2">
           <Link href={inicio} className="text-sm font-semibold text-[#1658B0] lg:hidden">Planer</Link>
-          <form action="/requerimientos" className="mx-auto w-full max-w-xl">
-            <input id="busqueda-global" name="q" aria-label="Buscar por código o título" placeholder="Buscar" className="h-9 w-full rounded-md border border-input bg-[#F4F7FC] px-3 text-sm" />
+          <form action="/requerimientos" className="relative mx-auto w-full max-w-xl">
+            <SearchIcon className="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground" />
+            <input id="busqueda-global" name="q" aria-label="Buscar en Planer" placeholder="Buscar en Planer…" className="h-11 w-full rounded-[10px] border border-[#D9DEE7] bg-white pr-3 pl-9 text-sm" />
           </form>
           {puedeRadicar || puedePlanner ? (
             <DropdownMenu>
@@ -169,7 +173,7 @@ export function Marco({
 
 function Enlace({ href, etiqueta, icono, activo, compacta }: { href: string; etiqueta: string; icono: React.ReactNode; activo: boolean; compacta: boolean }) {
   return (
-    <Link href={href} title={etiqueta} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent", activo && "bg-sidebar-accent font-medium text-[#1658B0]")}>
+    <Link href={href} title={etiqueta} className={cn("flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] hover:bg-[#F4F7FC]", activo && "bg-[#E7F0FB] font-medium text-[#1658B0]")}>
       {icono}
       {compacta ? <span className="sr-only">{etiqueta}</span> : <span className="truncate">{etiqueta}</span>}
     </Link>
@@ -192,7 +196,7 @@ function Usuario({ actor }: { actor: Actor }) {
   const letras = actor.name.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase()
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex size-8 items-center justify-center rounded-full bg-[#222B7C] text-xs font-semibold text-white" aria-label={`Cuenta de ${actor.name}`}>
+      <DropdownMenuTrigger className="inline-flex size-9 items-center justify-center rounded-full bg-[#1658B0] text-xs font-semibold text-white" aria-label={`Cuenta de ${actor.name}`}>
         {letras || "P"}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

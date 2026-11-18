@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ROLE_LABEL, TEAM_LABEL, type RoleName, type TeamName } from "@/lib/domain"
+import { Elegir, ElegirVarios } from "@/components/ui/elegir"
 import { type EstadoEnlace } from "@/lib/invitacion-estado"
 import { actualizarUsuarioAction, crearInvitacionAction, revocarInvitacionFormAction } from "@/server/actions"
 
@@ -38,8 +39,6 @@ type Invitacion = {
 
 const COLORES = ["#DBEAFE", "#FCE7F3", "#EDE9FE", "#DCFCE7", "#FEF3C7", "#E0F2FE"]
 const TINTAS = ["#1D4ED8", "#BE185D", "#6D28D9", "#15803D", "#B45309", "#0369A1"]
-const selecto = "h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm"
-
 function iniciales(nombre: string) {
   return nombre.split(" ").filter(Boolean).slice(0, 2).map((parte) => parte[0]?.toUpperCase() ?? "").join("") || "P"
 }
@@ -85,7 +84,7 @@ export function UsuariosAdmin({
   const [manual, setManual] = useState(false)
   const [editor, setEditor] = useState<Usuario | null>(null)
   const [pending, start] = useTransition()
-  const tamano = 8
+  const tamano = 5
   const filtrados = useMemo(() => usuarios.filter((usuario) => {
     const texto = `${usuario.name} ${usuario.email}`.toLowerCase()
     if (q && !texto.includes(q.toLowerCase())) return false
@@ -156,28 +155,16 @@ export function UsuariosAdmin({
               <SearchIcon className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted-foreground" />
               <input value={q} onChange={(event) => { setQ(event.target.value); setPagina(1) }} aria-label="Buscar por nombre o correo" placeholder="Buscar por nombre o correo..." className="h-10 w-full rounded-lg border border-[#E4E7EC] bg-white pr-3 pl-9 text-sm" />
             </label>
-            <select aria-label="Rol" className={selecto} value={rol} onChange={(event) => { setRol(event.target.value); setPagina(1) }}>
-              <option value="">Rol</option>
-              {["Administrador", "Líder", "Agente", "Observador", "Solicitante"].map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-            <select aria-label="Estado" className={selecto} value={estado} onChange={(event) => { setEstado(event.target.value); setPagina(1) }}>
-              <option value="">Estado</option>
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-              <option value="Pendiente">Pendiente</option>
-            </select>
+            <Elegir className="w-40" ariaLabel="Rol" value={rol} onValueChange={(valor) => { setRol(valor); setPagina(1) }} placeholder="Rol" opciones={[{ value: "", label: "Rol" }, ...["Administrador", "Líder", "Agente", "Observador", "Solicitante"].map((item) => ({ value: item, label: item }))]} />
+            <Elegir className="w-40" ariaLabel="Estado" value={estado} onValueChange={(valor) => { setEstado(valor); setPagina(1) }} placeholder="Estado" opciones={[{ value: "", label: "Estado" }, { value: "Activo", label: "Activo" }, { value: "Inactivo", label: "Inactivo" }, { value: "Pendiente", label: "Pendiente" }]} />
             <button type="button" aria-expanded={extra} className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" onClick={() => setExtra((valor) => !valor)}>
               <SlidersHorizontalIcon className="size-4" /> Filtros
             </button>
           </div>
           {extra ? (
-            <select aria-label="Equipo" className={selecto} value={equipo} onChange={(event) => { setEquipo(event.target.value); setPagina(1) }}>
-              <option value="">Todos los equipos</option>
-              <option value="DESARROLLO">Desarrollo</option>
-              <option value="MARKETING">Marketing</option>
-            </select>
+            <Elegir className="w-52" ariaLabel="Equipo" value={equipo} onValueChange={(valor) => { setEquipo(valor); setPagina(1) }} opciones={[{ value: "", label: "Todos los equipos" }, { value: "DESARROLLO", label: "Desarrollo" }, { value: "MARKETING", label: "Marketing" }]} />
           ) : null}
-          <div className="overflow-hidden rounded-lg border border-[#E4E7EC] bg-white">
+          <div className="overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-[0_1px_2px_rgba(21,18,42,0.04)]">
             <table className="w-full text-left text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-[#F0F2F5]">
@@ -306,6 +293,7 @@ function InvitarDrawer({
 }) {
   const router = useRouter()
   const [rol, setRol] = useState("SOLICITANTE")
+  const [areaId, setAreaId] = useState(areas[0]?.id || "")
   const [areasExtra, setAreasExtra] = useState<string[]>([])
   const [empresaIds, setEmpresaIds] = useState<string[]>([])
   const [enlace, setEnlace] = useState<string | null>(null)
@@ -339,71 +327,30 @@ function InvitarDrawer({
         }}>
           <div className="flex-1 space-y-5 overflow-y-auto px-4">
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold">Datos de acceso</h3>
-              <label className="grid gap-1 text-sm">
+              <h3 className="font-heading text-base">Datos de acceso</h3>
+              <label className="grid gap-1.5 text-sm">
                 Correo electrónico
-                <input name="email" type="email" required placeholder="nombre@empresa.com" className="h-10 rounded-lg border border-[#E4E7EC] px-3" />
+                <input name="email" type="email" required placeholder="nombre@empresa.com" className="h-11 rounded-[10px] border border-[#D9DEE7] px-3" />
               </label>
-              <label className="grid gap-1 text-sm">
+              <label className="grid gap-1.5 text-sm">
                 Rol
-                <select name="rol" value={rol} onChange={(event) => setRol(event.target.value)} className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3">
-                  {(["SOLICITANTE", "AGENTE", "LIDER", "OBSERVADOR", "ADMINISTRADOR"] as const).map((item) => (
-                    <option key={item} value={item}>{ROLE_LABEL[item]}</option>
-                  ))}
-                </select>
-                <span className="text-xs text-muted-foreground">Define qué puede consultar y gestionar.</span>
+                <Elegir name="rol" ariaLabel="Rol" value={rol} onValueChange={setRol} opciones={(["SOLICITANTE", "AGENTE", "LIDER", "OBSERVADOR", "ADMINISTRADOR"] as const).map((item) => ({ value: item, label: ROLE_LABEL[item] }))} />
+                <span className="text-xs font-normal text-muted-foreground">Define qué puede consultar y gestionar.</span>
               </label>
             </section>
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold">Organización</h3>
-              <label className="grid gap-1 text-sm">
+              <h3 className="font-heading text-base">Organización</h3>
+              <label className="grid gap-1.5 text-sm">
                 Área principal
-                <select name="areaId" required defaultValue={areas[0]?.id || ""} className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3">
-                  <option value="">Seleccionar área</option>
-                  {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
-                </select>
+                <Elegir name="areaId" ariaLabel="Área principal" value={areaId} onValueChange={setAreaId} placeholder="Seleccionar área" opciones={[{ value: "", label: "Seleccionar área" }, ...areas.map((area) => ({ value: area.id, label: area.name }))]} />
               </label>
-              <label className="grid gap-1 text-sm">
+              <label className="grid gap-1.5 text-sm">
                 Áreas adicionales · Opcional
-                {areasExtra.length ? (
-                  <span className="flex flex-wrap gap-1">
-                    {areasExtra.map((id) => {
-                      const area = areas.find((item) => item.id === id)
-                      return (
-                        <button key={id} type="button" className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-xs" onClick={() => setAreasExtra((prev) => prev.filter((item) => item !== id))}>
-                          {area?.name ?? id} ×
-                        </button>
-                      )
-                    })}
-                  </span>
-                ) : null}
-                <select aria-label="Áreas adicionales" value="" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3" onChange={(event) => {
-                  const id = event.target.value
-                  if (id) setAreasExtra((prev) => prev.includes(id) ? prev : [...prev, id])
-                }}>
-                  <option value="">Seleccionar áreas</option>
-                  {areas.filter((area) => !areasExtra.includes(area.id)).map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
-                </select>
+                <ElegirVarios ariaLabel="Áreas adicionales" values={areasExtra} onChange={setAreasExtra} placeholder="Seleccionar áreas" opciones={areas.map((area) => ({ value: area.id, label: area.name }))} />
               </label>
-              <label className="grid gap-1 text-sm">
+              <label className="grid gap-1.5 text-sm">
                 Empresas
-                <span className="flex min-h-10 flex-wrap items-center gap-1 rounded-lg border border-[#E4E7EC] px-2 py-1">
-                  {empresaIds.map((id) => {
-                    const empresa = empresas.find((item) => item.id === id)
-                    return (
-                      <button key={id} type="button" className="rounded-md border border-[#E4E7EC] bg-white px-2 py-0.5 text-xs" onClick={() => setEmpresaIds((prev) => prev.filter((item) => item !== id))}>
-                        {empresa?.name ?? id} ×
-                      </button>
-                    )
-                  })}
-                  <select aria-label="Empresas" value="" className="h-8 min-w-8 flex-1 bg-transparent text-sm" onChange={(event) => {
-                    const id = event.target.value
-                    if (id) setEmpresaIds((prev) => prev.includes(id) ? prev : [...prev, id])
-                  }}>
-                    <option value="">{empresaIds.length ? "" : "Seleccionar empresas"}</option>
-                    {empresas.filter((empresa) => !empresaIds.includes(empresa.id)).map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.name}</option>)}
-                  </select>
-                </span>
+                <ElegirVarios ariaLabel="Empresas" values={empresaIds} onChange={setEmpresaIds} placeholder="Seleccionar empresas" opciones={empresas.map((empresa) => ({ value: empresa.id, label: empresa.name }))} />
               </label>
               {pideEquipo ? (
                 <fieldset className="grid gap-1 text-sm">
