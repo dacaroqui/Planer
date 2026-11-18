@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TEAM_LABEL, type TeamName } from "@/lib/domain"
+import { TEAM_LABEL, TEAMS, type TeamName } from "@/lib/domain"
 
 const ROLES_AREA = ["AGENTE", "LIDER", "OBSERVADOR"] as const
 
@@ -39,10 +39,14 @@ export function EditorUsuario({
   const [isAdmin, setIsAdmin] = useState(user.isAdmin)
   const [empresaIds, setEmpresaIds] = useState<string[]>(user.empresaIds)
   const [areaIds, setAreaIds] = useState<string[]>(user.areaIds)
-  const [marks, setMarks] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {}
-    for (const item of user.memberships) initial[`${item.role}:${item.team}`] = true
-    return initial
+  const [rolEquipo, setRolEquipo] = useState<Record<string, string>>(() => {
+    const orden = { LIDER: 3, AGENTE: 2, OBSERVADOR: 1 }
+    const inicial: Record<string, string> = {}
+    for (const team of TEAMS) inicial[team] = ""
+    for (const item of user.memberships) {
+      if ((orden[item.role] ?? 0) >= (orden[inicial[item.team] as keyof typeof orden] ?? 0)) inicial[item.team] = item.role
+    }
+    return inicial
   })
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -60,7 +64,7 @@ export function EditorUsuario({
         data.set("isAdmin", isAdmin ? "1" : "0")
         for (const id of empresaIds) data.append("empresaIds", id)
         for (const id of areaIds) data.append("areaIds", id)
-        for (const [key, value] of Object.entries(marks)) if (value) data.set(key, "1")
+        for (const team of TEAMS) data.set(`rol:${team}`, rolEquipo[team] || "")
         start(async () => {
           const result = await actualizarUsuarioAction(data)
           if (!result.ok) setError(result.error)
@@ -81,23 +85,23 @@ export function EditorUsuario({
           {areas.map((area) => <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>)}
         </SelectContent>
       </Select>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {(["DESARROLLO", "MARKETING"] as const).map((team) => (
-          <fieldset key={team} className="grid gap-1 rounded-lg border border-border p-2">
-            <legend className="px-1 text-xs">{TEAM_LABEL[team]}</legend>
-            {ROLES_AREA.map((role) => {
-              const key = `${role}:${team}`
-              return (
-                <label key={key} className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={Boolean(marks[key])} onCheckedChange={(value) => setMarks((prev) => ({ ...prev, [key]: value === true }))} />
-                  {role === "AGENTE" ? "Agente" : role === "LIDER" ? "Líder" : "Observador"}
-                </label>
-              )
-            })}
-          </fieldset>
+      <fieldset className="grid gap-2">
+        <legend className="text-sm font-medium">Rol global</legend>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="rol-global" checked={!isAdmin} onChange={() => setIsAdmin(false)} /> Solicitante</label>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="rol-global" checked={isAdmin} onChange={() => setIsAdmin(true)} /> Administrador</label>
+      </fieldset>
+      <div className="grid gap-2">
+        <p className="text-sm font-medium">Membresías por área</p>
+        {TEAMS.map((team) => (
+          <label key={team} className="grid gap-1 text-sm">
+            {TEAM_LABEL[team]}
+            <select aria-label={`Rol en ${TEAM_LABEL[team]}`} className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3" value={rolEquipo[team] || ""} onChange={(event) => setRolEquipo((prev) => ({ ...prev, [team]: event.target.value }))}>
+              <option value="">Sin membresía</option>
+              {ROLES_AREA.map((role) => <option key={role} value={role}>{role === "LIDER" ? "Líder" : role === "AGENTE" ? "Agente" : "Observador"}</option>)}
+            </select>
+          </label>
         ))}
       </div>
-      <label className="flex items-center gap-2 text-sm"><Checkbox checked={isAdmin} onCheckedChange={(value) => setIsAdmin(value === true)} />Administrador</label>
       <fieldset className="grid gap-1">
         <legend className="text-xs text-muted-foreground">Empresas</legend>
         {empresas.map((empresa) => (
@@ -120,7 +124,7 @@ export function EditorUsuario({
       <label className="flex items-center gap-2 text-sm"><Checkbox checked={active} onCheckedChange={(value) => setActive(value === true)} />Usuario activo</label>
       <BotonRestablecer userId={user.id} />
       {error ? <p className="text-sm text-red-800">{error}</p> : null}
-      <div><Button type="submit" size="sm" disabled={pending}>Guardar roles</Button></div>
+      <div><Button type="submit" size="sm" disabled={pending}>Guardar persona</Button></div>
     </form>
   )
 }

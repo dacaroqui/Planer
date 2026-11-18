@@ -14,12 +14,12 @@ export default async function AvisosPage() {
         <div>
           <h1 className="font-heading text-4xl">Avisos</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {unread === 0 ? "No tiene avisos sin leer." : `${unread} sin leer. El correo correspondiente también sale por el proveedor configurado.`}
+            {unread === 0 ? "No tiene avisos sin leer." : `${unread} sin leer. El correo de asignación solo sale si el servidor tiene SMTP configurado.`}
           </p>
         </div>
         {unread > 0 ? (
           <form action={marcarAvisosAction}>
-            <Button type="submit" variant="outline">Marcar como leídos</Button>
+            <Button type="submit" variant="outline">Marcar todo como leído</Button>
           </form>
         ) : null}
       </div>

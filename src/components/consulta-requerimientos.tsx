@@ -7,11 +7,10 @@ import { BookmarkIcon, FilterIcon, SearchIcon, XIcon } from "lucide-react"
 import { AccionesMasivas } from "@/components/acciones-masivas"
 import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
 import { EstadoBadge, SlaBadge } from "@/components/insignias"
+import { EstadoVacio } from "@/components/estado-vacio"
 import { Elegir } from "@/components/ui/elegir"
-import { iniciales } from "@/lib/planer-ui"
-import { asignarAction } from "@/server/actions"
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { PRIORITY_LABEL, STATUS_LABEL, statusLabel, type PriorityName, type SlaState } from "@/lib/domain"
+import { PRIORITY_LABEL, STATUS_LABEL, TEAM_LABEL, TEAMS, statusLabel, type PriorityName, type SlaState } from "@/lib/domain"
 import { ZONE } from "@/lib/time"
 
 type Opcion = { value: string; label: string }
@@ -148,7 +147,7 @@ export function ConsultaRequerimientos({
           <input name="q" defaultValue={params.get("q") ?? ""} aria-label="Buscar requerimientos" placeholder="Buscar requerimientos..." className="h-10 w-full rounded-lg border border-[#E2E8F0] bg-white pr-3 pl-9 text-sm" />
         </form>
         <Selecto etiqueta="Estado" valor={params.get("status") ?? ""} onChange={(valor) => poner("status", valor)} opciones={[{ value: "", label: "Estado" }, ...estados]} />
-        <Selecto etiqueta="Equipo" valor={params.get("team") ?? ""} onChange={(valor) => poner("team", valor)} opciones={[{ value: "", label: "Equipo" }, { value: "DESARROLLO", label: "Desarrollo" }, { value: "MARKETING", label: "Marketing" }]} />
+        <Selecto etiqueta="Equipo" valor={params.get("team") ?? ""} onChange={(valor) => poner("team", valor)} opciones={[{ value: "", label: "Equipo" }, ...TEAMS.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] }))]} />
         <Selecto etiqueta="Prioridad" valor={params.get("priority") ?? ""} onChange={(valor) => poner("priority", valor)} opciones={[{ value: "", label: "Prioridad" }, { value: "CRITICA", label: "Crítica" }, { value: "ALTA", label: "Alta" }, { value: "MEDIA", label: "Media" }, { value: "BAJA", label: "Baja" }]} />
         <button type="button" onClick={() => setAbierto(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#1658B0] bg-white px-3 text-sm font-medium text-[#1658B0] hover:bg-[#E7F0FB]">
           <FilterIcon className="size-4" /> Más filtros{activos.length ? ` · ${activos.length}` : ""}
@@ -200,7 +199,7 @@ export function ConsultaRequerimientos({
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={puedeEliminar ? 6 : 5} className="px-3 py-10 text-center text-sm text-muted-foreground">No hay requerimientos con esos filtros.</td></tr>
+                <tr><td colSpan={puedeEliminar ? 6 : 5} className="px-3 py-6"><EstadoVacio compacto titulo="No hay requerimientos con esos filtros" texto="Pruebe con otros criterios o limpie la búsqueda." /></td></tr>
               ) : items.map((item) => (
                 <tr key={item.code} className="border-b border-[#F0F4FA] last:border-0 hover:bg-[#F8FAFD]">
                   <td className="px-3 py-3 align-top">
@@ -219,12 +218,10 @@ export function ConsultaRequerimientos({
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EEF6] px-3 py-2 text-sm">
+        {total > 0 ? <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EEF6] px-3 py-2 text-sm">
           <p className="text-muted-foreground">Mostrando {inicio.toLocaleString("es-CO")}–{fin.toLocaleString("es-CO")} de {total.toLocaleString("es-CO")}</p>
           <div className="flex items-center gap-2">
-            <select aria-label="Resultados por página" className="h-8 rounded-lg border border-[#E2E8F0] bg-white px-2 text-sm" value={String(pageSize)} onChange={(event) => poner("pageSize", event.target.value)}>
-              {TAMANOS.map((tamano) => <option key={tamano} value={tamano}>{tamano} por página</option>)}
-            </select>
+            <Elegir ariaLabel="Resultados por página" value={String(pageSize)} onValueChange={(valor) => poner("pageSize", valor)} className="w-40" opciones={TAMANOS.map((tamano) => ({ value: String(tamano), label: `${tamano} por página` }))} />
             <Paginador page={page} pages={pages} onPage={(siguiente) => {
               const next = new URLSearchParams(params.toString())
               next.set("page", String(siguiente))
@@ -232,7 +229,7 @@ export function ConsultaRequerimientos({
               router.push(query ? `/requerimientos?${query}` : "/requerimientos")
             }} />
           </div>
-        </div>
+        </div> : null}
       </div>
       {seleccionable ? (
         <AccionesMasivas
@@ -384,7 +381,7 @@ function Campo({ nombre, etiqueta, valor, opciones }: { nombre: string; etiqueta
 function catalogoDe(estados: Opcion[], empresas: Opcion[], proyectos: Opcion[], tipos: Opcion[], areas: Opcion[], solicitantes: Opcion[]) {
   return {
     status: new Map(estados.map((item) => [item.value, item.label])),
-    team: new Map([["DESARROLLO", "Desarrollo"], ["MARKETING", "Marketing"]]),
+    team: new Map(TEAMS.map((equipo) => [equipo, TEAM_LABEL[equipo]])),
     priority: new Map(Object.entries(PRIORITY_LABEL)),
     empresa: new Map(empresas.map((item) => [item.value, item.label])),
     brand: new Map([["CIFES", "CIFES"], ["LUVANIA", "Luvania"], ["AMBAS", "Ambas/Transversal"]]),

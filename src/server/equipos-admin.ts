@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { DomainError, PermisoDenegado, PREFIJO_EQUIPO, TEAM_LABEL, TEAMS, esTeam, type Actor, type TeamName } from "@/lib/domain"
+import { DomainError, PermisoDenegado, PREFIJO_EQUIPO, TEAM_LABEL, TEAMS, esTeam, type Actor } from "@/lib/domain"
 import { puedeAdministrar } from "@/lib/permissions"
 
 export const PLANTILLA_ESTANDAR = [

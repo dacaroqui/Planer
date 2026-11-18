@@ -345,7 +345,7 @@ describe("permisos del rendimiento", () => {
       "Persona: Camila",
       "Área: Tecnología",
       "Espacio: CIFES",
-      "Equipo: Desarrollo",
+      "Equipo: Producto",
       "Tipo: Error (bug)",
       "Prioridad: Alta",
     ])

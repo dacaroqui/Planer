@@ -31,16 +31,16 @@ export async function radicarDesdeFormulario(actor: Actor, formData: FormData): 
   })
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
 
-  const uploaded = formData.get("archivo")
-  let file: { name: string; type: string; bytes: Buffer } | null = null
-  if (uploaded instanceof File && uploaded.size > 0) {
+  const subidos = formData.getAll("archivo").filter((item): item is File => item instanceof File && item.size > 0)
+  const files: { name: string; type: string; bytes: Buffer }[] = []
+  for (const uploaded of subidos) {
     const bytes = Buffer.from(await uploaded.arrayBuffer())
     try {
-      assertAllowedFile(uploaded.name, bytes.length)
+      assertAllowedFile(uploaded.name, bytes.length, uploaded.type)
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : "Archivo inválido." }
     }
-    file = { name: uploaded.name, type: uploaded.type, bytes }
+    files.push({ name: uploaded.name, type: uploaded.type, bytes })
   }
 
   try {
@@ -57,7 +57,7 @@ export async function radicarDesdeFormulario(actor: Actor, formData: FormData): 
       areaId: String(formData.get("areaId") || "") || undefined,
       assigneeId: String(formData.get("assigneeId") || "") || null,
     })
-    if (file) await adjuntar(actor, request.id, file)
+    for (const file of files) await adjuntar(actor, request.id, file)
     return { ok: true, code: request.code }
   } catch (error) {
     return fallo(error)

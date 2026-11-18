@@ -45,6 +45,8 @@ export default async function PanelPage({
     <ParaTi
       actorId={actor.id}
       tabInicial={params.tab}
+      puedeBandeja={actor.isAdmin || actor.memberships.some((item) => item.role === "AGENTE" || item.role === "LIDER")}
+      ahoraIso={new Date().toISOString()}
       espacios={opciones.empresas.map((item) => ({ id: item.id, name: item.name }))}
       items={[...pedidos, ...piezas.filter((tarea) => !pedidos.some((pedido) => pedido.code === tarea.code && pedido.tipo === "Tarea"))]}
     />

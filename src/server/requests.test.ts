@@ -491,7 +491,7 @@ describe("acciones masivas sobre la selección", () => {
     const delLider = await asignarMasiva(helena, [desarrollo.code], camila.id)
     expect(delLider.hechos).toBe(0)
     expect(delLider.errores).toEqual([
-      { code: desarrollo.code, mensaje: "Camila Ejemplo no es agente ni líder de Desarrollo." },
+      { code: desarrollo.code, mensaje: "Camila Ejemplo no es agente ni líder de Producto." },
     ])
     const delAdmin = await asignarMasiva(admin, [desarrollo.code], camila.id)
     expect(delAdmin).toEqual({ hechos: 1, errores: [] })

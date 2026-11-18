@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { ArrowLeftIcon, ArrowRightIcon, Building2Icon, CheckIcon, ClipboardListIcon, Code2Icon, HandshakeIcon, InfoIcon, LightbulbIcon, MegaphoneIcon, TrendingUpIcon } from "lucide-react"
 import { toast } from "sonner"
 import { crearProyectoRadicarAction, radicarAction } from "@/server/actions"
@@ -89,7 +88,7 @@ export function FormularioRadicar({
   volverHref?: string
   embebido?: boolean
 }) {
-  const router = useRouter()
+  void _marcas
   const [paso, setPaso] = useState<1 | 2 | 3>(1)
   const [team, setTeam] = useState<TeamName | "">(equipos[0] ? "" : "")
   const [typeId, setTypeId] = useState("")

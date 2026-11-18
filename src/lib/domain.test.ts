@@ -68,7 +68,7 @@ describe("RQ-10 nombres de archivo", () => {
     expect(safeFilename("../../etc/passwd")).toBe("passwd")
     expect(safeFilename("pieza final.png")).toBe("pieza final.png")
     expect(() => assertAllowedFile("virus.exe", 10)).toThrow(/no está permitido/)
-    expect(() => assertAllowedFile("paquete.zip", 10)).toThrow(/no está permitido/)
+    expect(assertAllowedFile("paquete.zip", 10, "application/zip")).toBe("zip")
     expect(assertAllowedFile("brief.pdf", 20)).toBe("pdf")
     expect(assertAllowedFile("notas.txt", 20)).toBe("txt")
     expect(assertAllowedFile("lista.csv", 20)).toBe("csv")

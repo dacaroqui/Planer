@@ -22,6 +22,7 @@ export type FilaPersona = {
   nombre: string
   area: string
   equipos: string
+  inactivo: boolean
   abiertos: number
   tareas: number
   vencidos: number
@@ -30,9 +31,9 @@ export type FilaPersona = {
 
 export async function listarPersonas(
   actor: Actor,
-  filtros: { espacio?: string; equipo?: TeamName; area?: string; soloVacias?: boolean; persona?: string },
+  filtros: { espacio?: string; equipo?: TeamName; area?: string; soloVacias?: boolean; persona?: string; inactivos?: boolean },
 ) {
-  const and: Prisma.UserWhereInput[] = [{ active: true }]
+  const and: Prisma.UserWhereInput[] = [filtros.inactivos ? { active: false } : { active: true, deactivatedAt: null }]
   if (filtros.persona) and.push({ id: filtros.persona })
   if (filtros.area) and.push({ areaId: filtros.area })
   if (filtros.equipo) and.push({ areaRoles: { some: { team: filtros.equipo } } })
@@ -48,6 +49,7 @@ export async function listarPersonas(
     select: {
       id: true,
       name: true,
+      active: true,
       area: { select: { name: true } },
       areaRoles: { select: { team: true, role: true } },
     },
@@ -131,6 +133,7 @@ export async function listarPersonas(
       nombre: usuario.name,
       area: usuario.area.name,
       equipos: equipos.join(", ") || "Sin equipo",
+      inactivo: !usuario.active,
       abiertos: suyos.length,
       tareas: susTareas.length,
       vencidos: items.filter((item) => item.vencido).length,

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { TableroEspacio } from "@/components/tablero-espacio"
+import { TEAMS } from "@/lib/domain"
 import { equiposVisibles, esAdmin, rolEn, transicionesPara } from "@/lib/permissions"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
 import { prisma } from "@/lib/prisma"
@@ -25,7 +26,7 @@ export default async function TableroEspacioPage({
     prisma.workflowTransition.findMany({ where: { active: true } }),
   ])
   const porEquipo = new Map<string, ReturnType<typeof catalogoTablero>>()
-  for (const team of ["DESARROLLO", "MARKETING"] as const) {
+  for (const team of TEAMS) {
     porEquipo.set(team, catalogoTablero(transiciones.filter((item) => item.team === team).map((item) => ({ ...item, team }))))
   }
   const tareas = await prisma.tarea.findMany({

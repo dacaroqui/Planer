@@ -14,7 +14,7 @@ export function PersonasLista({ filas }: { filas: FilaPersona[] }) {
           <details key={fila.id} className="rounded-lg border border-[#E4E7EC] bg-white" open={filas.length === 1 || (!vacia && fila.vencidos > 0)}>
             <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3">
               <span>
-                <span className="block font-medium">{fila.nombre}</span>
+                <span className="flex items-center gap-2 font-medium">{fila.nombre}{fila.inactivo ? <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-medium text-[#3d4a63]">Inactivo</span> : null}</span>
                 <span className="text-xs text-muted-foreground">{fila.area} · {fila.equipos}</span>
               </span>
               {vacia ? <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs text-[#3d4a63]">Sin tareas asignadas</span> : (

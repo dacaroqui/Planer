@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { EliminarTarea } from "@/components/confirmar-eliminar"
+import { EstadoVacio } from "@/components/estado-vacio"
 import { Avatar } from "@/components/iconos-planer"
 import { guardarTareaAction } from "@/server/actions"
 import { Barra } from "@/components/barra"
@@ -23,7 +24,11 @@ export type TareaVista = {
   horasReales?: number | null
 }
 
-const ETIQUETA = { PENDIENTE: "Pendiente", EN_CURSO: "En curso", HECHA: "Hecha" }
+const ESTADOS = [
+  { value: "PENDIENTE", label: "Por hacer" },
+  { value: "EN_CURSO", label: "En curso" },
+  { value: "HECHA", label: "Hecho" },
+] as const
 
 export function TareasPanel({
   tareas,
@@ -42,7 +47,7 @@ export function TareasPanel({
   requestId?: string
   projectId?: string
   parentId?: string
-  agentes: { id: string; name: string }[]
+  agentes: { id: string; name: string; grupo?: string }[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -76,32 +81,8 @@ export function TareasPanel({
         <span className="text-muted-foreground">{tareas.filter((tarea) => tarea.status === "HECHA").length}/{tareas.length || 0} hechas</span>
       </div>
       <Barra porcentaje={porcentaje} />
-      {tareas.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay tareas en esta solicitud.</p> : tareas.map((tarea) => (
-        <div key={tarea.id} className="grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={tarea.status === "HECHA" ? "font-medium line-through" : "font-medium"}>{tarea.title}</p>
-            <span className={tarea.status === "HECHA" ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800" : tarea.status === "EN_CURSO" ? "rounded-full bg-[#E7F0FB] px-2 py-0.5 text-xs font-medium text-[#1658B0]" : "rounded-full bg-[#F3F4F6] px-2 py-0.5 text-xs font-medium text-[#3d4a63]"}>{ETIQUETA[tarea.status]}</span>
-          </div>
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Avatar nombre={tarea.assignee === "Sin responsable" ? "?" : tarea.assignee} />
-            <span>{tarea.assignee}</span>
-            <span>{tarea.dueDate ? `Fecha ${tarea.dueDate}` : "Sin fecha"}</span>
-            {tarea.vencida ? <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">Vencida</span> : null}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            {puede && tarea.status !== "HECHA" ? (
-              <form action={(data) => enviar(data)}>
-                <input type="hidden" name="id" value={tarea.id} />
-                <input type="hidden" name="title" value={tarea.title} />
-                <input type="hidden" name="status" value="HECHA" />
-                {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-                {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
-                <Button type="submit" size="sm" disabled={pending}>Marcar hecha</Button>
-              </form>
-            ) : null}
-            {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
-          </div>
-        </div>
+      {tareas.length === 0 ? <EstadoVacio compacto titulo="Aún no hay tareas" texto="Agregue la primera tarea de esta solicitud." /> : tareas.map((tarea) => (
+        <FilaTarea key={tarea.id} tarea={tarea} puede={puede} puedeEliminar={puedeEliminar} requestId={requestId} projectId={projectId} pending={pending} start={start} refrescar={() => router.refresh()} />
       ))}
       {puede && !agregar ? (
         <button type="button" className="h-11 rounded-lg border border-dashed border-[#1658B0] text-sm font-medium text-[#1658B0]" onClick={() => setAgregar(true)}>+ Agregar tarea</button>
@@ -120,8 +101,8 @@ export function TareasPanel({
         }}>
           <Input name="title" placeholder={parentId ? "Subtarea" : "Nueva tarea"} required minLength={3} />
           <div className="grid gap-2 sm:grid-cols-3">
-            <Elegir ariaLabel="Estado" value={status} onValueChange={(valor) => setStatus(valor as typeof status)} opciones={[{ value: "PENDIENTE", label: "Pendiente" }, { value: "EN_CURSO", label: "En curso" }, { value: "HECHA", label: "Hecha" }]} />
-            <Elegir ariaLabel="Responsable" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin responsable" opciones={[{ value: "", label: "Sin responsable" }, ...agentes.map((agente) => ({ value: agente.id, label: agente.name, iniciales: iniciales(agente.name) }))]} />
+            <Elegir ariaLabel="Estado" value={status} onValueChange={(valor) => setStatus(valor as typeof status)} opciones={ESTADOS.map((item) => ({ value: item.value, label: item.label }))} />
+            <Elegir ariaLabel="Responsable" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin responsable" opciones={[{ value: "", label: "Sin responsable" }, ...agentes.map((agente) => ({ value: agente.id, label: agente.name, iniciales: iniciales(agente.name), grupo: agente.grupo }))]} />
             <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" />
           </div>
           <div className="flex gap-2">
@@ -129,6 +110,119 @@ export function TareasPanel({
             <Button type="button" size="sm" variant="outline" onClick={() => setAgregar(false)}>Cancelar</Button>
           </div>
         </form>
+      ) : null}
+    </div>
+  )
+}
+
+function FilaTarea({
+  tarea,
+  puede,
+  puedeEliminar,
+  requestId,
+  projectId,
+  pending,
+  start,
+  refrescar,
+}: {
+  tarea: TareaVista
+  puede: boolean
+  puedeEliminar: boolean
+  requestId?: string
+  projectId?: string
+  pending: boolean
+  start: (trabajo: () => Promise<void>) => void
+  refrescar: () => void
+}) {
+  const inicial = tarea.horasEstimadas == null ? "" : String(tarea.horasEstimadas)
+  const [horas, setHoras] = useState(inicial)
+  const [aviso, setAviso] = useState<"idle" | "guardando" | "guardado">("idle")
+  const [pedir, setPedir] = useState(false)
+  const [trabajadas, setTrabajadas] = useState(tarea.horasReales == null ? "" : String(tarea.horasReales))
+  const ultima = useRef(inicial)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
+  function guardar(extra: { status?: TareaVista["status"]; horasEstimadas?: string; horasReales?: string }) {
+    const data = new FormData()
+    data.set("id", tarea.id)
+    data.set("title", tarea.title)
+    data.set("status", extra.status ?? tarea.status)
+    if (requestId) data.set("requestId", requestId)
+    if (projectId) data.set("projectId", projectId)
+    if (extra.horasEstimadas !== undefined) data.set("horasEstimadas", extra.horasEstimadas)
+    if (extra.horasReales !== undefined) data.set("horasReales", extra.horasReales)
+    setAviso("guardando")
+    start(async () => {
+      const result = await guardarTareaAction(data)
+      if (!result.ok) {
+        toast.error(result.error)
+        setAviso("idle")
+        return
+      }
+      setAviso("guardado")
+      setPedir(false)
+      refrescar()
+    })
+  }
+
+  function alCambiarHoras(valor: string) {
+    setHoras(valor)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      if (valor === ultima.current) return
+      ultima.current = valor
+      guardar({ horasEstimadas: valor })
+    }, 600)
+  }
+
+  function cambiarEstado(status: TareaVista["status"]) {
+    if (status === tarea.status) return
+    if (status === "HECHA") {
+      setPedir(true)
+      return
+    }
+    guardar({ status })
+  }
+
+  return (
+    <div className="grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm">
+      <p className={tarea.status === "HECHA" ? "font-medium line-through" : "font-medium"}>{tarea.title}</p>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Avatar nombre={tarea.assignee === "Sin responsable" ? "?" : tarea.assignee} />
+        <span>{tarea.assignee}</span>
+        <span>{tarea.dueDate ? `Fecha ${tarea.dueDate}` : "Sin fecha"}</span>
+        {tarea.vencida ? <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">Vencida</span> : null}
+        {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
+      </p>
+      {puede ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg border border-[#E4E7EC] p-0.5" role="group" aria-label={`Estado de ${tarea.title}`}>
+            {ESTADOS.map((item) => (
+              <button key={item.value} type="button" disabled={pending} aria-pressed={tarea.status === item.value} className={tarea.status === item.value ? "rounded-md bg-[#1658B0] px-2.5 py-1 text-xs font-medium text-white" : "rounded-md px-2.5 py-1 text-xs text-[#3d4a63]"} onClick={() => cambiarEstado(item.value)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            Horas estimadas
+            <input aria-label={`Horas estimadas de ${tarea.title}`} inputMode="decimal" value={horas} onChange={(event) => alCambiarHoras(event.target.value)} className="h-8 w-20 rounded-lg border border-[#E4E7EC] px-2" />
+          </label>
+          <span className="text-xs text-muted-foreground" aria-live="polite">{aviso === "guardando" ? "Guardando…" : aviso === "guardado" ? "Guardado" : ""}</span>
+        </div>
+      ) : <p className="text-xs text-muted-foreground">{ESTADOS.find((item) => item.value === tarea.status)?.label}</p>}
+      {pedir ? (
+        <div className="grid gap-2 rounded-lg bg-[#F8FAFD] p-3">
+          <label className="grid gap-1 text-xs">
+            Horas trabajadas
+            <input aria-label="Horas trabajadas" inputMode="decimal" value={trabajadas} onChange={(event) => setTrabajadas(event.target.value)} className="h-9 rounded-lg border border-[#E4E7EC] px-2" />
+          </label>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" disabled={pending} onClick={() => guardar({ status: "HECHA", horasReales: trabajadas })}>Guardar</Button>
+            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => guardar({ status: "HECHA" })}>Omitir</Button>
+          </div>
+        </div>
       ) : null}
     </div>
   )

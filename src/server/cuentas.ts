@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { DomainError, TEAM_LABEL, type Actor, type Membership, type TeamName } from "@/lib/domain"
+import { DomainError, PermisoDenegado, TEAM_LABEL, esTeam, type Actor, type Membership, type TeamName } from "@/lib/domain"
 import { puedeAdministrar } from "@/lib/permissions"
 import { isInternalEmail } from "@/lib/time"
 import { hashClave, validarClave, verificarClave } from "@/lib/clave"
@@ -32,7 +32,7 @@ function exigirDominio(email: string) {
 }
 
 function exigirAdmin(actor: Actor) {
-  if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador gestiona las cuentas.")
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado("Solo el administrador gestiona las cuentas.")
 }
 
 async function auditar(actorId: string | null, action: string, entityId: string, toValue: string) {
@@ -68,7 +68,7 @@ function leerMembresias(raw: string): Membership[] {
     const parsed = JSON.parse(raw) as Membership[]
     if (!Array.isArray(parsed)) return []
     return parsed.filter((item) => (
-      (item.team === "DESARROLLO" || item.team === "MARKETING")
+      esTeam(item.team)
       && ROLES_EQUIPO.has(item.role)
     ))
   } catch {

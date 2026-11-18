@@ -6,19 +6,32 @@ import { puedeAdministrar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { requireActor } from "@/server/session"
 import { catalogos } from "@/server/requests"
-import type { TeamName } from "@/lib/domain"
+import { TERMINAL_STATUSES, type TeamName } from "@/lib/domain"
 
 export default async function UsuariosPage() {
   const actor = await requireActor()
   if (!puedeAdministrar(actor)) redirect("/panel")
-  const [data, empresas, invitaciones] = await Promise.all([
+  const [data, empresas, invitaciones, cargas] = await Promise.all([
     catalogos(),
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.invitacion.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
+    prisma.user.findMany({
+      select: {
+        id: true,
+        _count: {
+          select: {
+            assigned: { where: { status: { notIn: [...TERMINAL_STATUSES] } } },
+            assignedTasks: { where: { status: { not: "HECHA" } } },
+          },
+        },
+      },
+    }),
   ])
+  const cargaDe = new Map(cargas.map((item) => [item.id, item._count]))
   const areas = data.areas.filter((area) => area.active).map((area) => ({ id: area.id, name: area.name }))
   return (
     <UsuariosAdmin
+      yoId={actor.id}
       areas={areas}
       empresas={empresas}
       usuarios={data.users.map((user) => ({
@@ -32,6 +45,8 @@ export default async function UsuariosPage() {
         isAdmin: user.role === "ADMINISTRADOR",
         empresaIds: user.empresas.map((item) => item.empresaId),
         areaIds: user.areasExtra.map((item) => item.areaId),
+        abiertos: cargaDe.get(user.id)?.assigned ?? 0,
+        tareas: cargaDe.get(user.id)?.assignedTasks ?? 0,
         memberships: user.areaRoles
           .filter((item) => item.role === "AGENTE" || item.role === "LIDER" || item.role === "OBSERVADOR")
           .map((item) => ({ team: item.team as TeamName, role: item.role as "AGENTE" | "LIDER" | "OBSERVADOR" })),

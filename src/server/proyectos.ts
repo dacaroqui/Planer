@@ -1,4 +1,6 @@
 import { DateTime } from "luxon"
+import { appBaseUrl, createEmailProvider } from "@/lib/email"
+import { correoAsignacionHabilitado } from "@/lib/correo-asignacion"
 import { prisma } from "@/lib/prisma"
 import { agruparTareas, avanceProyecto, avanceRequerimiento, tareaVencida } from "@/lib/avance"
 import { DomainError, PermisoDenegado, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
@@ -128,6 +130,7 @@ export async function guardarTarea(
     projectId?: string | null
     parentId?: string | null
     horasEstimadas?: string | null
+    horasReales?: string | null
   },
 ) {
   const title = input.title.trim()
@@ -143,7 +146,7 @@ export async function guardarTarea(
     if (!requestId) requestId = padre.requestId
     if (!projectId) projectId = padre.projectId
   }
-  const { request } = await contextoTarea({ requestId, projectId })
+  const { request, project } = await contextoTarea({ requestId, projectId })
   const team = request?.team ?? "DESARROLLO"
   const puede = request ? puedeGestionarTareas(actor, request.team) : puedeCrearProyecto(actor) || esAdmin(actor)
   if (!puede && !(request && actor.id === request.requesterId && !input.id)) {
@@ -168,11 +171,26 @@ export async function guardarTarea(
       }
     } else if (request && !puedeAsignar(actor, request)) {
       throw new DomainError("Solo el líder del área asigna el responsable.")
-    } else if (request) {
+    } else if (request || project) {
+      const equipo = request?.team ?? project?.team ?? null
+      if (!esAdmin(actor) && !equipo) throw new DomainError("Esa persona no es agente ni líder del equipo.")
       const miembro = await prisma.user.findFirst({
-        where: { id: nuevoResponsable, active: true, areaRoles: { some: { team: request.team, role: { in: ["AGENTE", "LIDER"] } } } },
+        where: esAdmin(actor)
+          ? {
+              id: nuevoResponsable,
+              active: true,
+              OR: [
+                { role: "ADMINISTRADOR" },
+                { areaRoles: { some: { role: { in: ["AGENTE", "LIDER"] } } } },
+              ],
+            }
+          : {
+              id: nuevoResponsable,
+              active: true,
+              areaRoles: { some: { team: equipo ?? undefined, role: { in: ["AGENTE", "LIDER"] } } },
+            },
       })
-      if (!miembro) throw new DomainError("Esa persona no es agente ni líder del equipo.")
+      if (!miembro) throw new DomainError(esAdmin(actor) ? "Esa persona no está activa o no puede recibir trabajo." : "Esa persona no es agente ni líder del equipo.")
     }
   }
   const completedAt = input.status === "HECHA" ? (existente?.completedAt ?? new Date()) : null
@@ -188,22 +206,58 @@ export async function guardarTarea(
     ...(input.horasEstimadas !== undefined
       ? { horasEstimadas: input.horasEstimadas && Number.isFinite(Number(input.horasEstimadas)) ? Number(input.horasEstimadas) : null }
       : {}),
+    ...(input.horasReales !== undefined
+      ? { horasReales: input.horasReales && Number.isFinite(Number(input.horasReales)) ? Number(input.horasReales) : null }
+      : {}),
   }
   const tarea = input.id
     ? await prisma.tarea.update({ where: { id: input.id }, data })
     : await prisma.tarea.create({ data: { ...data, createdById: actor.id } })
+  const avisos: { userId: string; subject: string; body: string }[] = []
   if (nuevoResponsable && nuevoResponsable !== previoResponsable && nuevoResponsable !== actor.id) {
-    await prisma.notification.create({
-      data: {
-        userId: nuevoResponsable,
-        requestId: request?.id ?? null,
-        subject: request ? `${request.code} · Se te asignó una tarea` : "Se te asignó una tarea",
-        body: request
-          ? `Se te asignó la tarea «${title}» en ${request.code}.`
-          : `Se te asignó la tarea «${title}».`,
-        dedupeKey: `tarea-${tarea.id}-${nuevoResponsable}`,
-      },
-    }).catch(() => undefined)
+    avisos.push({
+      userId: nuevoResponsable,
+      subject: request ? `${request.code} · Se te asignó una tarea` : "Se te asignó una tarea",
+      body: request ? `Se te asignó la tarea «${title}» en ${request.code}.` : `Se te asignó la tarea «${title}».`,
+    })
+  }
+  if (previoResponsable && nuevoResponsable !== previoResponsable && previoResponsable !== actor.id) {
+    avisos.push({
+      userId: previoResponsable,
+      subject: request ? `${request.code} · Ya no tienes la tarea` : "Ya no tienes la tarea",
+      body: `La tarea «${title}» quedó en manos de otra persona.`,
+    })
+  }
+  if (avisos.length) {
+    const destino = await prisma.user.findMany({
+      where: { id: { in: avisos.map((item) => item.userId) }, active: true, deactivatedAt: null },
+      select: { id: true, email: true },
+    })
+    const porId = new Map(destino.map((item) => [item.id, item]))
+    const correo = correoAsignacionHabilitado()
+    const href = request ? `/requerimientos/${request.code}` : "/planner"
+    for (const aviso of avisos) {
+      const persona = porId.get(aviso.userId)
+      if (!persona) continue
+      await prisma.notification.create({
+        data: {
+          userId: persona.id,
+          requestId: request?.id ?? null,
+          subject: aviso.subject,
+          body: aviso.body,
+          href,
+          dedupeKey: `tarea-${tarea.id}-${persona.id}-${Date.now()}`,
+        },
+      })
+      if (correo) {
+        const enlace = `${appBaseUrl()}${href}`
+        try {
+          await createEmailProvider().send({ to: persona.email, subject: aviso.subject, text: `${aviso.body}\n${enlace}` })
+        } catch (error) {
+          console.error("[correo] No se pudo enviar", persona.email, error)
+        }
+      }
+    }
   }
   if (request) {
     await prisma.activity.create({

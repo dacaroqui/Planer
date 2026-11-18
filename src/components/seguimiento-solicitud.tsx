@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { SLA_LABEL, type SlaState } from "@/lib/domain"
@@ -35,6 +36,7 @@ export function FichaSeguimiento({
   vence,
   paso,
   ctaHref,
+  pasos,
 }: {
   codigo: string
   etapas: EtapaVista[]
@@ -43,10 +45,11 @@ export function FichaSeguimiento({
   vence: string | null
   paso: { texto: string; cta: string | null }
   ctaHref?: string
+  pasos?: ReactNode
 }) {
   return (
     <div className="space-y-3">
-      <PasosSolicitud etapas={etapas} />
+      {pasos ?? <PasosSolicitud etapas={etapas} />}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <p>Responsable: <span className="font-medium">{responsable}</span></p>
         <p>

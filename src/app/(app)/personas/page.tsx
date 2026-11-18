@@ -25,6 +25,7 @@ export default async function PersonasPage({
     area: one("area"),
     soloVacias: one("vacias") === "1",
     persona: one("persona"),
+    inactivos: one("inactivos") === "1",
   })
   const [espacios, areas] = await Promise.all([
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),

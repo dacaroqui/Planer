@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { EstadoBadge, SlaBadge } from "@/components/insignias"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { PRIORITY_LABEL, type SlaState, type TeamName } from "@/lib/domain"
+import { PRIORITY_LABEL, TEAM_LABEL, type SlaState, type TeamName } from "@/lib/domain"
 import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -151,7 +151,7 @@ export function TablaRequerimientos({
                 </div>
                 <p className="mt-3 font-medium">{item.title}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {item.code} · {item.area?.name ?? "Sin área"} · {item.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {item.assignee?.name ?? "Sin asignar"}
+                  {item.code} · {item.area?.name ?? "Sin área"} · {TEAM_LABEL[item.team]} · {item.assignee?.name ?? "Sin asignar"}
                 </p>
               </Link>
             </div>

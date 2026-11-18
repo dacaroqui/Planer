@@ -23,6 +23,7 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
   ])
   const puedeEliminar = actor.isAdmin
   return (
+    <>
     <div className="overflow-hidden rounded-md border border-[#dfe1e6] bg-white">
       <table className="w-full text-left text-sm">
         <thead className="bg-[#F4F5F7] text-xs text-[#44546f]">
@@ -74,5 +75,6 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
         </ul>
       )}
     </section>
+    </>
   )
 }

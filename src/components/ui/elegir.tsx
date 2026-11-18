@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import { ChevronDownIcon, XIcon } from "lucide-react"
 import { cn } from "cn"
 
-export type Opcion = { value: string; label: string; iniciales?: string }
+export type Opcion = { value: string; label: string; iniciales?: string; grupo?: string }
 
 export function Elegir({
   value,
@@ -58,8 +58,9 @@ export function Elegir({
       </button>
       {abierto ? (
         <ul id={lista} role="listbox" className="absolute z-50 mt-1 max-h-64 w-full min-w-48 overflow-auto rounded-[10px] border border-[#D9DEE7] bg-white p-1 shadow-lg">
-          {opciones.map((opcion) => (
+          {opciones.map((opcion, index) => (
             <li key={opcion.value || "vacio"}>
+              {opcion.grupo && opcion.grupo !== opciones[index - 1]?.grupo ? <p className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{opcion.grupo}</p> : null}
               <button
                 type="button"
                 role="option"

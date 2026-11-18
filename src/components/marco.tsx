@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BellIcon,
   ChevronDownIcon,
   HelpCircleIcon,
   ChartColumnIcon,
@@ -15,6 +14,7 @@ import {
   StarIcon,
   ClockIcon,
   FilterIcon,
+  ListIcon,
   HomeIcon,
   InboxIcon,
   SearchIcon,
@@ -22,7 +22,8 @@ import {
   WorkflowIcon,
 } from "lucide-react"
 import { Atajos, BotonAtajos } from "@/components/atajos"
-import { Migas } from "@/components/migas"
+import { CampanaAvisos } from "@/components/campana-avisos"
+import { PageHeader } from "@/components/page-header"
 import { salir } from "@/server/actions"
 import {
   DropdownMenu,
@@ -118,7 +119,7 @@ export function Marco({
               </div>
             ) : null}
           </div>
-          <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Filtros" icono={<FilterIcon className="size-4" />} compacta={!abierta} />
+          <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Requerimientos" icono={<ListIcon className="size-4" />} compacta={!abierta} />
           {puedeTablero ? <Enlace href="/paneles" activo={path.startsWith("/paneles") || path.startsWith("/gerencia")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {actor.role !== "SOLICITANTE" ? <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
           {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
@@ -156,17 +157,16 @@ export function Marco({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-          <Link href="/notificaciones" className="relative inline-flex size-9 items-center justify-center rounded-md hover:bg-muted" aria-label={unread ? `Avisos, ${unread} sin leer` : "Avisos"}>
-            <BellIcon className="size-4" />
-            {unread > 0 ? <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-[#1658B0] px-1 text-center text-[10px] font-semibold text-white">{unread}</span> : null}
-          </Link>
+          <CampanaAvisos inicial={unread} />
           <BotonAtajos />
           <Link href="/ayuda" className="inline-flex size-9 items-center justify-center rounded-md hover:bg-muted" aria-label="Ayuda"><HelpCircleIcon className="size-4" /></Link>
           <Usuario actor={actor} />
         </header>
-        <Migas />
         <Atajos />
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-5 md:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-[1400px] px-4 pt-1 pb-5 md:px-6">
+          <PageHeader inicio={inicio} />
+          {children}
+        </main>
       </div>
     </div>
   )

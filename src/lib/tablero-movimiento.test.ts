@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { catalogoTablero } from "@/lib/catalogo-tablero"
-import { avisoTrasMovimiento, camposRequeridos, debePedirProyecto, debePedirResponsable, dentroDeVentanaDeshacer, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, tituloConfirmacion, transicionDeDetalle, VENTANA_DESHACER_MS, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, camposRequeridos, codigoSoltado, debePedirProyecto, debePedirResponsable, dentroDeVentanaDeshacer, detalleExigeDialogo, marcaObligatoria, movimientoAlSoltar, movimientoCierra, movimientoExigeDialogo, tituloConfirmacion, transicionDeDetalle, VENTANA_DESHACER_MS, validarDatosMovimiento, type TarjetaMovible } from "@/lib/tablero-movimiento"
 
 const tarjetas: TarjetaMovible[] = [
   {
@@ -28,6 +28,11 @@ describe("confirmación al soltar", () => {
 })
 
 describe("tablero: la tarjeta arrastrada", () => {
+  it("ignora el enlace que el navegador pone al arrastrar el título y usa el código guardado", () => {
+    expect(codigoSoltado("DES-0014", "http://localhost/requerimientos/DES-0014", ["DES-0010", "DES-0014"])).toBe("DES-0014")
+    expect(codigoSoltado("", "http://localhost/requerimientos/DES-0014", ["DES-0014"])).toBe("")
+  })
+
   it("usa el código arrastrado y no el de otra tarjeta de la misma columna", () => {
     const decision = movimientoAlSoltar(tarjetas, "DES-0014", "Cerrado")
     expect(decision.ok).toBe(true)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -9,7 +9,8 @@ import { Avatar, IconoPrioridad, IconoTipo } from "@/components/iconos-planer"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { transicionarAction } from "@/server/actions"
-import { camposRequeridos, tituloConfirmacion } from "@/lib/tablero-movimiento"
+import { camposRequeridos, codigoSoltado, tituloConfirmacion } from "@/lib/tablero-movimiento"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { COLUMNAS_KANBAN, claveGrupo, columnaDeEstado, necesitaInformacion, transicionHaciaColumna, type ColumnaKanban, type GrupoTablero } from "@/lib/kanban"
 import { FilterIcon, MoreHorizontalIcon, SlidersHorizontalIcon } from "lucide-react"
 import { PRIORITY_LABEL } from "@/lib/domain"
@@ -52,6 +53,7 @@ export function TableroEspacio({
   const [menu, setMenu] = useState(false)
   const [grupo, setGrupo] = useState<GrupoTablero>("ninguno")
   const [pending, start] = useTransition()
+  const arrastrada = useRef<string>("")
   const [confirma, setConfirma] = useState<TarjetaEspacio["moves"][number] & { code: string } | null>(null)
   const [motivo, setMotivo] = useState("")
   const [entrega, setEntrega] = useState("")
@@ -78,7 +80,12 @@ export function TableroEspacio({
 
   function soltar(event: React.DragEvent<HTMLElement>, columna: ColumnaKanban) {
     event.preventDefault()
-    const code = event.dataTransfer.getData("text/plain")
+    const code = codigoSoltado(arrastrada.current, event.dataTransfer.getData("text/plain"), tarjetas.map((item) => item.code))
+    arrastrada.current = ""
+    if (!code) {
+      toast.error("No se identificó la tarjeta. Use Mover a…")
+      return
+    }
     const tarjeta = tarjetas.find((item) => item.code === code)
     if (!tarjeta) return
     const actual = estados.find((item) => item.key === tarjeta.status)
@@ -170,14 +177,24 @@ export function TableroEspacio({
                 return estado ? columnaDeEstado(estado) === columna : columna === "Por hacer"
               })
               return (
-                <section key={columna} className="flex min-h-40 flex-col rounded-lg bg-[#F4F5F7] p-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (!pending) soltar(event, columna) }}>
+                <section key={columna} className="flex min-h-40 flex-col rounded-lg bg-[#F4F5F7] p-2" onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move" }} onDrop={(event) => { if (!pending) soltar(event, columna) }}>
                   <h3 className="px-1 py-2 text-xs font-semibold uppercase tracking-wide text-[#44546f]">{columna} {cartas.length}</h3>
                   <div className="grid gap-2">
                     {cartas.map((item) => (
-                      <article key={item.code} draggable={!pending} onDragStart={(event) => { event.dataTransfer.setData("text/plain", item.code); event.dataTransfer.effectAllowed = "move" }} className="cursor-grab rounded-md border border-[#dfe1e6] bg-white p-3 text-sm shadow-[0_1px_1px_rgba(9,30,66,0.12)]">
+                      <article key={item.code} draggable={!pending} onDragStart={(event) => { arrastrada.current = item.code; event.dataTransfer.setData("text/plain", item.code); event.dataTransfer.effectAllowed = "move" }} className="cursor-grab rounded-md border border-[#dfe1e6] bg-white p-3 text-sm shadow-[0_1px_1px_rgba(9,30,66,0.12)]">
                         <div className="flex items-start justify-between gap-2">
-                          <Link href={`/requerimientos/${item.code}`} className="line-clamp-2 font-medium leading-5 text-[#15122A] hover:underline">{item.title}</Link>
-                          {puedeEliminar ? <MenuEliminarRequerimiento code={item.code} title={item.title} /> : null}
+                          <Link href={`/requerimientos/${item.code}`} draggable={false} className="line-clamp-2 font-medium leading-5 text-[#15122A] hover:underline">{item.title}</Link>
+                          <span className="flex items-center gap-1">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className="text-xs font-medium text-[#1658B0]" aria-label={`Mover ${item.code}`}>Mover a…</DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {item.moves.length === 0 ? <DropdownMenuItem disabled>Sin movimientos para su rol</DropdownMenuItem> : item.moves.map((move) => (
+                                  <DropdownMenuItem key={move.name} onSelect={() => { setMotivo(""); setEntrega(""); setConfirma({ code: item.code, ...move }) }}>{move.name}</DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            {puedeEliminar ? <MenuEliminarRequerimiento code={item.code} title={item.title} /> : null}
+                          </span>
                         </div>
                         <p className="mt-2 flex flex-wrap gap-1">
                           <span className="rounded bg-[#F1F2F4] px-1.5 py-0.5 text-xs text-[#44546f]">{item.area}</span>
@@ -185,7 +202,7 @@ export function TableroEspacio({
                         </p>
                         <p className="mt-3 flex items-center gap-1.5">
                           <IconoTipo nombre={item.tipo} />
-                          <Link href={`/requerimientos/${item.code}`} className="text-xs font-medium text-[#1658B0] hover:underline">{item.code}</Link>
+                          <Link href={`/requerimientos/${item.code}`} draggable={false} className="text-xs font-medium text-[#1658B0] hover:underline">{item.code}</Link>
                           <span className="ml-auto flex items-center gap-1">
                             <IconoPrioridad prioridad={item.priority} />
                             <span className="inline-flex items-center gap-1 text-xs text-[#44546f]">

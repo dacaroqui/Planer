@@ -11,6 +11,6 @@ export async function requireActor(): Promise<Actor> {
   const email = session?.user?.email?.toLowerCase()
   if (!email) redirect("/login")
   const user = await prisma.user.findUnique({ where: { email }, include: { areaRoles: true } })
-  if (!user?.active || user.pendiente) redirect("/login?error=AccessDenied")
+  if (!user?.active || user.pendiente || user.deactivatedAt) redirect("/login?error=AccessDenied")
   return toActor(user)
 }

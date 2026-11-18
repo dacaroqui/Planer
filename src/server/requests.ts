@@ -3,6 +3,7 @@ import { DateTime } from "luxon"
 import { Prisma, type Team } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { appBaseUrl, createEmailProvider, type EmailMessage, type EmailProvider } from "@/lib/email"
+import { correoAsignacionHabilitado } from "@/lib/correo-asignacion"
 import { obtenerAlmacen } from "@/lib/almacen"
 import { dentroDeVentanaDeshacer } from "@/lib/tablero-movimiento"
 import { assertAllowedFile, safeFilename } from "@/lib/files"
@@ -22,6 +23,7 @@ import {
   type TeamName,
 } from "@/lib/domain"
 import { TRANSICIONES_OFICIALES, nombreEstado, type TransicionOficial } from "@/lib/flujo-oficial"
+import { personasAsignables } from "@/server/asignacion"
 import {
   encontrarTransicion,
   puedeAdjuntar,
@@ -108,28 +110,41 @@ export function evaluarSla(request: {
 async function fanout(
   tx: Tx,
   userIds: Array<string | null | undefined>,
-  payload: { requestId: string; subject: string; body: string; dedupeKey?: string },
+  payload: { requestId: string; subject: string; body: string; dedupeKey?: string; href?: string },
   bucket: EmailMessage[],
   exceptId?: string,
+  opciones?: { correo?: boolean },
 ) {
   const ids = [...new Set(userIds.filter((id): id is string => Boolean(id && id !== exceptId)))]
   if (ids.length === 0) return
-  const users = await tx.user.findMany({ where: { id: { in: ids }, active: true } })
+  const users = await tx.user.findMany({ where: { id: { in: ids }, active: true, deactivatedAt: null } })
+  let href = payload.href ?? null
+  if (!href) {
+    const fila = await tx.request.findUnique({ where: { id: payload.requestId }, select: { code: true } })
+    if (fila) href = `/requerimientos/${fila.code}`
+  }
+  const enviarCorreo = opciones?.correo !== false
   for (const user of users) {
     if (payload.dedupeKey) {
       const existing = await tx.notification.findFirst({ where: { userId: user.id, dedupeKey: payload.dedupeKey } })
       if (existing) continue
     }
-    await tx.notification.create({
-      data: {
-        userId: user.id,
-        requestId: payload.requestId,
-        subject: payload.subject,
-        body: payload.body,
-        dedupeKey: payload.dedupeKey,
-      },
-    })
-    bucket.push({ to: user.email, subject: payload.subject, text: payload.body })
+    try {
+      await tx.notification.create({
+        data: {
+          userId: user.id,
+          requestId: payload.requestId,
+          subject: payload.subject,
+          body: payload.body,
+          dedupeKey: payload.dedupeKey,
+          href,
+        },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue
+      throw error
+    }
+    if (enviarCorreo) bucket.push({ to: user.email, subject: payload.subject, text: payload.body })
   }
 }
 
@@ -144,8 +159,12 @@ async function deliver(email: EmailProvider, messages: EmailMessage[]) {
 }
 
 async function leaderIds(tx: Tx, team: Team) {
-  const leaders = await tx.areaRole.findMany({ where: { team, role: "LIDER" }, select: { userId: true } })
-  return leaders.map((leader) => leader.userId)
+  const activos = { active: true, deactivatedAt: null }
+  const [leaders, admins] = await Promise.all([
+    tx.areaRole.findMany({ where: { team, role: "LIDER", user: activos }, select: { userId: true } }),
+    tx.user.findMany({ where: { role: "ADMINISTRADOR", ...activos }, select: { id: true } }),
+  ])
+  return [...new Set([...leaders.map((leader) => leader.userId), ...admins.map((admin) => admin.id)])]
 }
 
 async function nextCode(tx: Tx, team: TeamName) {
@@ -260,13 +279,20 @@ export async function radicar(
   if (type.extra === "canal" && (input.channels ?? "").trim().length < 2) {
     throw new DomainError("Indique el canal.")
   }
+  if (input.publishAt) {
+    const publicada = DateTime.fromISO(input.publishAt, { zone: ZONE })
+    if (!publicada.isValid) throw new DomainError("La fecha de publicación no es válida.")
+    if (publicada < DateTime.fromJSDate(clock(deps)).setZone(ZONE).startOf("day")) {
+      throw new DomainError("La fecha no puede ser anterior a hoy")
+    }
+  }
   const areaElegida = actor.isAdmin && input.areaId ? input.areaId : actor.areaId
   const area = await prisma.area.findFirst({ where: { id: areaElegida, active: true } })
   if (!area) throw new DomainError("Elija un área activa. El administrador no radica en Académico por defecto.")
   const empresa = input.empresaId
     ? await prisma.empresa.findFirst({ where: { id: input.empresaId, active: true } })
     : await prisma.empresa.findFirst({
-        where: { name: input.brand === "LUVANIA" ? "Luvania" : "CIFES", active: true },
+        where: { name: input.brand === "LUVANIA" ? "Luvania" : input.brand === "AMBAS" ? "Ambas/Transversal" : "CIFES", active: true },
       }) ?? await prisma.empresa.findFirst({ where: { active: true }, orderBy: { name: "asc" } })
   if (!empresa) throw new DomainError("Elija una empresa activa.")
   if (input.assigneeId && !esAdmin(actor) && rolEn(actor, input.team) !== "LIDER") {
@@ -504,6 +530,8 @@ export async function deshacerTransicion(actor: Actor, requestId: string, deps?:
   if (!puede) throw new DomainError("No puede deshacer ese cambio.")
   const destino = last.fromValue
   const origen = last.toValue
+  const email = mailer(deps)
+  const messages: EmailMessage[] = []
   await prisma.$transaction(async (tx) => {
     const data: Prisma.RequestUpdateInput = { status: destino, updatedAt: ahora }
     if (TERMINAL_STATUSES.has(origen) && !TERMINAL_STATUSES.has(destino)) {
@@ -527,7 +555,13 @@ export async function deshacerTransicion(actor: Actor, requestId: string, deps?:
         createdAt: ahora,
       },
     })
+    await fanout(tx, [current.requesterId], {
+      requestId,
+      subject: `${current.code} · ${nombreEstado(current.team, destino)}`,
+      body: `${actor.name} deshizo el cambio de estado en ${current.code}.\n${link(current.code)}`,
+    }, messages, actor.id)
   })
+  await deliver(email, messages)
 }
 
 export async function comentar(actor: Actor, requestId: string, body: string, internal: boolean, deps?: Deps) {
@@ -652,9 +686,7 @@ export async function registrarEntrada(
     }
     const destinatarios = input.kind === "INTERNA" || input.kind === "REGISTRO"
       ? [current.assigneeId, ...leaders]
-      : TERMINAL_STATUSES.has(current.status)
-        ? leaders
-        : [actor.id === current.requesterId ? current.assigneeId : current.requesterId, ...leaders]
+      : [current.requesterId, current.assigneeId, ...leaders]
     const asunto = publicoDelSolicitante
       ? `${current.code} · El solicitante respondió`
       : input.kind === "SOLICITUD_INFO"
@@ -699,30 +731,38 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
   const now = clock(deps)
   const email = mailer(deps)
   const messages: EmailMessage[] = []
+  const correo = correoAsignacionHabilitado({ forzar: Boolean(deps?.email) })
   const updated = await prisma.$transaction(async (tx) => {
     const saved = await tx.request.update({ where: { id: requestId }, data: { assigneeId: assignee.id, updatedAt: now } })
     await tx.activity.create({
       data: {
         requestId,
         actorId: actor.id,
-        kind: "ASSIGN",
+        kind: "REGISTRO",
         field: "responsable",
-        message: `Asignó el requerimiento a ${assignee.name}.`,
+        message: `${actor.name} asignó a ${assignee.name}.`,
         fromValue: current.assigneeId,
         toValue: assignee.id,
         createdAt: now,
       },
     })
+    if (current.assigneeId && current.assigneeId !== assignee.id) {
+      await fanout(tx, [current.assigneeId], {
+        requestId,
+        subject: `${current.code} · Ya no eres el responsable`,
+        body: `${actor.name} reasignó ${current.code} a ${assignee.name}.\n${link(current.code)}`,
+      }, messages, actor.id, { correo })
+    }
     await fanout(tx, [assignee.id], {
       requestId,
       subject: `${current.code} · Se te asignó`,
       body: `Se te asignó ${current.code}.\n${link(current.code)}`,
-    }, messages, actor.id)
+    }, messages, actor.id, { correo })
     await fanout(tx, [current.requesterId], {
       requestId,
-      subject: `${current.code} · responsable asignado`,
-      body: `${assignee.name} quedó como responsable de ${current.code}.\n${link(current.code)}`,
-    }, messages, actor.id)
+      subject: `Tu requerimiento ${current.code} ya tiene responsable: ${assignee.name}`,
+      body: `Tu requerimiento ${current.code} ya tiene responsable: ${assignee.name}.\n${link(current.code)}`,
+    }, messages, actor.id, { correo })
     return saved
   })
   await deliver(email, messages)
@@ -985,11 +1025,7 @@ export async function getDetalle(actor: Actor, code: string) {
   const seeInternal = puedeVerNotaInterna(actor, request.team)
   const catalogo = await catalogoDe(request.team)
   const agents = puedeAsignar(actor, request) || puedeAutoasignarse(actor, request, true)
-    ? await prisma.user.findMany({
-        where: { active: true, areaRoles: { some: { team: request.team, role: { in: ["AGENTE", "LIDER"] } } } },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, role: true },
-      })
+    ? await personasAsignables(actor, request.team)
     : []
   return {
     request: {
@@ -1037,7 +1073,7 @@ export async function opcionesVisibles(actor: Actor) {
   }
 }
 
-export async function opcionesTablero(actor: Actor, team: "DESARROLLO" | "MARKETING") {
+export async function opcionesTablero(actor: Actor, team: TeamName) {
   const rows = await prisma.request.findMany({
     where: { AND: [visibilidad(actor), { team }] },
     select: {
@@ -1233,7 +1269,7 @@ export async function dashboard(actor: Actor, filters: { team?: string; brand?: 
   const from = filters.from ? new Date(filters.from) : new Date(now.getTime() - 56 * 24 * 60 * 60 * 1000)
   const to = filters.to ? new Date(filters.to) : now
   const base: Prisma.RequestWhereInput[] = [visibilidad(actor)]
-  if (filters.team === "DESARROLLO" || filters.team === "MARKETING") base.push({ team: filters.team })
+  if (filters.team && esTeam(filters.team)) base.push({ team: filters.team })
   if (filters.brand) base.push({ brand: filters.brand })
   if (filters.empresaId) base.push({ empresaId: filters.empresaId })
   if (filters.projectId) base.push({ projectId: filters.projectId })
@@ -1350,7 +1386,7 @@ export async function guardarRoles(
   userId: string,
   input: { isAdmin: boolean; active: boolean; areaId: string; memberships: { team: TeamName; role: "AGENTE" | "LIDER" | "OBSERVADOR" }[] },
 ) {
-  if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador asigna roles.")
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado("Solo el administrador edita personas.")
   if (userId === actor.id && !input.active) throw new DomainError("No puede desactivar su propio usuario.")
   const area = await prisma.area.findFirst({ where: { id: input.areaId, active: true } })
   if (!area) throw new DomainError("Elija un área del perfil.")
@@ -1433,7 +1469,7 @@ export async function guardarEstado(
   actor: Actor,
   input: { id?: string; team: TeamName; key: string; name: string; category: string; boardColumn: string },
 ) {
-  if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador configura flujos.")
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado("Solo el administrador configura flujos.")
   const key = input.key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_")
   if (!key || input.name.trim().length < 2) throw new DomainError("Indique la clave y el nombre del estado.")
   const last = await prisma.workflowState.findFirst({ where: { team: input.team }, orderBy: { sortOrder: "desc" } })
@@ -1493,7 +1529,7 @@ export async function cambiarPrioridadMasiva(actor: Actor, codes: string[], prio
 
 export async function eliminarEstado(actor: Actor, id: string, moveToKey?: string) {
   void moveToKey
-  if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador configura flujos.")
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado("Solo el administrador configura flujos.")
   const state = await prisma.workflowState.findUnique({ where: { id } })
   if (!state) throw new DomainError("El estado no existe.")
   const usados = await prisma.request.count({ where: { team: state.team, status: state.key } })
@@ -1523,7 +1559,7 @@ export async function guardarTransicion(
     slaEffect: string
   },
 ) {
-  if (!puedeAdministrar(actor)) throw new DomainError("Solo el administrador configura flujos.")
+  if (!puedeAdministrar(actor)) throw new PermisoDenegado("Solo el administrador configura flujos.")
   const data = {
     name: input.name.trim(),
     fromKeys: input.fromKeys,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Avatar, IconoTipo } from "@/components/iconos-planer"
+import { EstadoVacio } from "@/components/estado-vacio"
 import { enUltimaSemana, tiempoRelativo } from "@/lib/planer-ui"
 
 export type ItemParaTi = {
@@ -26,16 +27,39 @@ const TABS = [
   { id: "visto", label: "Visto" },
 ] as const
 
+const VACIO: Record<(typeof TABS)[number]["id"], { titulo: string; texto: string }> = {
+  asignaciones: {
+    titulo: "No tienes asignaciones pendientes ahora",
+    texto: "Cuando te asignen un requerimiento o una tarea, aparecerá aquí.",
+  },
+  reciente: {
+    titulo: "Aún no hay actividad reciente",
+    texto: "El trabajo de tu equipo aparecerá aquí cuando haya movimiento.",
+  },
+  marcado: {
+    titulo: "No has marcado nada como favorito",
+    texto: "La estrella de una fila lo deja en esta pestaña.",
+  },
+  visto: {
+    titulo: "Todavía no has abierto ningún requerimiento",
+    texto: "Los que abras desde aquí quedan en esta pestaña.",
+  },
+}
+
 export function ParaTi({
   actorId,
   espacios,
   items,
   tabInicial,
+  puedeBandeja = false,
+  ahoraIso,
 }: {
   actorId: string
   espacios: { id: string; name: string }[]
   items: ItemParaTi[]
   tabInicial?: string
+  puedeBandeja?: boolean
+  ahoraIso?: string
 }) {
   const [tab, setTab] = useState(tabInicial && TABS.some((item) => item.id === tabInicial) ? tabInicial : "reciente")
   const [marcados, setMarcados] = useState<string[]>([])
@@ -44,7 +68,7 @@ export function ParaTi({
     setMarcados(leer("planer-marcados"))
     setVistos(leer("planer-vistos"))
   }, [])
-  const ahora = new Date()
+  const ahora = ahoraIso ? new Date(ahoraIso) : new Date()
   const semana = items.filter((item) => enUltimaSemana(new Date(item.actualizado), ahora))
   const antes = items.filter((item) => !enUltimaSemana(new Date(item.actualizado), ahora))
   const visibles = tab === "asignaciones"
@@ -85,15 +109,24 @@ export function ParaTi({
           </button>
         ))}
       </div>
-      <Grupo titulo="En la última semana" items={visibles.filter((item) => semana.includes(item))} marcados={marcados} onMarcar={(code) => guardarMarca(code, marcados, setMarcados)} />
-      <Grupo titulo="Antes" items={visibles.filter((item) => antes.includes(item))} marcados={marcados} onMarcar={(code) => guardarMarca(code, marcados, setMarcados)} />
+      {visibles.length === 0 ? (
+        <EstadoVacio
+          titulo={VACIO[tab as keyof typeof VACIO].titulo}
+          texto={VACIO[tab as keyof typeof VACIO].texto}
+          accion={tab === "asignaciones" && puedeBandeja ? <Link href="/bandeja" className="text-sm font-medium text-[#1658B0] hover:underline">Ir a la bandeja de respuesta</Link> : null}
+        />
+      ) : (
+        <>
+          <Grupo titulo="En la última semana" items={visibles.filter((item) => semana.includes(item))} marcados={marcados} onMarcar={(code) => guardarMarca(code, marcados, setMarcados)} ahora={ahora} />
+          <Grupo titulo="Antes" items={visibles.filter((item) => antes.includes(item))} marcados={marcados} onMarcar={(code) => guardarMarca(code, marcados, setMarcados)} ahora={ahora} />
+        </>
+      )}
     </div>
   )
 }
 
-function Grupo({ titulo, items, marcados, onMarcar }: { titulo: string; items: ItemParaTi[]; marcados: string[]; onMarcar: (code: string) => void }) {
+function Grupo({ titulo, items, marcados, onMarcar, ahora }: { titulo: string; items: ItemParaTi[]; marcados: string[]; onMarcar: (code: string) => void; ahora: Date }) {
   if (items.length === 0) return null
-  const ahora = new Date()
   return (
     <section>
       <h2 className="mb-2 text-sm text-muted-foreground">{titulo}</h2>

@@ -1,7 +1,7 @@
 import { BandejaPanel } from "@/components/bandeja-panel"
 import type { EntradaLinea } from "@/components/cronologia-vista"
 import { esAdmin, puedeVerNotaInterna } from "@/lib/permissions"
-import { type TeamName } from "@/lib/domain"
+import { TEAMS, esTeam, type TeamName } from "@/lib/domain"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
 import { listarBandeja, puedeEntrarBandeja, tabBandeja } from "@/server/bandeja"
@@ -57,7 +57,8 @@ export default async function BandejaPage({
   }
   const params = await searchParams
   const texto = (clave: string) => typeof params[clave] === "string" ? params[clave] : ""
-  const equipo = texto("equipo") === "DESARROLLO" || texto("equipo") === "MARKETING" ? texto("equipo") as TeamName : undefined
+  const equipoPedido = texto("equipo")
+  const equipo: TeamName | undefined = esTeam(equipoPedido) ? equipoPedido : undefined
   const tab = tabBandeja(texto("tab") || undefined)
   const data = await listarBandeja(actor, {
     tab,
@@ -69,7 +70,7 @@ export default async function BandejaPage({
   })
   const codigo = texto("codigo")
   const detail = codigo ? await getDetalle(actor, codigo) : null
-  const equipos = esAdmin(actor) ? (["DESARROLLO", "MARKETING"] as TeamName[]) : [...new Set(actor.memberships.map((item) => item.team))]
+  const equipos = esAdmin(actor) ? [...TEAMS] : [...new Set(actor.memberships.map((item) => item.team))]
   return (
     <div className="space-y-4">
       <div>
@@ -102,7 +103,7 @@ export default async function BandejaPage({
           puedeAdjuntar: detail.canAttach,
           esSolicitante: actor.id === detail.request.requesterId,
           tareas: detail.request.tasks.filter((tarea) => !tarea.parentId).map((tarea) => ({ id: tarea.id, title: tarea.title })),
-          agentes: detail.agents.map((agente) => ({ id: agente.id, name: agente.name })),
+          agentes: detail.agents.map((agente) => ({ id: agente.id, name: agente.name, grupo: agente.grupo })),
           puedeAsignar: detail.canAssign,
         } : null}
       />

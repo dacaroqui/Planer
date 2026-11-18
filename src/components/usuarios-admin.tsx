@@ -7,13 +7,13 @@ import { toast } from "sonner"
 import { FormularioUsuarioManual } from "@/components/acceso-admin"
 import { EditorUsuario } from "@/components/admin-forms"
 import { CopiarEnlace } from "@/components/copiar-enlace"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { ROLE_LABEL, TEAM_LABEL, type RoleName, type TeamName } from "@/lib/domain"
+import { ROLE_LABEL, TEAM_LABEL, TEAMS, type RoleName, type TeamName } from "@/lib/domain"
 import { Elegir, ElegirVarios } from "@/components/ui/elegir"
 import { type EstadoEnlace } from "@/lib/invitacion-estado"
-import { actualizarUsuarioAction, crearInvitacionAction, revocarInvitacionFormAction } from "@/server/actions"
+import { actualizarUsuarioAction, crearInvitacionAction, desactivarPersonaAction, reactivarPersonaAction, revocarInvitacionFormAction } from "@/server/actions"
 
 type Usuario = {
   id: string
@@ -27,6 +27,8 @@ type Usuario = {
   empresaIds: string[]
   areaIds: string[]
   memberships: { team: TeamName; role: "AGENTE" | "LIDER" | "OBSERVADOR" }[]
+  abiertos: number
+  tareas: number
 }
 
 type Invitacion = {
@@ -66,11 +68,13 @@ export function UsuariosAdmin({
   invitaciones,
   areas,
   empresas,
+  yoId,
 }: {
   usuarios: Usuario[]
   invitaciones: Invitacion[]
   areas: { id: string; name: string }[]
   empresas: { id: string; name: string }[]
+  yoId: string
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<"usuarios" | "invitaciones">("usuarios")
@@ -83,6 +87,8 @@ export function UsuariosAdmin({
   const [invitar, setInvitar] = useState(false)
   const [manual, setManual] = useState(false)
   const [editor, setEditor] = useState<Usuario | null>(null)
+  const [baja, setBaja] = useState<Usuario | null>(null)
+  const [destino, setDestino] = useState("")
   const [pending, start] = useTransition()
   const tamano = 5
   const filtrados = useMemo(() => usuarios.filter((usuario) => {
@@ -99,6 +105,36 @@ export function UsuariosAdmin({
   const corte = filtrados.slice((paginaSegura - 1) * tamano, paginaSegura * tamano)
   const inicio = filtrados.length === 0 ? 0 : (paginaSegura - 1) * tamano + 1
   const fin = Math.min(paginaSegura * tamano, filtrados.length)
+
+  function reactivar(usuario: Usuario) {
+    const data = new FormData()
+    data.set("userId", usuario.id)
+    start(async () => {
+      const result = await reactivarPersonaAction(data)
+      if (!result.ok) toast.error(result.error)
+      else {
+        toast.success(result.message || "Persona reactivada.")
+        router.refresh()
+      }
+    })
+  }
+
+  function confirmarBaja() {
+    if (!baja) return
+    const data = new FormData()
+    data.set("userId", baja.id)
+    if (destino) data.set("reasignarA", destino)
+    start(async () => {
+      const result = await desactivarPersonaAction(data)
+      if (!result.ok) toast.error(result.error)
+      else {
+        toast.success(result.message || "Persona desactivada.")
+        setBaja(null)
+        setEditor(null)
+        router.refresh()
+      }
+    })
+  }
 
   function alternar(usuario: Usuario) {
     const data = new FormData()
@@ -162,7 +198,7 @@ export function UsuariosAdmin({
             </button>
           </div>
           {extra ? (
-            <Elegir className="w-52" ariaLabel="Equipo" value={equipo} onValueChange={(valor) => { setEquipo(valor); setPagina(1) }} opciones={[{ value: "", label: "Todos los equipos" }, { value: "DESARROLLO", label: "Desarrollo" }, { value: "MARKETING", label: "Marketing" }]} />
+            <Elegir className="w-52" ariaLabel="Equipo" value={equipo} onValueChange={(valor) => { setEquipo(valor); setPagina(1) }} opciones={[{ value: "", label: "Todos los equipos" }, ...TEAMS.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] }))]} />
           ) : null}
           <div className="overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-[0_1px_2px_rgba(21,18,42,0.04)]">
             <table className="w-full text-left text-sm">
@@ -201,9 +237,14 @@ export function UsuariosAdmin({
                         <DropdownMenu>
                           <DropdownMenuTrigger className="inline-flex size-8 items-center justify-center rounded-md hover:bg-[#F3F4F6]" aria-label={`Acciones de ${usuario.name}`}>⋯</DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditor(usuario)}>Editar</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setEditor(usuario)}>Editar persona</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEditor(usuario)}>Cambiar rol</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => alternar(usuario)} disabled={pending}>{usuario.active ? "Desactivar" : "Activar"}</DropdownMenuItem>
+                            {usuario.active ? (
+                              <DropdownMenuItem onSelect={() => { setDestino(""); setBaja(usuario) }}>Eliminar persona</DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onSelect={() => reactivar(usuario)} disabled={pending}>Reactivar</DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -268,10 +309,42 @@ export function UsuariosAdmin({
           <FormularioUsuarioManual areas={areas} empresas={empresas} />
         </DialogContent>
       </Dialog>
-      <Dialog open={Boolean(editor)} onOpenChange={(abierto) => { if (!abierto) setEditor(null) }}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader><DialogTitle>Editar usuario</DialogTitle></DialogHeader>
+      <Sheet open={Boolean(editor)} onOpenChange={(abierto) => { if (!abierto) setEditor(null) }}>
+        <SheetContent side="right" className="w-full overflow-y-auto bg-white sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Editar persona</SheetTitle>
+            <SheetDescription>El rol global, las áreas y las empresas quedan vigentes al guardar.</SheetDescription>
+          </SheetHeader>
           {editor ? <EditorUsuario areas={areas} empresas={empresas} user={editor} /> : null}
+          {editor && editor.id !== yoId ? (
+            <div className="mt-4 border-t border-[#E4E7EC] pt-4">
+              {editor.active ? (
+                <button type="button" className="text-sm font-medium text-red-700 hover:underline" onClick={() => { setDestino(""); setBaja(editor) }}>Eliminar persona</button>
+              ) : (
+                <button type="button" className="text-sm font-medium text-[#1658B0] hover:underline" onClick={() => reactivar(editor)} disabled={pending}>Reactivar</button>
+              )}
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+      <Dialog open={Boolean(baja)} onOpenChange={(abierto) => { if (!abierto) setBaja(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Eliminar persona</DialogTitle></DialogHeader>
+          {baja ? (
+            <div className="grid gap-3 text-sm">
+              <p>{baja.name} dejará de entrar a Planer. El historial conserva su nombre con la marca Inactivo.</p>
+              {baja.abiertos + baja.tareas > 0 ? (
+                <>
+                  <p>Tiene {baja.abiertos} {baja.abiertos === 1 ? "requerimiento abierto" : "requerimientos abiertos"} y {baja.tareas} {baja.tareas === 1 ? "tarea abierta" : "tareas abiertas"}. Elija quién los recibe antes de confirmar.</p>
+                  <Elegir ariaLabel="Reasignar a" value={destino} onValueChange={setDestino} placeholder="Reasignar a" opciones={[{ value: "", label: "Reasignar a" }, ...usuarios.filter((item) => item.active && item.id !== baja.id).map((item) => ({ value: item.id, label: item.name }))]} />
+                </>
+              ) : <p>No tiene requerimientos ni tareas abiertos.</p>}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <button type="button" className="h-10 rounded-lg border border-[#E4E7EC] px-3 text-sm" onClick={() => setBaja(null)}>Cancelar</button>
+            <button type="button" className="h-10 rounded-lg bg-red-700 px-3 text-sm font-medium text-white disabled:opacity-50" disabled={pending || Boolean(baja && baja.abiertos + baja.tareas > 0 && !destino)} onClick={confirmarBaja}>Eliminar persona</button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -355,8 +428,7 @@ function InvitarDrawer({
               {pideEquipo ? (
                 <fieldset className="grid gap-1 text-sm">
                   <legend>Equipo</legend>
-                  <label className="flex items-center gap-2"><input type="checkbox" name="team:DESARROLLO" value="1" /> {TEAM_LABEL.DESARROLLO}</label>
-                  <label className="flex items-center gap-2"><input type="checkbox" name="team:MARKETING" value="1" /> {TEAM_LABEL.MARKETING}</label>
+                  {TEAMS.map((equipo) => <label key={equipo} className="flex items-center gap-2"><input type="checkbox" name={`team:${equipo}`} value="1" /> {TEAM_LABEL[equipo]}</label>)}
                 </fieldset>
               ) : null}
             </section>

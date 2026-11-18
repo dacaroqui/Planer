@@ -12,12 +12,14 @@ import { formatDuration } from "@/lib/sla"
 import { trasladarAction } from "@/server/actions"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
+import { personasAsignables } from "@/server/asignacion"
 import { TEXTO_AVANCE_REQUERIMIENTO, avanceDesdeLista, tareaVencida } from "@/lib/avance"
 import { transicionDeDetalle } from "@/lib/tablero-movimiento"
-import { BRAND_LABEL, PRIORITY_LABEL, statusLabel, type BrandName, type PriorityName } from "@/lib/domain"
+import { BRAND_LABEL, PRIORITY_LABEL, TEAM_LABEL, TEAMS, statusLabel, type BrandName, type PriorityName } from "@/lib/domain"
 import { armarEtapas, pasoEsperado } from "@/lib/seguimiento"
-import { RESOLUCION_LABEL } from "@/lib/flujo-oficial"
+import { RESOLUCION_LABEL, TRANSICIONES_OFICIALES } from "@/lib/flujo-oficial"
 import { FormularioClasificar } from "@/components/formulario-clasificar"
+import { PasosInteractivos } from "@/components/pasos-interactivos"
 import { puedeGestionarTareas } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
 import { DateTime } from "luxon"
@@ -40,11 +42,7 @@ export default async function DetallePage({
     ? await prisma.requestType.findMany({ where: { team: request.team, active: true }, orderBy: { name: "asc" } })
     : []
   const proyectosEmpresa = await prisma.proyecto.findMany({ where: { empresaId: request.empresaId }, orderBy: { name: "asc" } })
-  const agentesTarea = await prisma.user.findMany({
-    where: { active: true, areaRoles: { some: { team: request.team, role: { in: ["AGENTE", "LIDER"] } } } },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  })
+  const agentesTarea = await personasAsignables(actor, request.team)
   const tareasRaiz = request.tasks.filter((tarea) => !tarea.parentId)
   const avance = avanceDesdeLista(request.tasks, request.status)
   const ratio = Math.max(0, Math.min(100, Math.round(sla.ratio * 100)))
@@ -67,11 +65,11 @@ export default async function DetallePage({
       tarea: item.tarea?.title ?? null,
       adjuntos: item.adjuntos.map((archivo) => ({ id: archivo.id, filename: archivo.filename, mimeType: archivo.mimeType })),
     })),
-    ...request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({
+    ...request.activities.filter((item) => (item.kind === "STATUS" && item.field === "estado") || item.kind === "REGISTRO").map((item) => ({
       tipo: "estado" as const,
       id: item.id,
       cuando: item.createdAt.toISOString(),
-      texto: item.fromValue && item.toValue ? `${statusLabel(item.fromValue)} → ${statusLabel(item.toValue)}` : item.message,
+      texto: `${item.actor?.name ?? "Planer"} · ${item.fromValue && item.toValue && item.field === "estado" ? `${statusLabel(item.fromValue)} → ${statusLabel(item.toValue)}. ` : ""}${item.message}`,
     })),
   ].sort((a, b) => a.cuando.localeCompare(b.cuando))
 
@@ -108,6 +106,24 @@ export default async function DetallePage({
               updatedAt: request.updatedAt,
               cambios: request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({ toValue: item.toValue, createdAt: item.createdAt })),
             })}
+            pasos={
+              <PasosInteractivos
+                codigo={request.code}
+                status={request.status}
+                anterior={request.previousStatus}
+                etapas={armarEtapas({
+                  status: request.status,
+                  createdAt: request.createdAt,
+                  updatedAt: request.updatedAt,
+                  cambios: request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({ toValue: item.toValue, createdAt: item.createdAt })),
+                })}
+                permitidas={detail.transitions}
+                catalogo={TRANSICIONES_OFICIALES.filter((item) => item.team === request.team && item.from.includes(request.status))}
+                agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name, grupo: agent.grupo }))}
+                assigneeId={request.assigneeId}
+                committedDate={request.committedDate ? DateTime.fromJSDate(request.committedDate).setZone(ZONE).toISODate() : null}
+              />
+            }
             responsable={request.assignee?.name ?? "Sin responsable todavía"}
             sla={sla.state}
             vence={sla.dueAt ? sla.dueAt.toISOString() : null}
@@ -172,7 +188,9 @@ export default async function DetallePage({
                 code={request.code}
                 transiciones={detail.transitions.map((item) => transicionDeDetalle(item))}
                 puedeAsignar={detail.canAssign}
-                agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name }))}
+                agentes={detail.agents.map((agent) => ({ id: agent.id, name: agent.name, grupo: agent.grupo, teams: agent.teams, esAdmin: agent.esAdmin }))}
+                equipo={request.team}
+                esAdministrador={actor.isAdmin}
                 asignadoId={request.assigneeId}
                 fechaComprometida={request.committedDate ? DateTime.fromJSDate(request.committedDate).setZone(ZONE).toISODate() : null}
                 puedeComentar={detail.canCommentPublic}
@@ -256,15 +274,32 @@ export default async function DetallePage({
                   proyectos={proyectosEmpresa.map((proyecto) => ({ id: proyecto.id, name: proyecto.name }))}
                 />
                 {detail.canMove ? (
-                  <form action={trasladarAction} className="mt-3">
+                  <form action={trasladarAction} className="mt-3 flex flex-wrap items-center gap-2">
                     <input type="hidden" name="code" value={request.code} />
-                    <input type="hidden" name="team" value={request.team === "DESARROLLO" ? "MARKETING" : "DESARROLLO"} />
-                    <button className="text-sm underline" type="submit">Trasladar a {request.team === "DESARROLLO" ? "Marketing" : "Desarrollo"}</button>
+                    <label className="text-sm">
+                      <span className="sr-only">Trasladar a</span>
+                      <select name="team" defaultValue={TEAMS.find((equipo) => equipo !== request.team)} className="h-9 rounded-lg border border-input px-2" aria-label="Trasladar a">
+                        {TEAMS.filter((equipo) => equipo !== request.team).map((equipo) => <option key={equipo} value={equipo}>{TEAM_LABEL[equipo]}</option>)}
+                      </select>
+                    </label>
+                    <button className="text-sm underline" type="submit">Trasladar</button>
                   </form>
                 ) : null}
               </CardContent>
             </Card>
-          ) : null}
+          ) : (
+            <Card>
+              <CardHeader><CardTitle>Clasificación</CardTitle></CardHeader>
+              <CardContent className="flex flex-wrap gap-2 text-sm">
+                <span className="rounded-full bg-[#E7F0FB] px-2.5 py-1 text-[#1658B0]">{TEAM_LABEL[request.team]}</span>
+                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{request.type.name}</span>
+                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{PRIORITY_LABEL[request.priority as PriorityName] ?? request.priority}</span>
+                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{BRAND_LABEL[request.brand as BrandName] ?? request.brand}</span>
+                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1">{request.project?.name ?? "Sin proyecto"}</span>
+                <p className="w-full text-xs text-muted-foreground">Solo el administrador cambia la clasificación.</p>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader><CardTitle>Otras solicitudes de este solicitante</CardTitle></CardHeader>
             <CardContent className="grid gap-2 text-sm">

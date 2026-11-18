@@ -15,6 +15,11 @@ export type TarjetaMovible = {
   moves: MovimientoTablero[]
 }
 
+export function codigoSoltado(guardado: string, transferido: string, codigos: string[]) {
+  const candidatos = [guardado, transferido].map((item) => item.trim()).filter(Boolean)
+  return candidatos.find((item) => codigos.includes(item)) ?? ""
+}
+
 export function movimientoAlSoltar(tarjetas: TarjetaMovible[], code: string, columna: string) {
   const limpio = code.trim()
   const tarjeta = tarjetas.find((item) => item.code === limpio)
