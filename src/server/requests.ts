@@ -60,6 +60,14 @@ const detailInclude = {
 function clock(deps?: Deps) {
   return deps?.now ?? new Date()
 }
+
+function limiteFecha(valor: string, fin: boolean, calendario: boolean) {
+  if (calendario && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const dia = DateTime.fromISO(valor, { zone: ZONE })
+    return (fin ? dia.endOf("day") : dia.startOf("day")).toJSDate()
+  }
+  return new Date(valor)
+}
 function mailer(deps?: Deps) {
   return deps?.email ?? createEmailProvider()
 }
@@ -929,6 +937,8 @@ export type ListQuery = {
   assignedToMe?: boolean
   from?: string
   to?: string
+  sla?: string
+  porActualizacion?: boolean
   openOnly?: boolean
   closedOnly?: boolean
   queueTeam?: TeamName | null
@@ -979,10 +989,11 @@ export async function listar(actor: Actor, query: ListQuery) {
   if (query.openOnly) and.push({ status: { notIn: [...TERMINAL_STATUSES] } })
   if (query.closedOnly) and.push({ status: { in: [...TERMINAL_STATUSES] } })
   if (query.from || query.to) {
+    const campo = query.porActualizacion ? "updatedAt" : "createdAt"
     and.push({
-      createdAt: {
-        gte: query.from ? new Date(query.from) : undefined,
-        lte: query.to ? new Date(query.to) : undefined,
+      [campo]: {
+        gte: query.from ? limiteFecha(query.from, false, Boolean(query.porActualizacion)) : undefined,
+        lte: query.to ? limiteFecha(query.to, true, Boolean(query.porActualizacion)) : undefined,
       },
     })
   }
@@ -996,20 +1007,45 @@ export async function listar(actor: Actor, query: ListQuery) {
       ? { [query.sort!]: dir }
       : { updatedAt: "desc" }
   const relaciones = relacionesListar(query)
+  const include = {
+    type: { select: { id: true, name: true, team: true } },
+    requester: { select: { id: true, name: true } },
+    assignee: { select: { id: true, name: true } },
+    area: { select: { id: true, name: true } },
+    empresa: { select: { id: true, name: true, exigirProyectoAlClasificar: true } },
+    project: { select: { id: true, name: true } },
+    ...(relaciones.pauses ? { pauses: { select: { startedAt: true, endedAt: true } } } : {}),
+    ...(relaciones.tasks ? { tasks: { select: { id: true, title: true, status: true, parentId: true } } } : {}),
+  }
+  function decorar<T extends {
+    slaStartedAt: Date
+    resolutionMinutes: number
+    slaTargetMinutes: number
+    pauses?: { startedAt: Date; endedAt: Date | null }[]
+    resolvedAt: Date | null
+    status: string
+  }>(row: T) {
+    const pauses = row.pauses ?? []
+    return { ...row, pauses, sla: evaluarSla({ ...row, pauses }) }
+  }
+  if (query.sla === "vencido" || query.sla === "riesgo") {
+    const rows = await prisma.request.findMany({ where, include, orderBy, take: 400 })
+    const filtradas = rows.map((row) => decorar(row)).filter((row) => (
+      query.sla === "vencido" ? row.sla.state === "VENCIDO" : row.sla.state === "EN_RIESGO"
+    ))
+    const start = (page - 1) * pageSize
+    return {
+      total: filtradas.length,
+      page,
+      pages: Math.max(1, Math.ceil(filtradas.length / pageSize)),
+      items: filtradas.slice(start, start + pageSize),
+    }
+  }
   const [total, rows] = await prisma.$transaction([
     prisma.request.count({ where }),
     prisma.request.findMany({
       where,
-      include: {
-        type: { select: { id: true, name: true, team: true } },
-        requester: { select: { id: true, name: true } },
-        assignee: { select: { id: true, name: true } },
-        area: { select: { id: true, name: true } },
-        empresa: { select: { id: true, name: true, exigirProyectoAlClasificar: true } },
-        project: { select: { id: true, name: true } },
-        ...(relaciones.pauses ? { pauses: { select: { startedAt: true, endedAt: true } } } : {}),
-        ...(relaciones.tasks ? { tasks: { select: { id: true, title: true, status: true, parentId: true } } } : {}),
-      },
+      include,
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -1019,7 +1055,7 @@ export async function listar(actor: Actor, query: ListQuery) {
     total,
     page,
     pages: Math.max(1, Math.ceil(total / pageSize)),
-    items: rows.map((row) => ({ ...row, pauses: "pauses" in row ? row.pauses : [], sla: evaluarSla({ ...row, pauses: "pauses" in row ? row.pauses : [] }) })),
+    items: rows.map((row) => decorar(row)),
   }
 }
 

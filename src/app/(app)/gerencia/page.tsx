@@ -1,8 +1,13 @@
 import Link from "next/link"
+import { Suspense } from "react"
+import { AlertTriangleIcon, ClipboardListIcon, ClockIcon } from "lucide-react"
 import { Barra } from "@/components/barra"
 import { EstadoBadge, SlaBadge } from "@/components/insignias"
+import { ControlesPanel } from "@/components/panel-controles"
 import { esAdmin, rolEn } from "@/lib/permissions"
 import { statusLabel } from "@/lib/domain"
+import { DateTime } from "luxon"
+import { ZONE } from "@/lib/time"
 import { requireActor } from "@/server/session"
 import { dashboard, listar } from "@/server/requests"
 import { listarProyectos } from "@/server/proyectos"
@@ -19,13 +24,24 @@ export default async function DashboardPage({
     const value = params[key]
     return Array.isArray(value) ? value[0] : value
   }
+  const puede = esAdmin(actor) || actor.memberships.length > 0
+  if (!puede) {
+    return (
+      <div className="max-w-xl">
+        <h1 className="font-heading text-2xl">Panel de gestión</h1>
+        <p className="mt-3 text-sm text-muted-foreground">El panel es para los equipos. Como solicitante, el seguimiento está en Mis solicitudes.</p>
+      </div>
+    )
+  }
+  const periodo = one("periodo") || "8s"
+  const ahora = DateTime.now().setZone(ZONE)
+  const desde = one("from") || (periodo === "mes" ? ahora.startOf("month") : periodo === "anio" ? ahora.startOf("year") : ahora.minus({ weeks: 8 })).toISO() || undefined
   const team = one("team")
-  const brand = one("brand")
   const empresaId = one("empresa")
   const projectId = one("proyecto")
   const areaId = one("area")
-  const data = await dashboard(actor, { team, brand, empresaId, projectId, areaId, from: one("from"), to: one("to") })
-  const mias = await listar(actor, { assignedToMe: true, openOnly: true, pageSize: 8, areaId: areaId || undefined })
+  const data = await dashboard(actor, { team, brand: one("brand"), empresaId, projectId, areaId, from: desde, to: one("to") })
+  const mias = await listar(actor, { assignedToMe: true, openOnly: true, pageSize: 6, areaId: areaId || undefined })
   const [empresas, proyectosCatalogo, areasCatalogo, avanceProyectos] = await Promise.all([
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, empresaId: true } }),
@@ -33,151 +49,124 @@ export default async function DashboardPage({
     listarProyectos(actor, empresaId),
   ])
   const avances = projectId ? avanceProyectos.filter((item) => item.id === projectId) : avanceProyectos
-  const puede = esAdmin(actor) || actor.memberships.length > 0
-  if (!puede) {
-    return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-semibold">Paneles</h1>
-        <p className="mt-3 text-sm text-muted-foreground">El dashboard es para los equipos y para gerencia. Como solicitante, el seguimiento está en Mis solicitudes.</p>
-      </div>
-    )
-  }
   const soloLectura = !esAdmin(actor) && actor.memberships.every((item) => item.role === "OBSERVADOR") && !actor.memberships.some((item) => rolEn(actor, item.team) !== "OBSERVADOR")
+  const mitad = Math.ceil(data.porEstado.length / 2)
+  const columnas = [data.porEstado.slice(0, mitad), data.porEstado.slice(mitad)]
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Paneles</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Abiertos por estado, creados frente a resueltos y cumplimiento de SLA. {soloLectura ? "Está en modo solo lectura." : ""}
-        </p>
+        <h1 className="font-heading text-2xl">Panel de gestión</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Carga de trabajo, cumplimiento y avance de proyectos.{soloLectura ? " Está en modo solo lectura." : ""}</p>
       </div>
-      <form className="grid gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <select name="team" defaultValue={team ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Equipo">
-          <option value="">Todos los equipos</option>
-          <option value="DESARROLLO">Desarrollo</option>
-          <option value="MARKETING">Marketing</option>
-        </select>
-        <select name="brand" defaultValue={brand ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Marca">
-          <option value="">Todas las marcas</option>
-          <option value="CIFES">CIFES</option>
-          <option value="LUVANIA">Luvania</option>
-          <option value="AMBAS">Ambas/Transversal</option>
-        </select>
-        <select name="empresa" defaultValue={empresaId ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Empresa">
-          <option value="">Todas las empresas</option>
-          {empresas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <select name="proyecto" defaultValue={projectId ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Proyecto">
-          <option value="">Todos los proyectos</option>
-          {proyectosCatalogo.filter((item) => !empresaId || item.empresaId === empresaId).map((item) => (
-            <option key={item.id} value={item.id}>{item.name}</option>
-          ))}
-        </select>
-        <select name="area" defaultValue={areaId ?? ""} className="h-9 rounded-lg border border-input bg-card px-2 text-sm" aria-label="Área">
-          <option value="">Todas las áreas</option>
-          {areasCatalogo.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <input name="from" type="date" defaultValue={one("from")} lang="es-CO" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Desde" />
-        <button className="h-9 rounded-lg bg-primary text-sm text-primary-foreground" type="submit">Recalcular</button>
-      </form>
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <section className="rounded-lg border border-[#1658B0] bg-white">
-          <header className="flex items-center justify-between border-b border-border px-3 py-2 text-sm font-medium">
-            <span>Mis asignaciones</span>
-            <Link href="/requerimientos?assigned=1" className="text-xs text-[#1658B0]">Actualizar</Link>
+      <Suspense>
+        <ControlesPanel empresas={empresas} areas={areasCatalogo} proyectos={proyectosCatalogo} />
+      </Suspense>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Tarjeta icono={<ClipboardListIcon className="size-5 text-[#1658B0]" />} fondo="#E7F0FB" etiqueta="Requerimientos abiertos" valor={String(data.abiertos)} href={`/requerimientos?${new URLSearchParams({ ...(team ? { team } : {}), ...(areaId ? { area: areaId } : {}) }).toString()}`} />
+        <Tarjeta icono={<ClockIcon className="size-5 text-[#B45309]" />} fondo="#FEF3C7" etiqueta="Cumplimiento de SLA" valor={data.cumplimiento === null ? "—" : `${data.cumplimiento} %`} />
+        <Tarjeta icono={<AlertTriangleIcon className="size-5 text-[#B91C1C]" />} fondo="#FEE2E2" etiqueta="Requerimientos vencidos" valor={String(data.vencidos.length)} href="/requerimientos?sla=vencido" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.8fr]">
+        <section className="rounded-lg border border-[#E2E8F0] bg-white">
+          <header className="flex items-center justify-between gap-3 px-4 py-3">
+            <h2 className="flex items-center gap-2 text-sm font-medium">
+              Requieren atención
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">{data.vencidos.length} vencidos</span>
+            </h2>
+            <Link href="/requerimientos?sla=vencido" className="text-sm text-[#1658B0] hover:underline">Ver todos →</Link>
           </header>
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-muted-foreground"><tr><th className="px-3 py-1">T</th><th>Clave</th><th>Resumen</th><th className="px-3">Pr</th></tr></thead>
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-t border-[#F0F4FA]"><th className="px-4 py-2 font-medium">Requerimiento</th><th className="px-3 py-2 font-medium">Estado</th><th className="px-4 py-2 font-medium">SLA</th></tr>
+            </thead>
             <tbody>
-              {mias.items.map((item) => (
-                <tr key={item.id} className="border-t border-border">
-                  <td className="px-3 py-1.5 text-[#1658B0]">□</td>
-                  <td><Link href={`/requerimientos/${item.code}`} className="text-[#1658B0] hover:underline">{item.code}</Link></td>
-                  <td className="max-w-[16rem] truncate">{item.title}</td>
-                  <td className="px-3">{item.priority === "CRITICA" || item.priority === "ALTA" ? "↑" : item.priority === "BAJA" ? "↓" : "="}</td>
+              {data.vencidos.length === 0 ? (
+                <tr><td colSpan={3} className="px-4 py-6 text-sm text-muted-foreground">Ningún SLA de solución está vencido.</td></tr>
+              ) : data.vencidos.slice(0, 6).map((item) => (
+                <tr key={item.id} className="border-t border-[#F0F4FA]">
+                  <td className="px-4 py-2.5"><Link href={`/requerimientos/${item.code}`} className="hover:underline">{item.code} · {item.title}</Link></td>
+                  <td className="px-3 py-2.5"><EstadoBadge status={item.status} etiqueta={item.status === "APROBADO" ? "En cola" : undefined} /></td>
+                  <td className="px-4 py-2.5"><SlaBadge state={item.sla.state} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="px-3 py-2 text-xs text-muted-foreground">{mias.items.length === 0 ? "0" : `1–${mias.items.length}`} de {mias.total}</p>
         </section>
-        <section className="rounded-lg border border-[#1658B0] bg-white">
-          <header className="border-b border-border px-3 py-2 text-sm font-medium">Proyectos</header>
-          <ul className="divide-y divide-border">
-            {avances.slice(0, 6).map((proyecto) => (
-              <li key={proyecto.id} className="px-3 py-2 text-sm">
-                <Link href={`/proyectos/${proyecto.id}`} className="font-medium text-[#1658B0] hover:underline">{proyecto.name}</Link>
-                <p className="text-xs text-muted-foreground">Responsable de proyecto: {proyecto.leader.name}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Link href={`/requerimientos?${new URLSearchParams({ ...(team ? { team } : {}), ...(brand ? { brand } : {}), ...(areaId ? { area: areaId } : {}) }).toString()}`} className="rounded-xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Abiertos</p>
-          <p className="font-heading text-4xl">{data.abiertos}</p>
-        </Link>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Cumplimiento de SLA</p>
-          <p className="font-heading text-4xl">{data.cumplimiento === null ? "—" : `${data.cumplimiento} %`}</p>
-        </div>
-        <Link href={`/requerimientos?sla=vencido`} className="rounded-xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Vencidos ahora</p>
-          <p className="font-heading text-4xl">{data.vencidos.length}</p>
-        </Link>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-border bg-card p-4">
-          <h2 className="font-heading text-xl">Abiertos por estado</h2>
-          <ul className="mt-3 grid gap-2 text-sm">
-            {data.porEstado.length === 0 ? <li className="text-muted-foreground">No hay abiertos con ese filtro.</li> : data.porEstado.map((item) => (
-              <li key={item.status}>
-                <Link className="flex justify-between hover:underline" href={`/requerimientos?status=${item.status}${team ? `&team=${team}` : ""}${areaId ? `&area=${areaId}` : ""}`}>
-                  <span>{statusLabel(item.status)}</span><span>{item.total}</span>
+        <section className="rounded-lg border border-[#E2E8F0] bg-white p-4">
+          <h2 className="text-sm font-medium">Avance por proyecto</h2>
+          <ul className="mt-3 space-y-3">
+            {avances.length === 0 ? <li className="text-sm text-muted-foreground">No hay proyectos en este corte.</li> : avances.slice(0, 6).map((proyecto) => (
+              <li key={proyecto.id}>
+                <Link href={`/proyectos/${proyecto.id}`} className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm">
+                  <span>
+                    <span className="block font-medium">{proyecto.name}</span>
+                    <span className="text-xs text-muted-foreground">{proyecto.empresa.name}</span>
+                  </span>
+                  <span className="flex w-36 items-center gap-2">
+                    <Barra porcentaje={proyecto.avance.porcentaje} />
+                    <span className="w-10 text-right text-xs tabular-nums">{proyecto.avance.porcentaje}%</span>
+                  </span>
                 </Link>
               </li>
             ))}
           </ul>
         </section>
-        <section className="rounded-xl border border-border bg-card p-4">
-          <h2 className="font-heading text-xl">Creados y resueltos</h2>
-          <ul className="mt-3 grid gap-2">
-            {data.semanas.map((semana) => (
-              <li key={semana.label} className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-xs">
-                <span>{semana.label}</span>
-                <span className="flex h-3 overflow-hidden rounded-full bg-muted">
-                  <span className="bg-primary/70" style={{ width: `${Math.min(100, semana.creados * 12)}%` }} />
-                  <span className="bg-emerald-700/70" style={{ width: `${Math.min(100, semana.resueltos * 12)}%` }} />
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-muted-foreground">Azul: creados. Verde: resueltos. Últimas 8 semanas del periodo.</p>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-lg border border-[#E2E8F0] bg-white p-4">
+          <h2 className="text-sm font-medium">Abiertos por estado</h2>
+          {data.porEstado.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No hay abiertos con ese filtro.</p> : (
+            <div className="mt-3 grid gap-x-8 sm:grid-cols-2">
+              {columnas.map((columna, indice) => (
+                <ul key={indice} className="divide-y divide-[#F0F4FA]">
+                  {columna.map((item) => (
+                    <li key={item.status}>
+                      <Link className="flex items-center justify-between py-2 text-sm hover:underline" href={`/requerimientos?status=${item.status}${team ? `&team=${team}` : ""}${areaId ? `&area=${areaId}` : ""}`}>
+                        <span>{item.status === "APROBADO" ? "En cola" : statusLabel(item.status)}</span>
+                        <span className="tabular-nums text-muted-foreground">{item.total}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="rounded-lg border border-[#E2E8F0] bg-white p-4">
+          <h2 className="text-sm font-medium">Mis asignaciones</h2>
+          {mias.items.length === 0 ? (
+            <div className="flex flex-col items-center px-6 py-10 text-center">
+              <span className="inline-flex size-12 items-center justify-center rounded-full bg-[#E7F0FB] text-[#1658B0]">
+                <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></svg>
+              </span>
+              <p className="mt-3 text-sm font-medium">No tienes requerimientos asignados</p>
+              <p className="mt-1 text-xs text-muted-foreground">Tus próximas asignaciones aparecerán aquí.</p>
+            </div>
+          ) : (
+            <ul className="mt-3 divide-y divide-[#F0F4FA]">
+              {mias.items.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <Link href={`/requerimientos/${item.code}`} className="truncate hover:underline">{item.code} · {item.title}</Link>
+                  <EstadoBadge status={item.status} />
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
-      <section className="rounded-xl border border-border bg-card p-4">
-        <h2 className="font-heading text-xl">Avance por proyecto</h2>
-        <div className="mt-3 grid gap-3">
-          {avances.length === 0 ? <p className="text-sm text-muted-foreground">No hay proyectos en este corte.</p> : avances.map((proyecto) => (
-            <Link key={proyecto.id} href={`/proyectos/${proyecto.id}`} className="grid gap-1 text-sm">
-              <span className="flex justify-between"><span>{proyecto.empresa.name} · {proyecto.name}</span><span>{proyecto.avance.porcentaje}%</span></span>
-              <Barra porcentaje={proyecto.avance.porcentaje} />
-            </Link>
-          ))}
-        </div>
-      </section>
-      <section className="rounded-xl border border-border bg-card p-4">
-        <h2 className="font-heading text-xl">Vencidos</h2>
-        <div className="mt-3 grid gap-2">
-          {data.vencidos.length === 0 ? <p className="text-sm text-muted-foreground">Ningún SLA de solución está vencido.</p> : data.vencidos.map((item) => (
-            <Link key={item.id} href={`/requerimientos/${item.code}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span>{item.code} · {item.title}</span>
-              <span className="flex gap-2"><EstadoBadge status={item.status} /><SlaBadge state={item.sla.state} /></span>
-            </Link>
-          ))}
-        </div>
-      </section>
     </div>
   )
+}
+
+function Tarjeta({ icono, fondo, etiqueta, valor, href }: { icono: React.ReactNode; fondo: string; etiqueta: string; valor: string; href?: string }) {
+  const cuerpo = (
+    <article className="flex items-center gap-3 rounded-lg border border-[#E2E8F0] bg-white p-4">
+      <span className="inline-flex size-11 items-center justify-center rounded-lg" style={{ background: fondo }}>{icono}</span>
+      <span>
+        <span className="block text-sm text-muted-foreground">{etiqueta}</span>
+        <span className="block font-heading text-3xl leading-tight">{valor}</span>
+      </span>
+    </article>
+  )
+  return href ? <Link href={href}>{cuerpo}</Link> : cuerpo
 }

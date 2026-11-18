@@ -12,8 +12,8 @@ import {
 import { slaClass, statusClass, statusText } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-export function EstadoBadge({ status }: { status: string }) {
-  return <Badge className={cn("border-transparent", statusClass(status))}>{statusText(status)}</Badge>
+export function EstadoBadge({ status, etiqueta }: { status: string; etiqueta?: string }) {
+  return <Badge className={cn("border-transparent", statusClass(status))}>{etiqueta ?? statusText(status)}</Badge>
 }
 
 export function SlaBadge({ state }: { state: SlaState }) {

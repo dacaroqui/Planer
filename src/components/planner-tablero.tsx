@@ -3,10 +3,13 @@
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import Link from "next/link"
 import { EliminarTarea } from "@/components/confirmar-eliminar"
 import { guardarTareaAction } from "@/server/actions"
+import { Avatar } from "@/components/iconos-planer"
 import { Barra } from "@/components/barra"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
 const COLUMNAS = [
@@ -52,6 +55,7 @@ export function PlannerTablero({
   const router = useRouter()
   const [abierta, setAbierta] = useState<string | null>(null)
   const [vista, setVista] = useState(grupos)
+  const [confirma, setConfirma] = useState<{ id: string; status: TareaPlanner["status"]; projectId: string; title: string; columna: string } | null>(null)
   useEffect(() => setVista(grupos), [grupos])
   const [pending, start] = useTransition()
 
@@ -67,48 +71,69 @@ export function PlannerTablero({
     })
   }
 
-  function soltar(event: React.DragEvent<HTMLElement>, status: string, projectId: string) {
+  function soltar(event: React.DragEvent<HTMLElement>, status: TareaPlanner["status"], projectId: string, columna: string) {
     event.preventDefault()
-    if (!puede) return
+    if (!puede || pending) return
     const id = event.dataTransfer.getData("text/plain")
     const tarea = vista.flatMap((grupo) => grupo.tareas).find((item) => item.id === id)
     if (!tarea || tarea.projectId !== projectId) {
       toast.error("Mueva la tarea dentro de su proyecto.")
       return
     }
+    if (tarea.status === status) return
+    setConfirma({ id, status, projectId, title: tarea.title, columna })
+  }
+
+  function aplicarMovimiento() {
+    if (!confirma) return
+    const { id, status, projectId, title } = confirma
     const data = new FormData()
     data.set("id", id)
-    data.set("title", tarea.title)
+    data.set("title", title)
     data.set("status", status)
     if (projectId !== "sin-proyecto") data.set("projectId", projectId)
     setVista((actual) => actual.map((grupo) => ({
       ...grupo,
-      tareas: grupo.tareas.map((item) => item.id === id ? { ...item, status: status as TareaPlanner["status"], porcentaje: status === "HECHA" && item.subtareas.length === 0 ? 100 : item.porcentaje } : item),
+      tareas: grupo.tareas.map((item) => item.id === id ? { ...item, status, porcentaje: status === "HECHA" && item.subtareas.length === 0 ? 100 : item.porcentaje } : item),
     })))
+    setConfirma(null)
     guardar(data)
   }
 
   return (
-    <div className="space-y-8">
-      {vista.map((grupo) => (
-        <section key={grupo.id}>
-          <h2 className="font-heading text-2xl">{grupo.nombre}</h2>
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            {COLUMNAS.map((columna) => (
+    <div className="space-y-5">
+      {vista.map((grupo) => {
+        const promedio = grupo.tareas.length === 0 ? 0 : Math.round(grupo.tareas.reduce((suma, tarea) => suma + tarea.porcentaje, 0) / grupo.tareas.length)
+        return (
+        <section key={grupo.id} className="rounded-lg border border-[#E2E8F0] bg-white p-4">
+          <header className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium">{grupo.nombre}</h2>
+              <p className="text-xs text-muted-foreground">{grupo.tareas.length.toLocaleString("es-CO")} tareas</p>
+            </div>
+            <span className="text-sm font-medium tabular-nums text-[#1658B0]">{promedio}%</span>
+          </header>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {COLUMNAS.map((columna) => {
+              const propias = grupo.tareas.filter((tarea) => tarea.status === columna.key)
+              return (
               <div
                 key={columna.key}
-                className="min-h-40 rounded-xl bg-muted/70 p-2"
+                className="min-h-40 rounded-lg bg-[#F4F7FC] p-2"
                 onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => soltar(event, columna.key, grupo.id)}
+                onDrop={(event) => soltar(event, columna.key, grupo.id, columna.label)}
               >
-                <p className="px-1 py-2 text-sm font-medium">{columna.label}</p>
+                <p className="flex items-center justify-between px-1 py-2 text-sm font-medium">
+                  {columna.label}
+                  <span className="text-xs font-normal text-muted-foreground">{propias.length}</span>
+                </p>
                 <div className="grid gap-2">
-                  {grupo.tareas.filter((tarea) => tarea.status === columna.key).map((tarea) => (
+                  {propias.map((tarea) => (
                     <article
                       key={tarea.id}
                       draggable={puede && !pending}
                       onDragStart={(event) => event.dataTransfer.setData("text/plain", tarea.id)}
-                      className="rounded-lg border border-border bg-card p-3 text-sm"
+                      className="rounded-lg border border-[#E2E8F0] bg-white p-3 text-sm shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <button type="button" className="text-left font-medium" onClick={() => setAbierta(abierta === tarea.id ? null : tarea.id)}>
@@ -116,12 +141,15 @@ export function PlannerTablero({
                         </button>
                         {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {tarea.assignee}{tarea.requestCode ? ` · ${tarea.requestCode}` : ""}{tarea.vencida ? " · vencida" : ""}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {tarea.requestCode ? <Link href={`/requerimientos/${tarea.requestCode}`} className="rounded-md bg-[#E7F0FB] px-1.5 py-0.5 text-[11px] font-medium text-[#1658B0]">{tarea.requestCode}</Link> : null}
+                        {tarea.vencida ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">vencida</span> : null}
+                      </div>
+                      <p className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                        <Avatar nombre={tarea.assignee} /> {tarea.assignee}
                       </p>
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-2">
                         <Barra porcentaje={tarea.porcentaje} />
-                        <span className="text-xs">{tarea.porcentaje}%</span>
                       </div>
                       {abierta === tarea.id ? (
                         <div className="mt-3 grid gap-2 border-t border-border pt-2">
@@ -170,10 +198,26 @@ export function PlannerTablero({
                   ))}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
-      ))}
+        )
+      })}
+      <Dialog open={Boolean(confirma)} onOpenChange={(abierto) => { if (!abierto && !pending) setConfirma(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mover la tarea</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {confirma ? `«${confirma.title}» pasará a ${confirma.columna}. Si cancela, la tarjeta se queda donde está.` : null}
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirma(null)} disabled={pending}>Cancelar</Button>
+            <Button type="button" onClick={aplicarMovimiento} disabled={pending || !confirma}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
