@@ -14,7 +14,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "Planer · Requerimientos CIFES y Luvania",
-  description: "Planer, la mesa interna para radicar y seguir requerimientos de Desarrollo y Marketing.",
+  description: "Planer, la mesa interna para radicar y seguir requerimientos de Producto, Marketing, Comercial, Innovación, Administración y Growth.",
   robots: { index: false, follow: false },
 }
 

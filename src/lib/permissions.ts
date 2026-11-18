@@ -1,5 +1,4 @@
-import type { Actor, TeamName } from "@/lib/domain"
-import { TERMINAL_STATUSES } from "@/lib/domain"
+import { TEAMS, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
 import { TRANSICIONES_OFICIALES, type TransicionOficial } from "@/lib/flujo-oficial"
 
 export type RequestAccess = {
@@ -61,7 +60,7 @@ export function etiquetaDeAutor(
 }
 
 export function equiposVisibles(actor: Actor) {
-  if (esAdmin(actor)) return ["DESARROLLO", "MARKETING"] as const
+  if (esAdmin(actor)) return [...TEAMS]
   return [...new Set(actor.memberships.map((item) => item.team))]
 }
 
@@ -118,12 +117,16 @@ export function puedeEditarCampos(
   return actor.id === request.requesterId && request.status === "NUEVO"
 }
 
-export function puedeCambiarPrioridad(actor: Actor, team: TeamName) {
-  return esAdmin(actor) || rolEn(actor, team) === "LIDER"
+export function puedeClasificar(actor: Actor) {
+  return esAdmin(actor)
 }
 
-export function puedeTrasladar(actor: Actor, team: TeamName) {
-  return esAdmin(actor) || rolEn(actor, team) === "LIDER"
+export function puedeCambiarPrioridad(actor: Actor, _team: TeamName) {
+  return puedeClasificar(actor)
+}
+
+export function puedeTrasladar(actor: Actor, _team: TeamName) {
+  return puedeClasificar(actor)
 }
 
 function rolPermitido(actor: Actor, request: RequestAccess, roles: TransicionOficial["roles"]) {
@@ -150,6 +153,7 @@ export function transicionesPara(
   return catalogo.filter((transition) => {
     if (transition.team !== request.team) return false
     if (!transition.from.includes(request.status)) return false
+    if (actor.id === request.requesterId && transition.name === "Pedir información") return false
     if (transition.reopenWithinDays && request.resolvedAt) {
       const limite = request.resolvedAt.getTime() + transition.reopenWithinDays * 24 * 60 * 60 * 1000
       if (now.getTime() > limite && !esAdmin(actor)) return false

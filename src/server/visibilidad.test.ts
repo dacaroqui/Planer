@@ -172,7 +172,7 @@ describe("H-02 H-03 H-05 H-17 visibilidad", () => {
       priority: "MEDIA",
       brand: "LUVANIA",
       declares: true,
-    })).rejects.toThrow(/canal y la fecha/)
+    })).rejects.toThrow(/canal/)
     const eventoReq = await radicar(sara, {
       title: "Activación de prueba",
       description: "Un evento no exige canal ni fecha de publicación en el formulario.",

@@ -3,8 +3,11 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { FileDropzone } from "@/components/file-dropzone"
 import { publicarComposicion } from "@/components/compositor-envio"
-import { adjuntarAction, comentarAction } from "@/server/actions"
+import { pestanasPara } from "@/lib/cronologia"
+import { puedeSeguirConArchivos, type PiezaArchivo } from "@/lib/archivos-zona"
+import { comentarAction } from "@/server/actions"
 
 const TABS = [
   { id: "PUBLICA", etiqueta: "Responder al solicitante" },
@@ -21,16 +24,23 @@ export function Compositor({
   puedeNota,
   puedeAdjuntar,
   tareas,
+  esSolicitante = false,
 }: {
   code: string
   puedePublica: boolean
   puedeNota: boolean
   puedeAdjuntar: boolean
   tareas: { id: string; title: string }[]
+  esSolicitante?: boolean
 }) {
   const router = useRouter()
-  const disponibles = TABS.filter((tab) => tab.id === "PUBLICA" ? puedePublica : puedeNota)
+  const permitidas = new Set(pestanasPara({ esSolicitante, puedePublica, puedeNota }))
+  const disponibles = TABS.filter((tab) => permitidas.has(tab.id)).map((tab) => (
+    esSolicitante && tab.id === "PUBLICA" ? { ...tab, etiqueta: "Comentar" as const } : tab
+  ))
   const [tab, setTab] = useState<Kind>(disponibles[0]?.id ?? "PUBLICA")
+  const [archivos, setArchivos] = useState<File[]>([])
+  const [piezas, setPiezas] = useState<PiezaArchivo[]>([])
   const [pending, start] = useTransition()
   if (disponibles.length === 0) return <p className="text-sm text-muted-foreground">Su perfil solo puede leer esta solicitud.</p>
   return (
@@ -40,14 +50,21 @@ export function Compositor({
       const data = new FormData(form)
       data.set("code", code)
       data.set("kind", tab)
-      start(() => publicarComposicion({
-        form,
-        data,
-        adjuntar: adjuntarAction,
-        comentar: comentarAction,
-        avisar: (tipo, texto) => tipo === "ok" ? toast.success(texto) : toast.error(texto),
-        refrescar: () => router.refresh(),
-      }))
+      if (!puedeSeguirConArchivos(piezas)) {
+        toast.error("Quite el archivo que no está permitido antes de publicar.")
+        return
+      }
+      for (const archivo of archivos) data.append("archivo", archivo)
+      start(async () => {
+        const ok = await publicarComposicion({
+          form,
+          data,
+          comentar: comentarAction,
+          avisar: (tipo, texto) => tipo === "ok" ? toast.success(texto) : toast.error(texto),
+          refrescar: () => router.refresh(),
+        })
+        if (ok) { setArchivos([]); setPiezas([]) }
+      })
     }}>
       <div className="mb-3 flex flex-wrap gap-1" role="tablist">
         {disponibles.map((item) => (
@@ -56,7 +73,7 @@ export function Compositor({
           </button>
         ))}
       </div>
-      <textarea name="body" required minLength={2} rows={3} placeholder={tab === "SOLICITUD_INFO" ? "Qué necesita del solicitante. Esto pausa el SLA." : tab === "REGISTRO" ? "Qué hizo en la tarea." : tab === "INTERNA" ? "Nota visible solo para el equipo." : "Respuesta para el solicitante."} className="w-full rounded-lg border border-[#E4E7EC] px-3 py-2 text-sm" />
+      <textarea name="body" required minLength={2} rows={3} placeholder={tab === "SOLICITUD_INFO" ? "Qué necesita del solicitante. Esto pausa el SLA." : tab === "REGISTRO" ? "Qué hizo en la tarea." : tab === "INTERNA" ? "Nota visible solo para el equipo." : esSolicitante ? "Escriba su comentario." : "Respuesta para el solicitante."} className="w-full rounded-lg border border-[#E4E7EC] px-3 py-2 text-sm" />
       {tab === "REGISTRO" ? (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">
@@ -75,7 +92,7 @@ export function Compositor({
           </label>
         </div>
       ) : null}
-      {puedeAdjuntar ? <input name="archivo" type="file" className="mt-3 block w-full text-sm" aria-label="Adjuntar archivo" /> : null}
+      {puedeAdjuntar ? <div className="mt-3"><FileDropzone piezas={piezas} archivos={archivos} onChange={(siguientes, lista) => { setPiezas(siguientes); setArchivos(lista) }} /></div> : null}
       <div className="mt-3 flex justify-end">
         <button type="submit" disabled={pending} className="h-10 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white disabled:opacity-60">
           {pending ? "Publicando…" : tab === "SOLICITUD_INFO" ? "Pedir información" : "Publicar"}

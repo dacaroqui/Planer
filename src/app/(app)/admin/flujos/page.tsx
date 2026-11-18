@@ -3,7 +3,7 @@ import { guardarEstadoAction, guardarSlaAction, guardarTransicionAction } from "
 import { EliminarEstado } from "@/components/eliminar-estado"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { PRIORITY_LABEL, type PriorityName } from "@/lib/domain"
+import { PRIORITY_LABEL, TEAM_LABEL, TEAMS, type PriorityName, type TeamName } from "@/lib/domain"
 import { puedeAdministrar } from "@/lib/permissions"
 import { requireActor } from "@/server/session"
 import { catalogos } from "@/server/requests"
@@ -23,12 +23,11 @@ export default async function FlujosPage() {
       <section className="grid gap-3">
         <h2 className="font-heading text-2xl">Estados</h2>
         {data.estados.map((estado) => (
-          <EliminarEstado key={estado.id} id={estado.id} nombre={`${estado.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · ${estado.name}`} />
+          <EliminarEstado key={estado.id} id={estado.id} nombre={`${TEAM_LABEL[estado.team as TeamName] ?? estado.team} · ${estado.name}`} />
         ))}
         <form action={guardarEstadoAction} className="grid gap-2 rounded-xl border border-border bg-card p-4 md:grid-cols-4">
           <select name="team" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Área">
-            <option value="DESARROLLO">Desarrollo</option>
-            <option value="MARKETING">Marketing</option>
+            {TEAMS.map((equipo) => <option key={equipo} value={equipo}>{TEAM_LABEL[equipo]}</option>)}
           </select>
           <Input name="key" placeholder="CLAVE" required />
           <Input name="name" placeholder="Nombre visible" required />
@@ -44,12 +43,11 @@ export default async function FlujosPage() {
       <section className="grid gap-3">
         <h2 className="font-heading text-2xl">Transiciones</h2>
         {data.transiciones.map((item) => (
-          <p key={item.id} className="text-sm">{item.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {item.name}: {item.fromKeys} → {item.toKey} · {item.allowedRoles}</p>
+          <p key={item.id} className="text-sm">{TEAM_LABEL[item.team as TeamName] ?? item.team} · {item.name}: {item.fromKeys} → {item.toKey} · {item.allowedRoles}</p>
         ))}
         <form action={guardarTransicionAction} className="grid gap-2 rounded-xl border border-border bg-card p-4 md:grid-cols-3">
           <select name="team" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Área">
-            <option value="DESARROLLO">Desarrollo</option>
-            <option value="MARKETING">Marketing</option>
+            {TEAMS.map((equipo) => <option key={equipo} value={equipo}>{TEAM_LABEL[equipo]}</option>)}
           </select>
           <Input name="name" placeholder="Nombre de la transición" required />
           <Input name="fromKeys" placeholder="Origen, separado por comas" required />
@@ -74,14 +72,13 @@ export default async function FlujosPage() {
         <h2 className="font-heading text-2xl">Metas de SLA</h2>
         {data.politicas.map((item) => (
           <p key={item.id} className="text-sm">
-            {item.team === "DESARROLLO" ? "Desarrollo" : "Marketing"} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority}
+            {TEAM_LABEL[item.team as TeamName] ?? item.team} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority}
             {item.type ? ` · ${item.type.name}` : " · cualquier tipo"} · primera respuesta {item.firstResponseMinutes / 60} h · solución {item.resolutionMinutes / 60} h
           </p>
         ))}
         <form action={guardarSlaAction} className="grid gap-2 rounded-xl border border-border bg-card p-4 md:grid-cols-4">
           <select name="team" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Área">
-            <option value="DESARROLLO">Desarrollo</option>
-            <option value="MARKETING">Marketing</option>
+            {TEAMS.map((equipo) => <option key={equipo} value={equipo}>{TEAM_LABEL[equipo]}</option>)}
           </select>
           <select name="priority" className="h-9 rounded-lg border border-input px-2 text-sm" aria-label="Prioridad">
             <option value="CRITICA">Crítica</option>

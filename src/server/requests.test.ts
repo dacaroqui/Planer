@@ -172,7 +172,13 @@ describe("RQ-10 RQ-11 RQ-12 RQ-21 transición, devolución y visibilidad", () =>
     await transicionar(helena, request.id, "Iniciar análisis", null, {}, { email, now })
     await expect(transicionar(helena, request.id, "Aprobar", null, {}, { email, now })).rejects.toBeInstanceOf(DomainError)
     await asignar(helena, request.id, valentina.id, { email, now })
-    await editarCampos(helena, request.id, { committedDate: "2026-11-20", priority: "ALTA" }, { email, now })
+    await editarCampos(helena, request.id, { committedDate: "2026-11-20" }, { email, now })
+    await expect(editarCampos(helena, request.id, { priority: "ALTA" }, { email, now })).rejects.toThrow(/administrador/)
+    const admin = toActor(await prisma.user.create({
+      data: { name: "Admin Clasifica", email: "admin.clasifica@cifes.edu.co", role: "ADMINISTRADOR", areaId: (await prisma.area.findFirstOrThrow()).id },
+      include: { areaRoles: true },
+    }))
+    await editarCampos(admin, request.id, { priority: "ALTA" }, { email, now })
     const cambio = await prisma.activity.findFirst({ where: { requestId: request.id, field: "prioridad" } })
     expect(cambio?.fromValue).toBe("MEDIA")
     expect(cambio?.toValue).toBe("ALTA")
@@ -418,7 +424,12 @@ describe("acciones masivas sobre la selección", () => {
       stepsToReproduce: "Abrir asistencia demo y pulsar exportar.",
     })
     await expect(cambiarPrioridadMasiva(valentina, [uno.code, dos.code], "ALTA")).rejects.toBeInstanceOf(DomainError)
-    const total = await cambiarPrioridadMasiva(helena, [uno.code, dos.code], "ALTA")
+    await expect(cambiarPrioridadMasiva(helena, [uno.code, dos.code], "ALTA")).rejects.toThrow(/administrador/)
+    const admin = toActor(await prisma.user.create({
+      data: { name: "Admin Prioridad", email: "admin.prioridad@cifes.edu.co", role: "ADMINISTRADOR", areaId: (await prisma.area.findFirstOrThrow()).id },
+      include: { areaRoles: true },
+    }))
+    const total = await cambiarPrioridadMasiva(admin, [uno.code, dos.code], "ALTA")
     expect(total).toBe(2)
     const lista = await listar(helena, {})
     expect(lista.items.every((item) => item.priority === "ALTA")).toBe(true)
@@ -480,7 +491,7 @@ describe("acciones masivas sobre la selección", () => {
     const delLider = await asignarMasiva(helena, [desarrollo.code], camila.id)
     expect(delLider.hechos).toBe(0)
     expect(delLider.errores).toEqual([
-      { code: desarrollo.code, mensaje: "Camila Ejemplo no es agente ni líder de Desarrollo." },
+      { code: desarrollo.code, mensaje: "Camila Ejemplo no es agente ni líder de Producto." },
     ])
     const delAdmin = await asignarMasiva(admin, [desarrollo.code], camila.id)
     expect(delAdmin).toEqual({ hechos: 1, errores: [] })

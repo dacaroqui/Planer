@@ -6,6 +6,7 @@ import { crearInvitacionAction, crearUsuarioManualAction, generarRestablecimient
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { TEAM_LABEL, TEAMS } from "@/lib/domain"
 
 const ROLES = [
   ["SOLICITANTE", "Solicitante"],
@@ -71,8 +72,7 @@ function CamposComunes({
       </fieldset>
       <fieldset className="grid gap-1">
         <legend className="text-xs text-muted-foreground">Equipo, si el rol es agente, líder u observador</legend>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="team:DESARROLLO" value="1" />Desarrollo</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="team:MARKETING" value="1" />Marketing</label>
+        {TEAMS.map((equipo) => <label key={equipo} className="flex items-center gap-2 text-sm"><input type="checkbox" name={`team:${equipo}`} value="1" />{TEAM_LABEL[equipo]}</label>)}
       </fieldset>
     </>
   )

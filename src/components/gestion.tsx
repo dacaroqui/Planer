@@ -1,22 +1,28 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { adjuntarAction, asignarAction, comentarAction, deshacerTransicionAction, transicionarAction, type ActionResult } from "@/server/actions"
+import { adjuntarAction, asignarAction, comentarAction, deshacerTransicionAction, guardarFechaEntregaAction, transicionarAction, type ActionResult } from "@/server/actions"
+import { Elegir } from "@/components/ui/elegir"
+import { Avatar } from "@/components/iconos-planer"
+import { EstadoBadge, SlaBadge } from "@/components/insignias"
+import { errorFechaEntrega } from "@/lib/fecha-entrega"
+import { iniciales } from "@/lib/planer-ui"
+import { TEAM_LABEL, TEAMS, type SlaState, type TeamName } from "@/lib/domain"
+import { opcionesPersona, type Candidato } from "@/lib/asignacion"
 import { SelectorArchivo } from "@/components/archivo"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { CamposMovimiento } from "@/components/campos-movimiento"
 import { detalleExigeDialogo, debePedirResponsable, VENTANA_DESHACER_MS, validarDatosMovimiento } from "@/lib/tablero-movimiento"
 import { notaResolucionOpcional, visibilidadDefecto } from "@/lib/cronologia"
 
 type Transicion = { name: string; to: string; label: string; requiresComment: boolean; requiresDelivery?: boolean; requiresAssignee?: boolean; requiresCommittedDate?: boolean }
-type Agente = { id: string; name: string }
+type Agente = { id: string; name: string; grupo?: string; teams?: TeamName[]; esAdmin?: boolean }
 
 export function Gestion({
   code,
@@ -30,6 +36,15 @@ export function Gestion({
   puedeAdjuntar,
   notaPrefill = "",
   soloTransiciones = false,
+  panel = false,
+  estado = "",
+  prioridad = "",
+  sla = "NO_APLICA" as SlaState,
+  responsable = "",
+  fechaEntrega = "",
+  hoy = "",
+  equipo = "DESARROLLO" as TeamName,
+  esAdministrador = false,
 }: {
   code: string
   transiciones: Transicion[]
@@ -42,10 +57,22 @@ export function Gestion({
   puedeAdjuntar: boolean
   notaPrefill?: string
   soloTransiciones?: boolean
+  panel?: boolean
+  estado?: string
+  prioridad?: string
+  sla?: SlaState
+  responsable?: string
+  fechaEntrega?: string
+  hoy?: string
+  equipo?: TeamName
+  esAdministrador?: boolean
 }) {
   const router = useRouter()
   const [comment, setComment] = useState("")
   const [assigneeId, setAssigneeId] = useState(asignadoId ?? "")
+  const [areaAsignacion, setAreaAsignacion] = useState<TeamName | "">(equipo)
+  const [responsableVisible, setResponsableVisible] = useState(responsable)
+  useEffect(() => setResponsableVisible(responsable), [responsable])
   const [interna, setInterna] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dialogo, setDialogo] = useState<Transicion | null>(null)
@@ -54,6 +81,9 @@ export function Gestion({
   const [resolucion, setResolucion] = useState("RESUELTO")
   const [responsableId, setResponsableId] = useState(asignadoId ?? "")
   const [fecha, setFecha] = useState(fechaComprometida ?? "")
+  const [entregaEsperada, setEntregaEsperada] = useState(fechaEntrega)
+  const [errorFecha, setErrorFecha] = useState<string | null>(null)
+  const [fechaTocada, setFechaTocada] = useState(false)
   const [pending, start] = useTransition()
 
   function correr(action: (data: FormData) => Promise<ActionResult>, data: FormData, deshacer = false) {
@@ -124,31 +154,88 @@ export function Gestion({
     correr(transicionarAction, data, true)
   }
 
-  return (
-    <div className="grid gap-5">
-      {puedeAsignar && agentes.length > 0 ? (
-        <form
-          className="grid gap-2"
-          onSubmit={(event) => {
+  function revisarFecha(valor: string) {
+    const mensaje = errorFechaEntrega(valor, new Date(`${hoy || "2026-01-01"}T12:00:00`))
+    setErrorFecha(mensaje)
+    return mensaje
+  }
+
+  const candidatos: Candidato[] = agentes.map((agente) => ({
+    id: agente.id,
+    name: agente.name,
+    teams: agente.teams ?? [],
+    esAdmin: Boolean(agente.esAdmin || agente.grupo === "Líderes"),
+  }))
+  const personasArea = opcionesPersona(esAdministrador, areaAsignacion, candidatos)
+  const ficha = panel ? (
+    <div className="grid gap-4">
+      <div className="grid gap-2">
+        <p className="text-sm font-medium text-[#15122A]">Responsable</p>
+        <div className="flex items-center gap-2">
+          {responsableVisible ? <Avatar nombre={responsableVisible} /> : <span className="inline-flex size-6 items-center justify-center rounded-full bg-[#F3F4F6] text-[10px] text-[#667085]">—</span>}
+          {responsableVisible ? <span className="text-sm">{responsableVisible}</span> : <span className="rounded-full bg-[#FEF3C7] px-2.5 py-1 text-xs font-medium text-[#92400E]">Pendiente de asignación</span>}
+        </div>
+        {puedeAsignar && agentes.length > 0 ? (
+          <form className="grid gap-2" onSubmit={(event) => {
             event.preventDefault()
             const data = new FormData()
             data.set("code", code)
             data.set("assigneeId", assigneeId)
-            correr(asignarAction, data)
-          }}
-        >
-          <Label>Asignar</Label>
-          <Select value={assigneeId || undefined} onValueChange={setAssigneeId}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Elija un agente" /></SelectTrigger>
-            <SelectContent>
-              {agentes.map((agente) => (
-                <SelectItem key={agente.id} value={agente.id}>{agente.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button type="submit" variant="secondary" disabled={pending || !assigneeId}>Guardar asignación</Button>
-        </form>
-      ) : null}
+            const nombre = personasArea.find((agente) => agente.id === assigneeId)?.name ?? agentes.find((agente) => agente.id === assigneeId)?.name ?? "la persona"
+            start(async () => {
+              const result = await asignarAction(data)
+              if (!result.ok) {
+                setError(result.error)
+                toast.error(result.error)
+                return
+              }
+              setResponsableVisible(nombre)
+              toast.success(`Asignado a ${nombre}`, {
+                description: <a className="font-medium text-[#1658B0] underline" href={`/personas?persona=${assigneeId}`}>Ver en sus tareas</a>,
+              })
+              router.refresh()
+            })
+          }}>
+            <Elegir ariaLabel="Área" value={areaAsignacion} onValueChange={(valor) => { setAreaAsignacion(valor as TeamName); setAssigneeId("") }} opciones={TEAMS.map((item) => ({ value: item, label: TEAM_LABEL[item] }))} />
+            <Elegir ariaLabel="Persona" value={assigneeId} onValueChange={setAssigneeId} placeholder="Persona" opciones={[{ value: "", label: "Persona" }, ...personasArea.map((agente) => ({ value: agente.id, label: agente.name, iniciales: iniciales(agente.name), grupo: agente.grupo }))]} />
+            <button type="submit" disabled={pending || !assigneeId} className="h-11 rounded-lg bg-[#1658B0] text-sm font-medium text-white disabled:opacity-50">{asignadoId || responsableVisible ? "Cambiar" : "Asignar"}</button>
+          </form>
+        ) : null}
+      </div>
+      <div className="grid gap-1">
+        <p className="text-sm font-medium text-[#15122A]">Estado</p>
+        {estado ? <EstadoBadge status={estado} /> : null}
+      </div>
+      <div className="grid gap-1">
+        <p className="text-sm font-medium text-[#15122A]">Prioridad</p>
+        <p className="text-sm">{prioridad || "—"}</p>
+      </div>
+      <form className="grid gap-2" onSubmit={(event) => {
+        event.preventDefault()
+        setFechaTocada(true)
+        if (revisarFecha(entregaEsperada)) return
+        const data = new FormData()
+        data.set("code", code)
+        data.set("desiredDate", entregaEsperada)
+        correr(guardarFechaEntregaAction, data)
+      }}>
+        <label className="grid gap-1.5 text-sm font-medium text-[#15122A]" htmlFor="fecha-entrega-esperada">
+          Fecha de entrega esperada
+          <input id="fecha-entrega-esperada" type="date" lang="es-CO" min={hoy} value={entregaEsperada} onChange={(event) => { setEntregaEsperada(event.target.value); setFechaTocada(true); revisarFecha(event.target.value) }} onBlur={() => { setFechaTocada(true); revisarFecha(entregaEsperada) }} className="h-11 w-full rounded-[10px] border border-[#D9DEE7] bg-white px-3 text-sm font-normal" aria-invalid={Boolean(fechaTocada && errorFecha)} />
+        </label>
+        {fechaTocada && errorFecha ? <p className="text-xs text-red-700">{errorFecha}</p> : null}
+        <button type="submit" disabled={pending || Boolean(errorFecha)} className="h-11 rounded-lg border border-[#1658B0] text-sm font-medium text-[#1658B0] disabled:opacity-50">Guardar fecha</button>
+      </form>
+      <div className="grid gap-1">
+        <p className="text-sm font-medium text-[#15122A]">SLA</p>
+        <SlaBadge state={sla} />
+      </div>
+    </div>
+  ) : null
+
+  return (
+    <div className="grid gap-5" id="gestion">
+      {ficha}
 
       {transiciones.length > 0 ? (
         <div className="grid gap-2">

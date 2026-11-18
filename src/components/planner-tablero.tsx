@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Elegir } from "@/components/ui/elegir"
+import { TEAM_LABEL, TEAMS, type TeamName } from "@/lib/domain"
 
 const COLUMNAS = [
   { key: "PENDIENTE", label: "Pendiente", punto: "bg-[#9CA3AF]" },
@@ -43,6 +45,7 @@ export type TareaPlanner = {
   total: number
   projectId: string
   requestCode: string | null
+  sinAsociar?: boolean
   subtareas: SubtareaVista[]
 }
 
@@ -58,7 +61,7 @@ export function PlannerVista({
 }: {
   empresas: { id: string; name: string }[]
   proyectos: { id: string; name: string; empresaId: string }[]
-  responsables: { id: string; name: string }[]
+  responsables: { id: string; name: string; grupo?: string }[]
   empresaId: string
   proyectoId: string
   tareas: TareaPlanner[]
@@ -70,7 +73,11 @@ export function PlannerVista({
   const [buscar, setBuscar] = useState("")
   const [responsable, setResponsable] = useState("")
   const [estado, setEstado] = useState("")
+  const [area, setArea] = useState("")
+  const [soloSinAsociar, setSoloSinAsociar] = useState(false)
   const [soloVencidas, setSoloVencidas] = useState(false)
+  const [areaNueva, setAreaNueva] = useState<TeamName | "">("")
+  const [responsableNuevo, setResponsableNuevo] = useState("")
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
   const [vista, setVista] = useState(tareas)
   const [firma, setFirma] = useState(tareas)
@@ -88,6 +95,7 @@ export function PlannerVista({
     if (texto && !tarea.title.toLowerCase().includes(texto)) return false
     if (responsable && tarea.assigneeId !== responsable) return false
     if (estado && tarea.status !== estado) return false
+    if (soloSinAsociar && !tarea.sinAsociar) return false
     if (soloVencidas && !tarea.vencida) return false
     return true
   })
@@ -168,12 +176,14 @@ export function PlannerVista({
       <FiltrosPlanner
         empresas={empresas}
         proyectos={proyectos}
-        responsables={responsables}
+        responsables={responsables.filter((item) => !area || item.grupo === "Líderes" || item.grupo === TEAM_LABEL[area as TeamName] || item.grupo === "Cualquier área" || !item.grupo)}
         empresaId={empresaId}
         proyectoId={proyectoId}
         buscar={buscar}
         responsable={responsable}
         estado={estado}
+        area={area}
+        soloSinAsociar={soloSinAsociar}
         soloVencidas={soloVencidas}
         filtrosAbiertos={filtrosAbiertos}
         resumen={resumen}
@@ -187,6 +197,8 @@ export function PlannerVista({
         onBuscar={setBuscar}
         onResponsable={setResponsable}
         onEstado={setEstado}
+        onArea={(valor) => { setArea(valor); setResponsable("") }}
+        onSinAsociar={setSoloSinAsociar}
         onVencidas={setSoloVencidas}
         onFiltros={() => setFiltrosAbiertos((valor) => !valor)}
       />
@@ -249,6 +261,7 @@ export function PlannerVista({
                           </Link>
                         ) : null}
                         {tarea.vencida ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">Vencida</span> : null}
+                        {tarea.sinAsociar ? <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-medium text-[#3d4a63]">Sin asociar</span> : null}
                       </div>
                       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="w-8 tabular-nums">{tarea.porcentaje}%</span>
@@ -289,11 +302,12 @@ export function PlannerVista({
             guardar(data, () => setCrear(null))
           }}>
             <Input name="title" placeholder="Título de la tarea" required minLength={3} aria-label="Título" />
-            <select name="assigneeId" aria-label="Responsable de la tarea" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" defaultValue="">
-              <option value="">Sin responsable</option>
-              {responsables.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-            <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" />
+            <label className="grid gap-1 text-sm">Pertenece a
+              <input readOnly aria-readonly="true" value={proyectos.find((item) => item.id === proyectoId)?.name || "Proyecto"} className="h-10 rounded-lg border border-[#E4E7EC] bg-[#F8FAFD] px-3" />
+            </label>
+            <Elegir ariaLabel="Área de la tarea" value={areaNueva} onValueChange={(valor) => { setAreaNueva(valor as TeamName); setResponsableNuevo("") }} placeholder="Área" opciones={[{ value: "", label: "Área" }, ...TEAMS.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] }))]} />
+            <Elegir name="assigneeId" ariaLabel="Responsable de la tarea" value={responsableNuevo} onValueChange={setResponsableNuevo} placeholder="Responsable" opciones={[{ value: "", label: "Sin responsable" }, ...responsables.filter((item) => !areaNueva || item.grupo === "Líderes" || item.grupo === TEAM_LABEL[areaNueva] || item.grupo === "Cualquier área" || !item.grupo).map((item) => ({ value: item.id, label: item.name, grupo: item.grupo }))]} />
+            <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" min={new Date().toISOString().slice(0, 10)} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCrear(null)} disabled={pending}>Cancelar</Button>
               <Button type="submit" disabled={pending}>Crear tarea</Button>

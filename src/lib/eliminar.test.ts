@@ -27,14 +27,15 @@ describe("texto de confirmación", () => {
 })
 
 describe("rechazo de la acción", () => {
-  it("responde 403 a quien no es administrador", () => {
-    const lider = actor({ role: "LIDER", memberships: [{ team: "DESARROLLO", role: "LIDER" }] })
-    const rechazo = rechazoEliminar(lider)
-    expect(rechazo).toEqual({
+  it("responde 403 a líder, agente y solicitante", () => {
+    const esperado = {
       ok: false,
       error: "No tiene permiso para eliminar. Solo un administrador puede hacerlo.",
       status: 403,
-    })
+    }
+    expect(rechazoEliminar(actor({ role: "LIDER", memberships: [{ team: "DESARROLLO", role: "LIDER" }] }))).toEqual(esperado)
+    expect(rechazoEliminar(actor({ role: "AGENTE", memberships: [{ team: "DESARROLLO", role: "AGENTE" }] }))).toEqual(esperado)
+    expect(rechazoEliminar(actor({ role: "SOLICITANTE" }))).toEqual(esperado)
     expect(rechazoEliminar(actor({ role: "ADMINISTRADOR", isAdmin: true }))).toBeNull()
     expect(new PermisoDenegado().status).toBe(403)
   })

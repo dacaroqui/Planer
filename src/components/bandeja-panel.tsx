@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { asignarAction } from "@/server/actions"
@@ -8,7 +8,7 @@ import { Compositor } from "@/components/compositor"
 import { Cronologia, hace, type EntradaLinea } from "@/components/cronologia-vista"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Elegir } from "@/components/ui/elegir"
-import { SLA_LABEL, type SlaState, type TeamName } from "@/lib/domain"
+import { SLA_LABEL, TEAM_LABEL, type SlaState, type TeamName } from "@/lib/domain"
 
 export type FilaBandeja = {
   code: string
@@ -56,6 +56,7 @@ export function BandejaPanel({
     puedePublica: boolean
     puedeNota: boolean
     puedeAdjuntar: boolean
+    esSolicitante: boolean
     tareas: { id: string; title: string }[]
     agentes: { id: string; name: string }[]
     puedeAsignar: boolean
@@ -81,7 +82,7 @@ export function BandejaPanel({
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Elegir className="w-40" ariaLabel="Equipo" value={query.equipo ?? ""} onValueChange={(valor) => ir({ equipo: valor || undefined })} placeholder="Equipo" opciones={[{ value: "", label: "Equipo" }, ...equipos.map((equipo) => ({ value: equipo, label: equipo === "DESARROLLO" ? "Desarrollo" : "Marketing" }))]} />
+        <Elegir className="w-40" ariaLabel="Equipo" value={query.equipo ?? ""} onValueChange={(valor) => ir({ equipo: valor || undefined })} placeholder="Equipo" opciones={[{ value: "", label: "Equipo" }, ...equipos.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] }))]} />
         <Elegir className="w-44" ariaLabel="Empresa" value={query.empresa ?? ""} onValueChange={(valor) => ir({ empresa: valor || undefined })} placeholder="Empresa" opciones={[{ value: "", label: "Empresa" }, ...empresas.map((empresa) => ({ value: empresa.id, label: empresa.name }))]} />
         <Elegir className="w-40" ariaLabel="Prioridad" value={query.prioridad ?? ""} onValueChange={(valor) => ir({ prioridad: valor || undefined })} placeholder="Prioridad" opciones={[{ value: "", label: "Prioridad" }, { value: "CRITICA", label: "Crítica" }, { value: "ALTA", label: "Alta" }, { value: "MEDIA", label: "Media" }, { value: "BAJA", label: "Baja" }]} />
         <Elegir className="w-48" ariaLabel="Responsable" value={query.responsable ?? ""} onValueChange={(valor) => ir({ responsable: valor || undefined })} placeholder="Responsable" opciones={[{ value: "", label: "Responsable" }, ...responsables.map((persona) => ({ value: persona.id, label: persona.name }))]} />
@@ -135,7 +136,7 @@ export function BandejaPanel({
               <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
                 <Cronologia entradas={detalle.entradas} />
                 {detalle.puedeAsignar && detalle.agentes.length > 0 ? <AsignarRapido code={detalle.code} agentes={detalle.agentes} /> : null}
-                <Compositor code={detalle.code} puedePublica={detalle.puedePublica && !soloLectura} puedeNota={detalle.puedeNota && !soloLectura} puedeAdjuntar={detalle.puedeAdjuntar && !soloLectura} tareas={detalle.tareas} />
+                <Compositor code={detalle.code} puedePublica={detalle.puedePublica && !soloLectura} puedeNota={detalle.puedeNota && !soloLectura} puedeAdjuntar={detalle.puedeAdjuntar && !soloLectura} esSolicitante={detalle.esSolicitante} tareas={detalle.tareas} />
               </div>
             </>
           ) : null}
@@ -145,9 +146,10 @@ export function BandejaPanel({
   )
 }
 
-function AsignarRapido({ code, agentes }: { code: string; agentes: { id: string; name: string }[] }) {
+function AsignarRapido({ code, agentes }: { code: string; agentes: { id: string; name: string; grupo?: string }[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [persona, setPersona] = useState("")
   return (
     <form className="flex gap-2" onSubmit={(event) => {
       event.preventDefault()
@@ -162,10 +164,7 @@ function AsignarRapido({ code, agentes }: { code: string; agentes: { id: string;
         }
       })
     }}>
-      <select name="assigneeId" aria-label="Asignar responsable" className="h-10 flex-1 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm" required>
-        <option value="">Asignar a…</option>
-        {agentes.map((agente) => <option key={agente.id} value={agente.id}>{agente.name}</option>)}
-      </select>
+      <Elegir name="assigneeId" ariaLabel="Asignar responsable" className="min-w-48 flex-1" value={persona} onValueChange={setPersona} placeholder="Asignar a…" opciones={[{ value: "", label: "Asignar a…" }, ...agentes.map((agente) => ({ value: agente.id, label: agente.name, grupo: agente.grupo }))]} />
       <button type="submit" disabled={pending} className="h-10 rounded-lg border border-[#E4E7EC] px-3 text-sm">Asignar</button>
     </form>
   )

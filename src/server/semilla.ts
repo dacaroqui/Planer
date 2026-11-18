@@ -2,8 +2,18 @@ import type { PrismaClient } from "@prisma/client"
 import { ESTADOS_OFICIALES, SLA_POR_DEFECTO, TIPOS_OFICIALES, TRANSICIONES_OFICIALES } from "@/lib/flujo-oficial"
 import { prisma } from "@/lib/prisma"
 
+export async function asegurarLiderAdministracion(client: PrismaClient = prisma) {
+  const user = await client.user.findUnique({ where: { email: "cristianaudit@cifes.edu.co" } })
+  if (!user) return
+  await client.areaRole.upsert({
+    where: { userId_team_role: { userId: user.id, team: "ADMINISTRACION", role: "LIDER" } },
+    update: {},
+    create: { userId: user.id, team: "ADMINISTRACION", role: "LIDER" },
+  })
+}
+
 export async function asegurarCatalogo(client: PrismaClient = prisma) {
-  for (const name of ["CIFES", "Luvania"]) {
+  for (const name of ["CIFES", "Luvania", "Ambas/Transversal"]) {
     await client.empresa.upsert({
       where: { name },
       update: { active: true },
@@ -82,13 +92,17 @@ export async function asegurarCatalogo(client: PrismaClient = prisma) {
     })
   }
   const equipos = [
-    { key: "DESARROLLO", name: "Desarrollo", description: "Errores, soporte técnico y mejoras en plataformas.", icon: "codigo", color: "azul", sortOrder: 1 },
+    { key: "DESARROLLO", name: "Producto", description: "Errores, soporte técnico y mejoras en plataformas.", icon: "codigo", color: "azul", sortOrder: 1 },
     { key: "MARKETING", name: "Marketing", description: "Diseño, contenidos y piezas de comunicación.", icon: "megafono", color: "coral", sortOrder: 2 },
+    { key: "COMERCIAL", name: "Comercial", description: "Cotizaciones, propuestas y seguimiento de clientes.", icon: "acuerdo", color: "verde", sortOrder: 3 },
+    { key: "INNOVACION", name: "Innovación", description: "Ideas, prototipos y pilotos para mejorar la operación.", icon: "bombilla", color: "violeta", sortOrder: 4 },
+    { key: "ADMINISTRACION", name: "Administración", description: "Compras, documentos y trámites internos de la casa.", icon: "edificio", color: "ambar", sortOrder: 5 },
+    { key: "GROWTH", name: "Growth", description: "Experimentos, adquisición y conversión.", icon: "crecimiento", color: "lima", sortOrder: 6 },
   ]
   for (const item of equipos) {
     await client.catalogItem.upsert({
       where: { kind_key: { kind: "EQUIPO", key: item.key } },
-      update: {},
+      update: { name: item.name, description: item.description, icon: item.icon, color: item.color, sortOrder: item.sortOrder },
       create: { kind: "EQUIPO", ...item },
     })
   }
@@ -107,6 +121,7 @@ export async function asegurarCatalogo(client: PrismaClient = prisma) {
       })
     }
   }
+  await asegurarLiderAdministracion(client)
   const agenteDemo = await client.user.findUnique({ where: { email: "agente.demo@cifes.edu.co" } })
   if (agenteDemo) {
     await client.areaRole.deleteMany({ where: { userId: agenteDemo.id, team: "MARKETING" } })

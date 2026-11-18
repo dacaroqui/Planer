@@ -1,12 +1,42 @@
 import { DateTime } from "luxon"
+import { appBaseUrl, createEmailProvider } from "@/lib/email"
+import { correoAsignacionHabilitado } from "@/lib/correo-asignacion"
 import { prisma } from "@/lib/prisma"
 import { agruparTareas, avanceProyecto, avanceRequerimiento, tareaVencida } from "@/lib/avance"
 import { DomainError, PermisoDenegado, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
-import { esAdmin, puedeAdministrar, puedeVer, rolEn } from "@/lib/permissions"
+import { esAdmin, puedeAdministrar, puedeAsignar, puedeAutoasignarse, puedeRadicar, puedeVer, rolEn } from "@/lib/permissions"
 import { ZONE } from "@/lib/time"
 
 export function puedeCrearProyecto(actor: Actor) {
   return actor.active && (esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER"))
+}
+
+export function puedeCrearProyectoAlRadicar(actor: Actor) {
+  return puedeRadicar(actor)
+}
+
+export async function crearProyectoAlRadicar(
+  actor: Actor,
+  input: { empresaId: string; name: string; description?: string; team: TeamName },
+) {
+  if (!puedeCrearProyectoAlRadicar(actor)) throw new DomainError("Su perfil no puede crear un proyecto al radicar.")
+  const name = input.name.trim()
+  if (name.length < 3) throw new DomainError("El nombre del proyecto es muy corto.")
+  const empresa = await prisma.empresa.findFirst({ where: { id: input.empresaId, active: true } })
+  if (!empresa) throw new DomainError("Elija una empresa activa.")
+  const hoy = DateTime.now().setZone(ZONE).startOf("day")
+  return prisma.proyecto.create({
+    data: {
+      empresaId: empresa.id,
+      name,
+      description: (input.description ?? "").trim(),
+      leaderId: actor.id,
+      startsAt: hoy.toJSDate(),
+      targetAt: hoy.plus({ days: 30 }).toJSDate(),
+      status: "PLANIFICADO",
+      team: input.team,
+    },
+  })
 }
 
 export function puedeGestionarEmpresa(actor: Actor) {
@@ -76,7 +106,7 @@ export async function guardarProyecto(
 
 async function contextoTarea(input: { requestId?: string | null; projectId?: string | null }) {
   const request = input.requestId
-    ? await prisma.request.findUnique({ where: { id: input.requestId }, include: { empresa: true } })
+    ? await prisma.request.findUnique({ where: { id: input.requestId }, include: { empresa: true, area: true } })
     : null
   const project = input.projectId ? await prisma.proyecto.findUnique({ where: { id: input.projectId } }) : null
   if (input.requestId && !request) throw new DomainError("El requerimiento no existe.")
@@ -100,6 +130,7 @@ export async function guardarTarea(
     projectId?: string | null
     parentId?: string | null
     horasEstimadas?: string | null
+    horasReales?: string | null
   },
 ) {
   const title = input.title.trim()
@@ -115,7 +146,7 @@ export async function guardarTarea(
     if (!requestId) requestId = padre.requestId
     if (!projectId) projectId = padre.projectId
   }
-  const { request } = await contextoTarea({ requestId, projectId })
+  const { request, project } = await contextoTarea({ requestId, projectId })
   const team = request?.team ?? "DESARROLLO"
   const puede = request ? puedeGestionarTareas(actor, request.team) : puedeCrearProyecto(actor) || esAdmin(actor)
   if (!puede && !(request && actor.id === request.requesterId && !input.id)) {
@@ -129,10 +160,43 @@ export async function guardarTarea(
   if (!request && !puedeCrearProyecto(actor)) {
     throw new DomainError("Solo un líder o el administrador crea tareas sueltas del proyecto.")
   }
+  const nuevoResponsable = input.assigneeId !== undefined ? (input.assigneeId || null) : (existente?.assigneeId ?? null)
+  const previoResponsable = existente?.assigneeId ?? null
+  if (nuevoResponsable !== previoResponsable) {
+    if (!nuevoResponsable) {
+      if (request && !puedeAsignar(actor, request)) throw new DomainError("Solo el líder del área quita el responsable.")
+    } else if (nuevoResponsable === actor.id && request) {
+      if (!puedeAsignar(actor, request) && !puedeAutoasignarse(actor, request, request.area.allowSelfAssign)) {
+        throw new DomainError("No puede asignarse esta tarea.")
+      }
+    } else if (request && !puedeAsignar(actor, request)) {
+      throw new DomainError("Solo el líder del área asigna el responsable.")
+    } else if (request || project) {
+      const equipo = request?.team ?? project?.team ?? null
+      if (!esAdmin(actor) && !equipo) throw new DomainError("Esa persona no es agente ni líder del equipo.")
+      const miembro = await prisma.user.findFirst({
+        where: esAdmin(actor)
+          ? {
+              id: nuevoResponsable,
+              active: true,
+              OR: [
+                { role: "ADMINISTRADOR" },
+                { areaRoles: { some: { role: { in: ["AGENTE", "LIDER"] } } } },
+              ],
+            }
+          : {
+              id: nuevoResponsable,
+              active: true,
+              areaRoles: { some: { team: equipo ?? undefined, role: { in: ["AGENTE", "LIDER"] } } },
+            },
+      })
+      if (!miembro) throw new DomainError(esAdmin(actor) ? "Esa persona no está activa o no puede recibir trabajo." : "Esa persona no es agente ni líder del equipo.")
+    }
+  }
   const completedAt = input.status === "HECHA" ? (existente?.completedAt ?? new Date()) : null
   const data = {
     title,
-    assigneeId: input.assigneeId !== undefined ? (input.assigneeId || null) : (existente?.assigneeId ?? null),
+    assigneeId: nuevoResponsable,
     dueDate: input.dueDate !== undefined ? (input.dueDate ? fecha(input.dueDate) : null) : (existente?.dueDate ?? null),
     status: input.status,
     requestId: requestId || null,
@@ -142,10 +206,59 @@ export async function guardarTarea(
     ...(input.horasEstimadas !== undefined
       ? { horasEstimadas: input.horasEstimadas && Number.isFinite(Number(input.horasEstimadas)) ? Number(input.horasEstimadas) : null }
       : {}),
+    ...(input.horasReales !== undefined
+      ? { horasReales: input.horasReales && Number.isFinite(Number(input.horasReales)) ? Number(input.horasReales) : null }
+      : {}),
   }
   const tarea = input.id
     ? await prisma.tarea.update({ where: { id: input.id }, data })
     : await prisma.tarea.create({ data: { ...data, createdById: actor.id } })
+  const avisos: { userId: string; subject: string; body: string }[] = []
+  if (nuevoResponsable && nuevoResponsable !== previoResponsable && nuevoResponsable !== actor.id) {
+    avisos.push({
+      userId: nuevoResponsable,
+      subject: "",
+      body: request ? `se te asignó ${request.code}: ${title}.` : `se te asignó la tarea «${title}».`,
+    })
+  }
+  if (previoResponsable && nuevoResponsable !== previoResponsable && previoResponsable !== actor.id) {
+    avisos.push({
+      userId: previoResponsable,
+      subject: "",
+      body: `ya no tienes la tarea «${title}».`,
+    })
+  }
+  if (avisos.length) {
+    const destino = await prisma.user.findMany({
+      where: { id: { in: avisos.map((item) => item.userId) }, active: true, deactivatedAt: null },
+      select: { id: true, name: true, email: true },
+    })
+    const porId = new Map(destino.map((item) => [item.id, item]))
+    const correo = correoAsignacionHabilitado()
+    const href = request ? `/requerimientos/${request.code}` : "/planner"
+    for (const aviso of avisos) {
+      const persona = porId.get(aviso.userId)
+      if (!persona) continue
+      await prisma.notification.create({
+        data: {
+          userId: persona.id,
+          requestId: request?.id ?? null,
+          subject: `${persona.name}, ${aviso.body}`,
+          body: `${persona.name}, ${aviso.body}`,
+          href,
+          dedupeKey: `tarea-${tarea.id}-${persona.id}-${Date.now()}`,
+        },
+      })
+      if (correo) {
+        const enlace = `${appBaseUrl()}${href}`
+        try {
+          await createEmailProvider().send({ to: persona.email, subject: `${persona.name}, ${aviso.body}`, text: `${persona.name}, ${aviso.body}\n${enlace}` })
+        } catch (error) {
+          console.error("[correo] No se pudo enviar", persona.email, error)
+        }
+      }
+    }
+  }
   if (request) {
     await prisma.activity.create({
       data: {

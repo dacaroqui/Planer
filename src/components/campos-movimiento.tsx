@@ -57,7 +57,7 @@ export function CamposMovimiento({
       {pideFecha ? (
         <div className="grid gap-1">
           <Label htmlFor={`${prefijo}-fecha`}>{fechaObligatoria.etiqueta}</Label>
-          <Input id={`${prefijo}-fecha`} type="date" lang="es-CO" aria-required={fechaObligatoria.ariaRequired} value={fecha} onChange={(event) => onFecha(event.target.value)} />
+          <Input id={`${prefijo}-fecha`} type="date" lang="es-CO" aria-required={fechaObligatoria.ariaRequired} value={fecha} onChange={(event) => onFecha(event.target.value)} className="h-11 w-full" />
         </div>
       ) : null}
       {cierra && movimiento.to === "CERRADO" ? (

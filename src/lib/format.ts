@@ -1,21 +1,40 @@
 import { ZONE } from "@/lib/time"
 import { SLA_LABEL, type SlaState, statusLabel } from "@/lib/domain"
 
+function parte(date: Date, tipo: Intl.DateTimeFormatPartTypes, opciones: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat("en-US", { ...opciones, timeZone: ZONE })
+    .formatToParts(date)
+    .find((item) => item.type === tipo)?.value ?? ""
+}
+
 export function formatDateTime(date: Date | null | undefined) {
   if (!date) return "—"
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: ZONE,
-  }).format(date)
+  const opciones: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }
+  return `${parte(date, "day", opciones)}/${parte(date, "month", opciones)}/${parte(date, "year", opciones)} ${parte(date, "hour", opciones)}:${parte(date, "minute", opciones)}`
 }
 
 export function formatDate(date: Date | null | undefined) {
   if (!date) return "—"
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeZone: ZONE,
-  }).format(date)
+  const opciones: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit" }
+  return `${parte(date, "day", opciones)}/${parte(date, "month", opciones)}/${parte(date, "year", opciones)}`
+}
+
+export function formatoNumero(valor: number, maxDecimales = 0) {
+  const negativo = valor < 0
+  const factor = 10 ** maxDecimales
+  const redondeado = Math.round((Math.abs(valor) + Number.EPSILON) * factor) / factor
+  const [entero, frac = ""] = redondeado.toFixed(maxDecimales).split(".")
+  const recortado = frac.replace(/0+$/, "")
+  const grupos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+  const cuerpo = recortado ? `${grupos},${recortado}` : grupos
+  return negativo ? `-${cuerpo}` : cuerpo
 }
 
 export function formatBytes(bytes: number) {

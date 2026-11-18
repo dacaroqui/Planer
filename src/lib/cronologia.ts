@@ -13,17 +13,41 @@ export function esEntradaPublica(kind: TipoComentario) {
   return kind === "PUBLICA" || kind === "SOLICITUD_INFO"
 }
 
+export function adjuntoVisible(veInternas: boolean, kind: string | null) {
+  if (!kind) return true
+  if (veInternas) return true
+  return esTipoComentario(kind) && esEntradaPublica(kind)
+}
+
+export function esImagenAdjunto(mime: string, nombre: string) {
+  if (mime.startsWith("image/")) return true
+  return /\.(png|jpe?g|webp|gif)$/i.test(nombre)
+}
+
 export function visibilidadDefecto(nombre: string): "publica" | "interna" {
   if (nombre === "Pedir información" || nombre.startsWith("Entregar")) return "publica"
   return "interna"
 }
 
 export function notaResolucionOpcional(movimiento: { name?: string; to?: string }) {
-  return Boolean(movimiento.name?.startsWith("Entregar") || movimiento.to === "CERRADO" || movimiento.to === "RECHAZADO" || movimiento.to === "CANCELADO")
+  return Boolean(movimiento.name?.startsWith("Entregar") || movimiento.to === "CERRADO" || movimiento.to === "RECHAZADO" || movimiento.to === "CANCELADO" || movimiento.to === "CERRADO_GANADO" || movimiento.to === "CERRADO_PERDIDO" || movimiento.to === "IMPLEMENTADA" || movimiento.to === "DESCARTADA")
 }
 
-export function esPorResponder(fila: { requesterId: string; lastPublicActorId: string | null }) {
+export function esPorResponder(
+  fila: { requesterId: string; lastPublicActorId: string | null },
+  actorId?: string,
+) {
+  if (actorId && fila.lastPublicActorId === actorId) return false
   return !fila.lastPublicActorId || fila.lastPublicActorId === fila.requesterId
+}
+
+export function pestanasPara(input: { esSolicitante: boolean; puedePublica: boolean; puedeNota: boolean }) {
+  if (input.esSolicitante && input.puedeNota) return ["INTERNA", "REGISTRO"] as const
+  if (input.esSolicitante) return input.puedePublica ? (["PUBLICA"] as const) : ([] as const)
+  const pestanas: Array<"PUBLICA" | "INTERNA" | "REGISTRO" | "SOLICITUD_INFO"> = []
+  if (input.puedePublica) pestanas.push("PUBLICA")
+  if (input.puedeNota) pestanas.push("INTERNA", "REGISTRO", "SOLICITUD_INFO")
+  return pestanas
 }
 
 export function puedeRegistrar(actorPuedeNota: boolean, kind: TipoComentario) {

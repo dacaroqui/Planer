@@ -20,6 +20,10 @@ enum Role {
 enum Team {
   DESARROLLO
   MARKETING
+  COMERCIAL
+  INNOVACION
+  ADMINISTRACION
+  GROWTH
 }
 
 enum TipoComentario {
@@ -80,6 +84,10 @@ model User {
   area          Area           @relation(fields: [areaId], references: [id])
   active         Boolean          @default(true)
   pendiente      Boolean          @default(false)
+  deactivatedAt  DateTime?
+  deactivatedById String?
+  deactivatedBy  User?            @relation("UsuarioDesactivado", fields: [deactivatedById], references: [id])
+  desactivados   User[]           @relation("UsuarioDesactivado")
   passwordHash   String?
   failedAttempts Int              @default(0)
   lockedUntil    DateTime?
@@ -187,6 +195,7 @@ model Proyecto {
   startsAt    DateTime
   targetAt    DateTime
   status      EstadoProyecto @default(PLANIFICADO)
+  team        Team?
   requests    Request[]
   tasks       Tarea[]
   createdAt   DateTime       @default(now())
@@ -399,6 +408,7 @@ model Comment {
   compartir  Boolean        @default(false)
   internal   Boolean        @default(false)
   createdAt  DateTime       @default(now())
+  adjuntos   Attachment[]
 
   @@index([requestId])
   @@index([tareaId])
@@ -415,7 +425,11 @@ model Attachment {
   storedName   String
   mimeType     String
   sizeBytes    Int
+  commentId    String?
+  comment      Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
+
+  @@index([commentId])
 }
 
 model Activity {
@@ -444,6 +458,7 @@ model Notification {
   subject   String
   body      String
   dedupeKey String?
+  href      String?
   readAt    DateTime?
   createdAt DateTime  @default(now())
 

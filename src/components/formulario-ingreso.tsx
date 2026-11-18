@@ -4,6 +4,7 @@ import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import { entrarConClave } from "@/server/actions"
 
@@ -45,7 +46,7 @@ export function FormularioIngreso() {
       </div>
       <div className="grid gap-1">
         <Label htmlFor="password">Contraseña</Label>
-        <Input id="password" name="password" type="password" autoComplete="current-password" required disabled={pending} />
+        <PasswordInput id="password" name="password" autoComplete="current-password" required disabled={pending} />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" size="lg" disabled={pending}>{pending ? "Ingresando…" : "Ingresar"}</Button>

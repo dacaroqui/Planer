@@ -4,6 +4,9 @@ import { esAdmin, puedeVerPlanner } from "@/lib/permissions"
 import { puedeCrearProyecto, puedeGestionarTareas } from "@/server/proyectos"
 import { listarPlanner } from "@/server/planner"
 import { catalogoPara } from "@/server/catalogo-nav"
+import { personasAsignables } from "@/server/asignacion"
+import { prisma } from "@/lib/prisma"
+import type { TeamName } from "@/lib/domain"
 import { requireActor } from "@/server/session"
 
 function isoFecha(fecha: Date | null) {
@@ -38,6 +41,10 @@ export default async function PlannerPage({
   const tareas = proyectoId
     ? await listarPlanner(actor, { empresaId, projectId: proyectoId })
     : []
+  const equipoProyecto = proyectoId
+    ? (await prisma.proyecto.findUnique({ where: { id: proyectoId }, select: { team: true } }))?.team ?? null
+    : null
+  const asignables = await personasAsignables(actor, (equipoProyecto as TeamName | null) ?? actor.memberships[0]?.team ?? null)
   const puede = esAdmin(actor) || puedeCrearProyecto(actor) || actor.memberships.some((item) => puedeGestionarTareas(actor, item.team))
   return (
     <div className="space-y-5">
@@ -48,7 +55,7 @@ export default async function PlannerPage({
       <PlannerVista
         empresas={empresas}
         proyectos={proyectos}
-        responsables={catalogo.personas}
+        responsables={asignables}
         empresaId={empresaId}
         proyectoId={proyectoId}
         puede={puede}
@@ -66,6 +73,7 @@ export default async function PlannerPage({
           total: tarea.children.length,
           projectId: tarea.projectId ?? proyectoId,
           requestCode: tarea.request?.code ?? null,
+          sinAsociar: !tarea.requestId && !tarea.projectId,
           subtareas: tarea.children.map((sub) => ({
             id: sub.id,
             title: sub.title,

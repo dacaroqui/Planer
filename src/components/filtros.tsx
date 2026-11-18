@@ -6,6 +6,7 @@ import { SearchIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TEAM_LABEL, TEAMS } from "@/lib/domain"
 
 type Opcion = { value: string; label: string }
 
@@ -69,8 +70,7 @@ export function Filtros({
             onChange={(valor) => aplicar("team", valor)}
             opciones={[
               { value: "TODOS", label: "Todos los equipos" },
-              { value: "DESARROLLO", label: "Desarrollo" },
-              { value: "MARKETING", label: "Marketing" },
+              ...TEAMS.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] })),
             ]}
           />
         ) : null}

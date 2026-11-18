@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CamposMovimiento } from "@/components/campos-movimiento"
-import { avisoTrasMovimiento, camposRequeridos, debePedirProyecto, debePedirResponsable, movimientoAlSoltar, tituloConfirmacion, VENTANA_DESHACER_MS, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { avisoTrasMovimiento, camposRequeridos, codigoSoltado, debePedirProyecto, debePedirResponsable, movimientoAlSoltar, tituloConfirmacion, VENTANA_DESHACER_MS, validarDatosMovimiento, type MovimientoTablero } from "@/lib/tablero-movimiento"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
 
 export type Tarjeta = {
@@ -38,6 +39,7 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [], puedeEl
 
   const router = useRouter()
   const arrastrada = useRef<string | null>(null)
+  const codigos = tarjetas.map((item) => item.code)
   const [marca, setMarca] = useState("TODAS")
   const [responsable, setResponsable] = useState("TODOS")
   const [tipo, setTipo] = useState("TODOS")
@@ -55,11 +57,27 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [], puedeEl
   const visibles = tarjetas.filter((item) => (marca === "TODAS" || item.brand === marca) && (responsable === "TODOS" || item.assignee === responsable) && (tipo === "TODOS" || item.tipo === tipo))
   const movimiento = dialogo?.moves.find((item) => item.name === dialogo.elegido) ?? dialogo?.moves[0]
 
+  function permitirSoltar(event: React.DragEvent<HTMLElement>) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+  }
+
   function iniciarArrastre(event: React.DragEvent<HTMLElement>) {
     const code = event.currentTarget.getAttribute("data-code") || ""
     arrastrada.current = code
     event.dataTransfer.setData("text/plain", code)
     event.dataTransfer.effectAllowed = "move"
+  }
+
+  function preparar(code: string, moves: MovimientoTablero[], elegido: string) {
+    const tarjeta = tarjetas.find((item) => item.code === code)
+    setMotivo("")
+    setEntrega("")
+    setProyectoId(tarjeta?.projectId ?? "")
+    setResponsableId(tarjeta?.assigneeId ?? "")
+    setFecha(tarjeta?.committedDate ?? "")
+    setResolucion("RESUELTO")
+    setDialogo({ code, moves, elegido })
   }
 
   function ejecutar(code: string, move: MovimientoTablero, comment: string, deliveryUrl: string) {
@@ -118,23 +136,20 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [], puedeEl
   function soltar(event: React.DragEvent<HTMLElement>, columna: string) {
     event.preventDefault()
     event.stopPropagation()
-    const code = arrastrada.current || event.dataTransfer.getData("text/plain")
+    const code = codigoSoltado(arrastrada.current || "", event.dataTransfer.getData("text/plain"), codigos)
     arrastrada.current = null
+    if (!code) {
+      setError("No se identificó la tarjeta. Use Mover a…")
+      toast.error("No se identificó la tarjeta. Use Mover a…")
+      return
+    }
     const decision = movimientoAlSoltar(tarjetas, code, columna)
     if (!decision.ok) {
       setError(decision.error)
       toast.error(decision.error)
       return
     }
-    const move = decision.moves[0]
-    const tarjeta = tarjetas.find((item) => item.code === decision.code)
-    setMotivo("")
-    setEntrega("")
-    setProyectoId(tarjeta?.projectId ?? "")
-    setResponsableId(tarjeta?.assigneeId ?? "")
-    setFecha(tarjeta?.committedDate ?? "")
-    setResolucion("RESUELTO")
-    setDialogo({ code: decision.code, moves: decision.moves, elegido: move.name })
+    preparar(decision.code, decision.moves, decision.moves[0].name)
   }
 
   return (
@@ -175,7 +190,7 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [], puedeEl
           <section
             key={columna}
             className="w-72 shrink-0 rounded-xl bg-muted/70 p-2"
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={permitirSoltar}
             onDrop={(event) => { if (!soloLectura) soltar(event, columna) }}
           >
             <h2 className="px-1 py-2 text-sm font-medium">{columna}</h2>
@@ -190,7 +205,19 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [], puedeEl
                 >
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/requerimientos/${item.code}`} draggable={false} className="font-medium hover:underline">{item.title}</Link>
-                    {puedeEliminar ? <MenuEliminarRequerimiento code={item.code} title={item.title} /> : null}
+                    <span className="flex items-center gap-1">
+                      {!soloLectura ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="text-xs font-medium text-[#1658B0]" aria-label={`Mover ${item.code}`}>Mover a…</DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {item.moves.length === 0 ? <DropdownMenuItem disabled>Sin movimientos para su rol</DropdownMenuItem> : item.moves.map((move) => (
+                              <DropdownMenuItem key={move.name} onSelect={() => preparar(item.code, [move], move.name)}>{move.name}</DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
+                      {puedeEliminar ? <MenuEliminarRequerimiento code={item.code} title={item.title} /> : null}
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{item.code} · {BRAND_LABEL[item.brand as BrandName] ?? item.brand} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority}</p>
                   <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Avatar nombre={item.assignee} marca={item.brand} />{item.assignee || "Sin asignar"}</p>

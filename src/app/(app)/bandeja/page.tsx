@@ -1,7 +1,7 @@
 import { BandejaPanel } from "@/components/bandeja-panel"
 import type { EntradaLinea } from "@/components/cronologia-vista"
 import { esAdmin, puedeVerNotaInterna } from "@/lib/permissions"
-import { type TeamName } from "@/lib/domain"
+import { TEAMS, esTeam, type TeamName } from "@/lib/domain"
 import { requireActor } from "@/server/session"
 import { getDetalle } from "@/server/requests"
 import { listarBandeja, puedeEntrarBandeja, tabBandeja } from "@/server/bandeja"
@@ -24,6 +24,7 @@ function entradasDe(detail: NonNullable<Awaited<ReturnType<typeof getDetalle>>>)
       cuerpo: item.body,
       minutos: item.minutes,
       tarea: item.tarea?.title ?? null,
+      adjuntos: item.adjuntos.map((archivo) => ({ id: archivo.id, filename: archivo.filename, mimeType: archivo.mimeType })),
       orden: item.createdAt.getTime(),
     })),
     ...detail.request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({
@@ -37,7 +38,7 @@ function entradasDe(detail: NonNullable<Awaited<ReturnType<typeof getDetalle>>>)
   lineas.sort((a, b) => a.orden - b.orden)
   return lineas.map((entrada) => entrada.tipo === "estado"
     ? { tipo: entrada.tipo, id: entrada.id, cuando: entrada.cuando, texto: entrada.texto }
-    : { tipo: entrada.tipo, id: entrada.id, autor: entrada.autor, cuando: entrada.cuando, cuerpo: entrada.cuerpo, minutos: entrada.minutos, tarea: entrada.tarea })
+    : { tipo: entrada.tipo, id: entrada.id, autor: entrada.autor, cuando: entrada.cuando, cuerpo: entrada.cuerpo, minutos: entrada.minutos, tarea: entrada.tarea, adjuntos: entrada.adjuntos })
 }
 
 export default async function BandejaPage({
@@ -56,7 +57,8 @@ export default async function BandejaPage({
   }
   const params = await searchParams
   const texto = (clave: string) => typeof params[clave] === "string" ? params[clave] : ""
-  const equipo = texto("equipo") === "DESARROLLO" || texto("equipo") === "MARKETING" ? texto("equipo") as TeamName : undefined
+  const equipoPedido = texto("equipo")
+  const equipo: TeamName | undefined = esTeam(equipoPedido) ? equipoPedido : undefined
   const tab = tabBandeja(texto("tab") || undefined)
   const data = await listarBandeja(actor, {
     tab,
@@ -68,7 +70,7 @@ export default async function BandejaPage({
   })
   const codigo = texto("codigo")
   const detail = codigo ? await getDetalle(actor, codigo) : null
-  const equipos = esAdmin(actor) ? (["DESARROLLO", "MARKETING"] as TeamName[]) : [...new Set(actor.memberships.map((item) => item.team))]
+  const equipos = esAdmin(actor) ? [...TEAMS] : [...new Set(actor.memberships.map((item) => item.team))]
   return (
     <div className="space-y-4">
       <div>
@@ -99,8 +101,9 @@ export default async function BandejaPage({
           puedePublica: detail.canCommentPublic,
           puedeNota: detail.canCommentInternal,
           puedeAdjuntar: detail.canAttach,
+          esSolicitante: actor.id === detail.request.requesterId,
           tareas: detail.request.tasks.filter((tarea) => !tarea.parentId).map((tarea) => ({ id: tarea.id, title: tarea.title })),
-          agentes: detail.agents.map((agente) => ({ id: agente.id, name: agente.name })),
+          agentes: detail.agents.map((agente) => ({ id: agente.id, name: agente.name, grupo: agente.grupo })),
           puedeAsignar: detail.canAssign,
         } : null}
       />

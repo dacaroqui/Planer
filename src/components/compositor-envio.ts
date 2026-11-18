@@ -7,25 +7,17 @@ export type ResultadoComposicion = { ok: true; message?: string } | { ok: false;
 export async function publicarComposicion(input: {
   form: { reset: () => void }
   data: FormData
-  adjuntar: (data: FormData) => Promise<ResultadoComposicion>
   comentar: (data: FormData) => Promise<ResultadoComposicion>
   avisar: (tipo: "ok" | "error", texto: string) => void
   refrescar: () => void
-}) {
-  const archivo = input.data.get("archivo")
-  if (archivo instanceof File && archivo.size > 0) {
-    const adjunto = await input.adjuntar(input.data)
-    if (!adjunto.ok) {
-      input.avisar("error", adjunto.error)
-      return
-    }
-  }
+}): Promise<boolean> {
   const result = await input.comentar(input.data)
   if (!result.ok) {
     input.avisar("error", result.error)
-    return
+    return false
   }
   input.avisar("ok", result.message || "Publicado.")
   input.form.reset()
   input.refrescar()
+  return true
 }

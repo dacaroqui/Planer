@@ -1,13 +1,9 @@
 import { FormularioRadicar } from "@/components/formulario-radicar"
 import { puedeRadicar } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
-import { type TeamName } from "@/lib/domain"
+import { esTeam } from "@/lib/domain"
 import { requireActor } from "@/server/session"
 import { asegurarCatalogo } from "@/server/semilla"
-
-function esEquipo(key: string): key is TeamName {
-  return key === "DESARROLLO" || key === "MARKETING"
-}
 
 export default async function RadicarSolicitudPage() {
   const actor = await requireActor()
@@ -20,7 +16,7 @@ export default async function RadicarSolicitudPage() {
     )
   }
   await asegurarCatalogo()
-  const [tipos, area, marcas, prioridades, empresas, proyectos, areas, equipos] = await Promise.all([
+  const [tipos, area, marcas, prioridades, empresas, proyectos, areas, equipos, politicas, roster] = await Promise.all([
     prisma.requestType.findMany({ where: { active: true }, orderBy: [{ team: "asc" }, { name: "asc" }] }),
     prisma.area.findUnique({ where: { id: actor.areaId } }),
     prisma.catalogItem.findMany({ where: { kind: "MARCA", active: true }, orderBy: { sortOrder: "asc" } }),
@@ -29,11 +25,18 @@ export default async function RadicarSolicitudPage() {
     prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, empresaId: true, name: true } }),
     actor.isAdmin ? prisma.area.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : Promise.resolve([]),
     prisma.catalogItem.findMany({ where: { kind: "EQUIPO", active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.slaPolicy.findMany({ where: { active: true }, select: { team: true, typeId: true, priority: true, resolutionMinutes: true } }),
+    prisma.user.findMany({
+      where: { active: true, areaRoles: { some: { role: { in: ["AGENTE", "LIDER"] } } } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, areaRoles: { select: { team: true, role: true } } },
+    }),
   ])
+  const personas = roster.flatMap((usuario) => usuario.areaRoles.flatMap((rol) => rol.role === "AGENTE" || rol.role === "LIDER" ? [{ id: usuario.id, name: usuario.name, team: rol.team, role: rol.role }] : []))
   return (
     <FormularioRadicar
       area={area?.name ?? "su área"}
-      equipos={equipos.flatMap((item) => esEquipo(item.key) ? [{
+      equipos={equipos.flatMap((item) => esTeam(item.key) ? [{
         key: item.key,
         name: item.name,
         description: item.description,
@@ -46,6 +49,11 @@ export default async function RadicarSolicitudPage() {
       empresas={empresas.map((item) => ({ id: item.id, name: item.name }))}
       proyectos={proyectos}
       areas={areas}
+      politicas={politicas}
+      ahora={new Date().toISOString()}
+      personas={personas}
+      esAdministrador={actor.isAdmin}
+      liderazgos={actor.memberships.filter((item) => item.role === "LIDER").map((item) => item.team)}
     />
   )
 }

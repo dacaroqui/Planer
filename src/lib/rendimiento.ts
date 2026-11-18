@@ -1,5 +1,5 @@
 import { DateTime } from "luxon"
-import type { Actor, SlaState, TeamName } from "@/lib/domain"
+import { TEAM_LABEL, esTeam, type Actor, type SlaState, type TeamName } from "@/lib/domain"
 import { snapshotSolucion } from "@/lib/sla-solicitud"
 import { ZONE } from "@/lib/time"
 
@@ -282,7 +282,7 @@ export function leerFiltros(params: Parametros, now = new Date()): FiltrosRendim
     personas: varios("persona"),
     areaId: acotar(uno("area")),
     empresaId: acotar(uno("empresa")),
-    equipo: equipo === "DESARROLLO" || equipo === "MARKETING" ? equipo : undefined,
+    equipo: equipo && esTeam(equipo) ? equipo : undefined,
     tipoId: acotar(uno("tipo")),
     prioridad: prioridad === "BAJA" || prioridad === "MEDIA" || prioridad === "ALTA" || prioridad === "CRITICA" ? prioridad : undefined,
     orden,
@@ -342,7 +342,7 @@ export function chipsRendimiento(
   }
   if (filtros.areaId) chips.push({ id: "area", texto: `Área: ${nombres.area.get(filtros.areaId) ?? filtros.areaId}`, patch: { areaId: undefined } })
   if (filtros.empresaId) chips.push({ id: "empresa", texto: `Espacio: ${nombres.empresa.get(filtros.empresaId) ?? filtros.empresaId}`, patch: { empresaId: undefined } })
-  if (filtros.equipo) chips.push({ id: "equipo", texto: `Equipo: ${filtros.equipo === "DESARROLLO" ? "Desarrollo" : "Marketing"}`, patch: { equipo: undefined } })
+  if (filtros.equipo) chips.push({ id: "equipo", texto: `Equipo: ${TEAM_LABEL[filtros.equipo]}`, patch: { equipo: undefined } })
   if (filtros.tipoId) chips.push({ id: "tipo", texto: `Tipo: ${nombres.tipo.get(filtros.tipoId) ?? filtros.tipoId}`, patch: { tipoId: undefined } })
   if (filtros.prioridad) {
     const prioridad = { BAJA: "Baja", MEDIA: "Media", ALTA: "Alta", CRITICA: "Crítica" }[filtros.prioridad]

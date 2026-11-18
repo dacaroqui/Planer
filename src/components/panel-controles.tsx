@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { FilterIcon, RefreshCwIcon } from "lucide-react"
 import { Elegir } from "@/components/ui/elegir"
+import { TEAM_LABEL, TEAMS } from "@/lib/domain"
 
 type Opcion = { id: string; name: string; empresaId?: string }
 
@@ -43,7 +44,7 @@ export function ControlesPanel({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Elegir className="w-48" ariaLabel="Equipo" value={params.get("team") ?? ""} onValueChange={(valor) => ir("team", valor)} opciones={[{ value: "", label: "Todos los equipos" }, { value: "DESARROLLO", label: "Desarrollo" }, { value: "MARKETING", label: "Marketing" }]} />
+          <Elegir className="w-48" ariaLabel="Equipo" value={params.get("team") ?? ""} onValueChange={(valor) => ir("team", valor)} opciones={[{ value: "", label: "Todos los equipos" }, ...TEAMS.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] }))]} />
           <Elegir className="w-52" ariaLabel="Empresa" value={empresa} onValueChange={(valor) => ir("empresa", valor)} opciones={[{ value: "", label: "Todas las empresas" }, ...empresas.map((item) => ({ value: item.id, label: item.name }))]} />
           <Elegir className="w-52" ariaLabel="Periodo" value={params.get("periodo") ?? "8s"} onValueChange={(valor) => ir("periodo", valor)} opciones={[{ value: "8s", label: "Últimas 8 semanas" }, { value: "mes", label: "Este mes" }, { value: "anio", label: "Este año" }]} />
           <button type="button" aria-expanded={extra} className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm" onClick={() => setExtra((valor) => !valor)}>

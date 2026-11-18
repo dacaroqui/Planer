@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BellIcon,
   ChevronDownIcon,
   HelpCircleIcon,
   ChartColumnIcon,
@@ -15,6 +14,7 @@ import {
   StarIcon,
   ClockIcon,
   FilterIcon,
+  ListIcon,
   HomeIcon,
   InboxIcon,
   SearchIcon,
@@ -22,7 +22,8 @@ import {
   WorkflowIcon,
 } from "lucide-react"
 import { Atajos, BotonAtajos } from "@/components/atajos"
-import { Migas } from "@/components/migas"
+import { CampanaAvisos } from "@/components/campana-avisos"
+import { PageHeader } from "@/components/page-header"
 import { salir } from "@/server/actions"
 import {
   DropdownMenu,
@@ -32,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ROLE_LABEL, type Actor } from "@/lib/domain"
+import { ROLE_LABEL, esEspacio, type Actor } from "@/lib/domain"
 import { cn } from "@/lib/utils"
 
 export type EspacioNav = { id: string; name: string }
@@ -106,7 +107,7 @@ export function Marco({
             </button>
             {espaciosAbiertos && abierta ? (
               <div className="mt-1 grid gap-0.5">
-                {espacios.length === 0 ? <p className="px-2 text-xs text-muted-foreground">Todavía no hay espacios.</p> : espacios.map((espacio) => (
+                {espacios.filter((espacio) => esEspacio(espacio.name)).length === 0 ? <p className="px-2 text-xs text-muted-foreground">Todavía no hay espacios.</p> : espacios.filter((espacio) => esEspacio(espacio.name)).map((espacio) => (
                   <div key={espacio.id}>
                     <Link href={`/espacios/${espacio.id}`} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent", path.startsWith(`/espacios/${espacio.id}`) && "bg-sidebar-accent font-medium text-[#1658B0]")}>
                       <span className="inline-flex size-5 items-center justify-center rounded text-[10px] font-semibold text-white" style={{ background: espacio.name.toLowerCase().includes("luvania") ? "#EE876B" : "#1658B0" }}>{espacio.name.slice(0, 1)}</span>
@@ -118,7 +119,7 @@ export function Marco({
               </div>
             ) : null}
           </div>
-          <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Filtros" icono={<FilterIcon className="size-4" />} compacta={!abierta} />
+          <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Requerimientos" icono={<ListIcon className="size-4" />} compacta={!abierta} />
           {puedeTablero ? <Enlace href="/paneles" activo={path.startsWith("/paneles") || path.startsWith("/gerencia")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {actor.role !== "SOLICITANTE" ? <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
           {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
@@ -131,6 +132,7 @@ export function Marco({
             <div className="mt-4 border-t border-sidebar-border pt-3">
               {abierta ? <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">Administración</p> : null}
               <Enlace href="/admin/usuarios" activo={path.startsWith("/admin/usuarios")} etiqueta="Usuarios" icono={<UsersIcon className="size-4" />} compacta={!abierta} />
+              <Enlace href="/admin/areas" activo={path.startsWith("/admin/areas")} etiqueta="Áreas" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/catalogos" activo={path.startsWith("/admin/catalogos")} etiqueta="Catálogos" icono={<BookOpenIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/flujos" activo={path.startsWith("/admin/flujos")} etiqueta="Flujos y SLA" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
             </div>
@@ -155,17 +157,16 @@ export function Marco({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-          <Link href="/notificaciones" className="relative inline-flex size-9 items-center justify-center rounded-md hover:bg-muted" aria-label={unread ? `Avisos, ${unread} sin leer` : "Avisos"}>
-            <BellIcon className="size-4" />
-            {unread > 0 ? <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-[#1658B0] px-1 text-center text-[10px] font-semibold text-white">{unread}</span> : null}
-          </Link>
+          <CampanaAvisos inicial={unread} />
           <BotonAtajos />
           <Link href="/ayuda" className="inline-flex size-9 items-center justify-center rounded-md hover:bg-muted" aria-label="Ayuda"><HelpCircleIcon className="size-4" /></Link>
           <Usuario actor={actor} />
         </header>
-        <Migas />
         <Atajos />
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-5 md:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-[1400px] px-4 pt-1 pb-5 md:px-6">
+          <PageHeader inicio={inicio} />
+          {children}
+        </main>
       </div>
     </div>
   )

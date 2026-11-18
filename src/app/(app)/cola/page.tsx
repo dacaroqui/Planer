@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { EstadoBadge } from "@/components/insignias"
 import { formatDateTime } from "@/lib/format"
-import { BRAND_LABEL, PRIORITY_LABEL, type BrandName, type PriorityName } from "@/lib/domain"
+import { BRAND_LABEL, PRIORITY_LABEL, TEAM_LABEL, type BrandName, type PriorityName, type TeamName } from "@/lib/domain"
 import { esAdmin, rolEn } from "@/lib/permissions"
 import { requireActor } from "@/server/session"
 import { listar } from "@/server/requests"
@@ -30,7 +30,7 @@ export default async function ColaPage() {
       <div>
         <h1 className="font-heading text-4xl">Cola de entrada</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Requerimientos en estado Nuevo{team ? ` de ${team === "DESARROLLO" ? "Desarrollo" : "Marketing"}` : ""}, del más antiguo al más reciente.
+          Requerimientos en estado Nuevo{team ? ` de ${TEAM_LABEL[team as TeamName] ?? team}` : ""}, del más antiguo al más reciente.
           {areas.length > 1 || (esAdmin(actor) && rolEn(actor, "DESARROLLO")) ? "" : ""}
         </p>
       </div>
