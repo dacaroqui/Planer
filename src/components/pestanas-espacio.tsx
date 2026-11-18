@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarIcon, Columns3Icon, FileTextIcon, LayoutGridIcon, ListIcon, PaperclipIcon, StickyNoteIcon } from "lucide-react"
+import { CalendarIcon, Columns3Icon, FileTextIcon, LayoutGridIcon, ListIcon, PaperclipIcon, StickyNoteIcon, UsersIcon } from "lucide-react"
 
 const TABS = [
   { id: "resumen", label: "Resumen", icon: LayoutGridIcon },
   { id: "tablero", label: "Tablero", icon: Columns3Icon },
   { id: "lista", label: "Lista", icon: ListIcon },
+  { id: "personas", label: "Personas", icon: UsersIcon },
   { id: "formularios", label: "Formularios", icon: FileTextIcon },
   { id: "paginas", label: "Páginas", icon: StickyNoteIcon },
   { id: "adjuntos", label: "Adjuntos", icon: PaperclipIcon },

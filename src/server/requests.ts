@@ -60,6 +60,14 @@ const detailInclude = {
 function clock(deps?: Deps) {
   return deps?.now ?? new Date()
 }
+
+function limiteFecha(valor: string, fin: boolean, calendario: boolean) {
+  if (calendario && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const dia = DateTime.fromISO(valor, { zone: ZONE })
+    return (fin ? dia.endOf("day") : dia.startOf("day")).toJSDate()
+  }
+  return new Date(valor)
+}
 function mailer(deps?: Deps) {
   return deps?.email ?? createEmailProvider()
 }
@@ -582,9 +590,22 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
   }
   if (!self && !puedeAsignar(actor, current)) throw new DomainError("Solo el líder del área asigna el responsable.")
   const assignee = await prisma.user.findFirst({
-    where: { id: assigneeId, active: true, areaRoles: { some: { team: current.team, role: { in: ["AGENTE", "LIDER"] } } } },
+    where: esAdmin(actor)
+      ? {
+          id: assigneeId,
+          active: true,
+          OR: [
+            { role: "ADMINISTRADOR" },
+            { areaRoles: { some: { role: { in: ["AGENTE", "LIDER"] } } } },
+          ],
+        }
+      : { id: assigneeId, active: true, areaRoles: { some: { team: current.team, role: { in: ["AGENTE", "LIDER"] } } } },
   })
-  if (!assignee) throw new DomainError("Elija un agente o líder activo de esa área.")
+  if (!assignee) {
+    const persona = await prisma.user.findUnique({ where: { id: assigneeId }, select: { name: true, active: true } })
+    if (!persona?.active) throw new DomainError("Esa persona no está activa.")
+    throw new DomainError(`${persona.name} no es agente ni líder de ${TEAM_LABEL[current.team]}.`)
+  }
   const now = clock(deps)
   const email = mailer(deps)
   const messages: EmailMessage[] = []
@@ -929,6 +950,8 @@ export type ListQuery = {
   assignedToMe?: boolean
   from?: string
   to?: string
+  sla?: string
+  porActualizacion?: boolean
   openOnly?: boolean
   closedOnly?: boolean
   queueTeam?: TeamName | null
@@ -979,10 +1002,11 @@ export async function listar(actor: Actor, query: ListQuery) {
   if (query.openOnly) and.push({ status: { notIn: [...TERMINAL_STATUSES] } })
   if (query.closedOnly) and.push({ status: { in: [...TERMINAL_STATUSES] } })
   if (query.from || query.to) {
+    const campo = query.porActualizacion ? "updatedAt" : "createdAt"
     and.push({
-      createdAt: {
-        gte: query.from ? new Date(query.from) : undefined,
-        lte: query.to ? new Date(query.to) : undefined,
+      [campo]: {
+        gte: query.from ? limiteFecha(query.from, false, Boolean(query.porActualizacion)) : undefined,
+        lte: query.to ? limiteFecha(query.to, true, Boolean(query.porActualizacion)) : undefined,
       },
     })
   }
@@ -996,20 +1020,45 @@ export async function listar(actor: Actor, query: ListQuery) {
       ? { [query.sort!]: dir }
       : { updatedAt: "desc" }
   const relaciones = relacionesListar(query)
+  const include = {
+    type: { select: { id: true, name: true, team: true } },
+    requester: { select: { id: true, name: true } },
+    assignee: { select: { id: true, name: true } },
+    area: { select: { id: true, name: true } },
+    empresa: { select: { id: true, name: true, exigirProyectoAlClasificar: true } },
+    project: { select: { id: true, name: true } },
+    ...(relaciones.pauses ? { pauses: { select: { startedAt: true, endedAt: true } } } : {}),
+    ...(relaciones.tasks ? { tasks: { select: { id: true, title: true, status: true, parentId: true } } } : {}),
+  }
+  function decorar<T extends {
+    slaStartedAt: Date
+    resolutionMinutes: number
+    slaTargetMinutes: number
+    pauses?: { startedAt: Date; endedAt: Date | null }[]
+    resolvedAt: Date | null
+    status: string
+  }>(row: T) {
+    const pauses = row.pauses ?? []
+    return { ...row, pauses, sla: evaluarSla({ ...row, pauses }) }
+  }
+  if (query.sla === "vencido" || query.sla === "riesgo") {
+    const rows = await prisma.request.findMany({ where, include, orderBy, take: 400 })
+    const filtradas = rows.map((row) => decorar(row)).filter((row) => (
+      query.sla === "vencido" ? row.sla.state === "VENCIDO" : row.sla.state === "EN_RIESGO"
+    ))
+    const start = (page - 1) * pageSize
+    return {
+      total: filtradas.length,
+      page,
+      pages: Math.max(1, Math.ceil(filtradas.length / pageSize)),
+      items: filtradas.slice(start, start + pageSize),
+    }
+  }
   const [total, rows] = await prisma.$transaction([
     prisma.request.count({ where }),
     prisma.request.findMany({
       where,
-      include: {
-        type: { select: { id: true, name: true, team: true } },
-        requester: { select: { id: true, name: true } },
-        assignee: { select: { id: true, name: true } },
-        area: { select: { id: true, name: true } },
-        empresa: { select: { id: true, name: true, exigirProyectoAlClasificar: true } },
-        project: { select: { id: true, name: true } },
-        ...(relaciones.pauses ? { pauses: { select: { startedAt: true, endedAt: true } } } : {}),
-        ...(relaciones.tasks ? { tasks: { select: { id: true, title: true, status: true, parentId: true } } } : {}),
-      },
+      include,
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -1019,7 +1068,7 @@ export async function listar(actor: Actor, query: ListQuery) {
     total,
     page,
     pages: Math.max(1, Math.ceil(total / pageSize)),
-    items: rows.map((row) => ({ ...row, pauses: "pauses" in row ? row.pauses : [], sla: evaluarSla({ ...row, pauses: "pauses" in row ? row.pauses : [] }) })),
+    items: rows.map((row) => decorar(row)),
   }
 }
 
@@ -1368,16 +1417,20 @@ export async function transicionarMasiva(actor: Actor, codes: string[], name: st
 
 export async function asignarMasiva(actor: Actor, codes: string[], assigneeId: string) {
   if (!assigneeId) throw new DomainError("Elija un responsable.")
-  let cambiados = 0
+  const errores: { code: string; mensaje: string }[] = []
+  let hechos = 0
   for (const code of codes) {
     const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
-    if (!request) continue
+    if (!request) {
+      errores.push({ code, mensaje: "El requerimiento no existe." })
+      continue
+    }
     try {
       await asignar(actor, request.id, assigneeId)
-      cambiados += 1
-    } catch {
-      // Se conservan permisos de asignación; los que no aplican se omiten.
+      hechos += 1
+    } catch (error) {
+      errores.push({ code, mensaje: error instanceof Error ? error.message : "No se pudo asignar." })
     }
   }
-  return cambiados
+  return { hechos, errores }
 }

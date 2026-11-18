@@ -1,11 +1,8 @@
 import { Suspense } from "react"
+import { ConsultaRequerimientos } from "@/components/consulta-requerimientos"
 import { Esqueleto } from "@/components/esqueleto"
-import { Filtros } from "@/components/filtros"
-import { ListaRequerimientos } from "@/components/lista-requerimientos"
-import { Paginacion } from "@/components/tabla"
-import { STATUS_LABEL } from "@/lib/domain"
-import { consultaDesde, queryString } from "@/lib/list-query"
 import { esAdmin, puedeAdministrar } from "@/lib/permissions"
+import { consultaDesde } from "@/lib/list-query"
 import { prisma } from "@/lib/prisma"
 import { catalogoPara } from "@/server/catalogo-nav"
 import { listar } from "@/server/requests"
@@ -17,17 +14,9 @@ export default function RequerimientosPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Lista</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Aquí ve los requerimientos que su rol le permite consultar. Las notas internas quedan para el equipo del área.
-        </p>
-      </div>
-      <Suspense fallback={<Esqueleto />}>
-        <ListaCargada searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<Esqueleto />}>
+      <ListaCargada searchParams={searchParams} />
+    </Suspense>
   )
 }
 
@@ -39,13 +28,10 @@ async function ListaCargada({
   const actor = await requireActor()
   const params = await searchParams
   const consulta = consultaDesde(params, actor)
-  const data = await listar(actor, { ...consulta, conPausas: true, conTareas: false })
+  const tamanos = [7, 10, 25, 50]
+  const pageSize = tamanos.includes(consulta.pageSize ?? 0) ? consulta.pageSize : 7
+  const data = await listar(actor, { ...consulta, pageSize, porActualizacion: true, conPausas: true, conTareas: false })
   const opciones = await catalogoPara(actor)
-  const estados = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))
-  const uno = (key: string) => {
-    const value = params[key]
-    return Array.isArray(value) ? value[0] : value
-  }
   const puedePrioridad = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER")
   const puedeEstado = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER" || item.role === "AGENTE")
   const puedeAsignar = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER")
@@ -57,31 +43,30 @@ async function ListaCargada({
       })
     : []
   return (
-    <>
-      <Filtros
-        ruta="/requerimientos"
-        estados={estados}
-        empresas={opciones.empresas.map((item) => ({ value: item.id, label: item.name }))}
-        proyectos={opciones.proyectos.map((item) => ({ value: item.id, label: item.name }))}
-        tipos={opciones.tipos.map((item) => ({ value: item.id, label: item.name }))}
-        areas={opciones.areas.map((item) => ({ value: item.id, label: item.name }))}
-        solicitantes={opciones.personas.map((item) => ({ value: item.id, label: item.name }))}
-      />
-      <ListaRequerimientos
-        items={data.items}
-        vacio="No hay requerimientos con esos filtros. Pruebe otra búsqueda o radique uno nuevo."
-        ruta="/requerimientos"
-        consulta={queryString(params)}
-        sort={uno("sort")}
-        dir={uno("dir")}
-        puedePrioridad={puedePrioridad}
-        puedeEstado={puedeEstado}
-        puedeAsignar={puedeAsignar}
-        puedeEliminar={puedeAdministrar(actor)}
-        estados={estados}
-        agentes={agentes}
-      />
-      <Paginacion page={data.page} pages={data.pages} ruta="/requerimientos" query={queryString(params)} />
-    </>
+    <ConsultaRequerimientos
+      items={data.items.map((item) => ({
+        code: item.code,
+        title: item.title,
+        status: item.status,
+        priority: item.priority,
+        typeName: item.type.name,
+        requester: item.requester.name,
+        updatedAt: item.updatedAt.toISOString(),
+        sla: item.sla.state,
+      }))}
+      total={data.total}
+      page={data.page}
+      pages={data.pages}
+      empresas={opciones.empresas.map((item) => ({ value: item.id, label: item.name }))}
+      proyectos={opciones.proyectos.map((item) => ({ value: item.id, label: item.name }))}
+      tipos={opciones.tipos.map((item) => ({ value: item.id, label: item.name }))}
+      areas={opciones.areas.map((item) => ({ value: item.id, label: item.name }))}
+      solicitantes={opciones.personas.map((item) => ({ value: item.id, label: item.name }))}
+      puedePrioridad={puedePrioridad}
+      puedeEstado={puedeEstado}
+      puedeAsignar={puedeAsignar}
+      puedeEliminar={puedeAdministrar(actor)}
+      agentes={agentes}
+    />
   )
 }

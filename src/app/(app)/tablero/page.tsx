@@ -89,6 +89,7 @@ async function TableroCargado({
       </form>
       <Tablero
         soloLectura={!esAdmin(actor) && rolEn(actor, team) === "OBSERVADOR"}
+        puedeEliminar={actor.isAdmin}
         columnas={columnas}
         agentes={agentes}
         tarjetas={data.items.map((item) => {

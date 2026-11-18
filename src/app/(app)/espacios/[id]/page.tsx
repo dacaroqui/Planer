@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Barra } from "@/components/barra"
+import { Avatar } from "@/components/iconos-planer"
 import { PRIORITY_LABEL, statusLabel, type PriorityName } from "@/lib/domain"
 import { formatDateTime } from "@/lib/format"
 import { prisma } from "@/lib/prisma"
@@ -31,7 +32,7 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
     where: { requestId: { in: casos.items.map((item) => item.id) }, internal: false },
     orderBy: { createdAt: "desc" },
     take: 8,
-    include: { request: { select: { code: true } } },
+    include: { actor: { select: { name: true } }, request: { select: { code: true, assignee: { select: { name: true } } } } },
   })
   const porEstado = conteo(casos.items.map((item) => ({ key: item.status, label: statusLabel(item.status) })))
   const porPrioridad = conteo(casos.items.map((item) => ({ key: item.priority, label: PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority })))
@@ -60,7 +61,13 @@ export default async function EspacioPage({ params }: { params: Promise<{ id: st
           <h2 className="text-sm font-semibold">Trabajo reciente</h2>
           <ul className="mt-3 grid gap-2 text-sm">
             {actividad.length === 0 ? <li className="text-muted-foreground">Todavía no hay actividad visible.</li> : actividad.map((item) => (
-              <li key={item.id}><Link href={`/requerimientos/${item.request.code}`} className="text-[#1658B0] hover:underline">{item.request.code}</Link> · {item.message} <span className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</span></li>
+              <li key={item.id} className="flex items-start gap-2">
+                <Avatar nombre={item.request.assignee?.name ?? item.actor?.name ?? "Sin asignar"} />
+                <span>
+                  <Link href={`/requerimientos/${item.request.code}`} className="text-[#1658B0] hover:underline">{item.request.code}</Link> · {item.message}{" "}
+                  <span className="text-xs text-muted-foreground">{item.request.assignee?.name ?? "Sin asignar"} · {formatDateTime(item.createdAt)}</span>
+                </span>
+              </li>
             ))}
           </ul>
         </section>

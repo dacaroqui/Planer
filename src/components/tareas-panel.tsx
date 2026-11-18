@@ -85,7 +85,7 @@ export function TareasPanel({
               <Button type="submit" size="sm" disabled={pending}>Marcar hecha</Button>
             </form>
           ) : null}
-          {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} /> : null}
+          {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
           </span>
         </div>
       ))}

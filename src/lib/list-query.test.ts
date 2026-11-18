@@ -23,4 +23,11 @@ describe("consultaDesde", () => {
     const query = consultaDesde({}, actor)
     expect(query.areaId).toBeUndefined()
   })
+
+  it("lee el tamaño de página, el SLA y la fecha de actualización", () => {
+    const query = consultaDesde({ pageSize: "7", sla: "vencido", fecha: "actualizacion" }, actor)
+    expect(query.pageSize).toBe(7)
+    expect(query.sla).toBe("vencido")
+    expect(query.porActualizacion).toBe(true)
+  })
 })

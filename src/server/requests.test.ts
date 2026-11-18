@@ -452,9 +452,38 @@ describe("acciones masivas sobre la selección", () => {
     expect(transicionLider).toBe(2)
     expect((await prisma.request.findUniqueOrThrow({ where: { id: uno.id } })).status).toBe("EN_ANALISIS")
     const asignaSolicitante = await asignarMasiva(ana, [uno.code, dos.code], valentina.id)
-    expect(asignaSolicitante).toBe(0)
+    expect(asignaSolicitante.hechos).toBe(0)
+    expect(asignaSolicitante.errores).toHaveLength(2)
     const asignados = await asignarMasiva(helena, [uno.code, dos.code], valentina.id)
-    expect(asignados).toBe(2)
+    expect(asignados.hechos).toBe(2)
+    expect(asignados.errores).toEqual([])
     expect((await prisma.request.findUniqueOrThrow({ where: { id: dos.id } })).assigneeId).toBe(valentina.id)
+  })
+
+  it("el administrador asigna a otro equipo y el líder ve el motivo por requerimiento", async () => {
+    const { area, incidencia, ana, camila, helena } = await mundo()
+    const adminUser = await prisma.user.create({
+      data: { name: "Admin Asigna", email: "admin.asigna@cifes.edu.co", role: "ADMINISTRADOR", areaId: area.id },
+      include: { areaRoles: true },
+    })
+    const admin = toActor(adminUser)
+    const desarrollo = await radicar(ana, {
+      ...base,
+      title: "Caso de desarrollo para otro equipo",
+      description: "El administrador quiere dejarlo en manos de marketing para la prueba.",
+      team: "DESARROLLO",
+      typeId: incidencia.id,
+      priority: "MEDIA",
+      brand: "CIFES",
+      stepsToReproduce: "Abrir el caso de prueba y revisar el módulo.",
+    })
+    const delLider = await asignarMasiva(helena, [desarrollo.code], camila.id)
+    expect(delLider.hechos).toBe(0)
+    expect(delLider.errores).toEqual([
+      { code: desarrollo.code, mensaje: "Camila Ejemplo no es agente ni líder de Desarrollo." },
+    ])
+    const delAdmin = await asignarMasiva(admin, [desarrollo.code], camila.id)
+    expect(delAdmin).toEqual({ hechos: 1, errores: [] })
+    expect((await prisma.request.findUniqueOrThrow({ where: { id: desarrollo.id } })).assigneeId).toBe(camila.id)
   })
 })

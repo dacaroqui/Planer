@@ -81,6 +81,17 @@ export async function asegurarCatalogo(client: PrismaClient = prisma) {
       create: { kind: "PRIORIDAD", ...item },
     })
   }
+  const equipos = [
+    { key: "DESARROLLO", name: "Desarrollo", description: "Errores, soporte técnico y mejoras en plataformas.", icon: "codigo", color: "azul", sortOrder: 1 },
+    { key: "MARKETING", name: "Marketing", description: "Diseño, contenidos y piezas de comunicación.", icon: "megafono", color: "coral", sortOrder: 2 },
+  ]
+  for (const item of equipos) {
+    await client.catalogItem.upsert({
+      where: { kind_key: { kind: "EQUIPO", key: item.key } },
+      update: {},
+      create: { kind: "EQUIPO", ...item },
+    })
+  }
   for (const policy of SLA_POR_DEFECTO) {
     const existing = await client.slaPolicy.findFirst({
       where: { team: policy.team, typeId: null, priority: policy.priority },

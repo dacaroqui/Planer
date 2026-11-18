@@ -48,12 +48,15 @@ model RequestType {
 }
 
 model CatalogItem {
-  id        String   @id @default(cuid())
-  kind      String
-  key       String
-  name      String
-  active    Boolean  @default(true)
-  sortOrder Int      @default(0)
+  id          String  @id @default(cuid())
+  kind        String
+  key         String
+  name        String
+  description String  @default("")
+  icon        String  @default("")
+  color       String  @default("")
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0)
 
   @@unique([kind, key])
 }

@@ -534,10 +534,12 @@ export async function estadoMasivaAction(formData: FormData): Promise<ActionResu
 export async function asignarMasivaAction(formData: FormData): Promise<ActionResult> {
   const actor = await requireActor()
   try {
-    const total = await asignarMasiva(actor, codesDe(formData), String(formData.get("assigneeId") || ""))
+    const resultado = await asignarMasiva(actor, codesDe(formData), String(formData.get("assigneeId") || ""))
     refrescar()
-    if (!total) return { ok: false, error: "No se pudo asignar el responsable de los seleccionados." }
-    return { ok: true, message: `Responsable asignado en ${total} requerimientos.` }
+    const detalle = resultado.errores.map((item) => `${item.code}: ${item.mensaje}`).join(" ")
+    if (!resultado.hechos) return { ok: false, error: detalle || "No se pudo asignar el responsable de los seleccionados." }
+    if (detalle) return { ok: true, message: `Responsable asignado en ${resultado.hechos}. ${detalle}` }
+    return { ok: true, message: `Responsable asignado en ${resultado.hechos} requerimientos.` }
   } catch (error) {
     return fallo(error)
   }

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
 import { Avatar, IconoPrioridad, IconoTipo } from "@/components/iconos-planer"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -33,11 +34,13 @@ export function TableroEspacio({
   estados,
   actorId,
   espacioId,
+  puedeEliminar = false,
 }: {
   tarjetas: TarjetaEspacio[]
   estados: EstadoEspacio[]
   actorId: string
   espacioId: string
+  puedeEliminar?: boolean
 }) {
   const router = useRouter()
   const [q, setQ] = useState("")
@@ -172,7 +175,10 @@ export function TableroEspacio({
                   <div className="grid gap-2">
                     {cartas.map((item) => (
                       <article key={item.code} draggable={!pending} onDragStart={(event) => { event.dataTransfer.setData("text/plain", item.code); event.dataTransfer.effectAllowed = "move" }} className="cursor-grab rounded-md border border-[#dfe1e6] bg-white p-3 text-sm shadow-[0_1px_1px_rgba(9,30,66,0.12)]">
-                        <Link href={`/requerimientos/${item.code}`} className="line-clamp-2 font-medium leading-5 text-[#15122A] hover:underline">{item.title}</Link>
+                        <div className="flex items-start justify-between gap-2">
+                          <Link href={`/requerimientos/${item.code}`} className="line-clamp-2 font-medium leading-5 text-[#15122A] hover:underline">{item.title}</Link>
+                          {puedeEliminar ? <MenuEliminarRequerimiento code={item.code} title={item.title} /> : null}
+                        </div>
                         <p className="mt-2 flex flex-wrap gap-1">
                           <span className="rounded bg-[#F1F2F4] px-1.5 py-0.5 text-xs text-[#44546f]">{item.area}</span>
                           {necesitaInformacion(item.status) ? <span className="rounded-full bg-[#F1CEB3] px-2 py-0.5 text-xs text-[#15122A]">Necesita información</span> : null}
@@ -182,7 +188,10 @@ export function TableroEspacio({
                           <Link href={`/requerimientos/${item.code}`} className="text-xs font-medium text-[#1658B0] hover:underline">{item.code}</Link>
                           <span className="ml-auto flex items-center gap-1">
                             <IconoPrioridad prioridad={item.priority} />
-                            {item.asignado ? <Avatar nombre={item.asignado} marca={item.marca} /> : null}
+                            <span className="inline-flex items-center gap-1 text-xs text-[#44546f]">
+                              <Avatar nombre={item.asignado || "Sin asignar"} marca={item.marca} />
+                              {item.asignado || "Sin asignar"}
+                            </span>
                           </span>
                         </p>
                       </article>
