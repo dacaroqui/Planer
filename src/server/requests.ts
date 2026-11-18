@@ -36,6 +36,7 @@ import {
   esAdmin,
   rolEn,
 } from "@/lib/permissions"
+import { esEntradaPublica, horasDeMinutos, notaResolucionOpcional, visibilidadDefecto, type TipoComentario } from "@/lib/cronologia"
 import { snapshotSolucion } from "@/lib/sla-solicitud"
 import { addBusinessMinutes, describeWindows } from "@/lib/sla"
 import { ZONE } from "@/lib/time"
@@ -51,7 +52,7 @@ const detailInclude = {
   empresa: true,
   project: true,
   tasks: { include: { assignee: true }, orderBy: { createdAt: "asc" as const } },
-  comments: { include: { author: { include: { areaRoles: true } } }, orderBy: { createdAt: "asc" as const } },
+  comments: { include: { author: { include: { areaRoles: true } }, tarea: { select: { title: true } } }, orderBy: { createdAt: "asc" as const } },
   activities: { include: { actor: { include: { areaRoles: true } } }, orderBy: { createdAt: "asc" as const } },
   attachments: { include: { uploadedBy: true }, orderBy: { createdAt: "asc" as const } },
   pauses: { orderBy: { startedAt: "asc" as const } },
@@ -351,7 +352,7 @@ export async function transicionar(
   requestId: string,
   name: string,
   comment: string | null,
-  extra?: { deliveryUrl?: string; projectId?: string | null; assigneeId?: string | null; committedDate?: string | null; resolution?: string | null },
+  extra?: { deliveryUrl?: string; projectId?: string | null; assigneeId?: string | null; committedDate?: string | null; resolution?: string | null; visibilidad?: "publica" | "interna"; resolutionNote?: string | null },
   deps?: Deps,
 ) {
   const current = await prisma.request.findUnique({
@@ -365,7 +366,9 @@ export async function transicionar(
   const transition = encontrarTransicion(actor, acceso(current), name, catalogo, now)
   if (!transition) throw new DomainError("No puede ejecutar esa transición.")
   const note = comment?.trim() ?? ""
-  if (transition.requiresComment && note.length < 2) throw new DomainError("Escriba el motivo o la pregunta. Queda visible para el solicitante.")
+  const destinoNota = transition.toPrevious ? (current.previousStatus || "NUEVO") : transition.to
+  const entregaOCierre = notaResolucionOpcional({ name: transition.name, to: destinoNota })
+  if (transition.requiresComment && note.length < 2 && !entregaOCierre) throw new DomainError("Escriba el motivo o la pregunta. Queda visible para el solicitante.")
   const assigneeId = extra?.assigneeId || current.assigneeId
   if (transition.requiresAssignee && !assigneeId) throw new DomainError("Elija un responsable antes de aprobar.")
   const committed = extra?.committedDate || (current.committedDate ? current.committedDate.toISOString().slice(0, 10) : "")
@@ -427,6 +430,16 @@ export async function transicionar(
     }
     if (transition.incrementRounds) data.adjustmentRounds = { increment: 1 }
     if (delivery && transition.requiresDelivery) data.deliveryUrl = delivery
+    const visibilidad = extra?.visibilidad ?? visibilidadDefecto(transition.name)
+    const kind: TipoComentario = visibilidad === "interna"
+      ? "INTERNA"
+      : transition.name === "Pedir información" ? "SOLICITUD_INFO" : "PUBLICA"
+    const notaHecho = (extra?.resolutionNote ?? (entregaOCierre ? note : "")).trim()
+    if (entregaOCierre) data.resolutionNote = notaHecho || null
+    if (note && esEntradaPublica(kind)) {
+      data.lastPublicActor = { connect: { id: actor.id } }
+      data.lastPublicAt = now
+    }
     const saved = await tx.request.update({ where: { id: current.id }, data })
     await tx.activity.create({
       data: {
@@ -442,7 +455,7 @@ export async function transicionar(
     })
     if (note) {
       await tx.comment.create({
-        data: { requestId: current.id, authorId: actor.id, body: note, internal: false, createdAt: now },
+        data: { requestId: current.id, authorId: actor.id, body: note, kind, internal: kind === "INTERNA", createdAt: now },
       })
     }
     const leaders = await leaderIds(tx, current.team)
@@ -509,37 +522,76 @@ export async function deshacerTransicion(actor: Actor, requestId: string, deps?:
 }
 
 export async function comentar(actor: Actor, requestId: string, body: string, internal: boolean, deps?: Deps) {
+  return registrarEntrada(actor, requestId, { kind: internal ? "INTERNA" : "PUBLICA", body }, deps)
+}
+
+export async function registrarEntrada(
+  actor: Actor,
+  requestId: string,
+  input: { kind: TipoComentario; body: string; minutes?: number | null; tareaId?: string | null; compartir?: boolean },
+  deps?: Deps,
+) {
   const current = await prisma.request.findUnique({ where: { id: requestId } })
   if (!current) throw new DomainError("El requerimiento no existe.")
-  if (!puedeComentar(actor, current, internal)) {
-    throw new DomainError(internal ? "Las notas internas son solo del equipo del área." : "No puede comentar en este requerimiento.")
+  const interno = input.kind !== "PUBLICA"
+  if (input.kind !== "PUBLICA" && !puedeVerNotaInterna(actor, current.team)) {
+    throw new DomainError("Esa entrada es solo del equipo del área.")
   }
-  const text = body.trim()
+  if (!puedeComentar(actor, current, input.kind === "INTERNA" || input.kind === "REGISTRO")) {
+    throw new DomainError(interno ? "Las notas internas son solo del equipo del área." : "No puede comentar en este requerimiento.")
+  }
+  const text = input.body.trim()
   if (text.length < 2) throw new DomainError("Escriba un comentario.")
+  const minutes = input.kind === "REGISTRO" ? Number(input.minutes ?? 0) : null
+  if (input.kind === "REGISTRO" && (!Number.isFinite(minutes) || (minutes ?? 0) <= 0)) {
+    throw new DomainError("Indique los minutos trabajados.")
+  }
+  if (input.tareaId) {
+    const tarea = await prisma.tarea.findFirst({ where: { id: input.tareaId, requestId } })
+    if (!tarea) throw new DomainError("La tarea no pertenece a este requerimiento.")
+  }
   const now = clock(deps)
   const email = mailer(deps)
   const messages: EmailMessage[] = []
+  const publica = esEntradaPublica(input.kind)
   const comment = await prisma.$transaction(async (tx) => {
     const created = await tx.comment.create({
-      data: { requestId, authorId: actor.id, body: text, internal, createdAt: now },
-    })
-    await tx.activity.create({
       data: {
         requestId,
-        actorId: actor.id,
-        kind: "COMMENT",
-        message: internal ? "Dejó una nota interna." : "Comentó en el requerimiento.",
-        internal,
+        authorId: actor.id,
+        body: text,
+        kind: input.kind,
+        internal: input.kind === "INTERNA",
+        minutes: input.kind === "REGISTRO" ? Math.round(minutes ?? 0) : null,
+        tareaId: input.kind === "REGISTRO" ? (input.tareaId || null) : null,
+        compartir: input.kind === "REGISTRO" && Boolean(input.compartir),
         createdAt: now,
       },
     })
+    if (input.kind === "REGISTRO" && input.tareaId) {
+      const suma = await tx.comment.aggregate({ where: { tareaId: input.tareaId, kind: "REGISTRO" }, _sum: { minutes: true } })
+      await tx.tarea.update({ where: { id: input.tareaId }, data: { horasReales: horasDeMinutos(suma._sum.minutes ?? 0) } })
+    }
+    const mensaje = input.kind === "REGISTRO"
+      ? "Registró trabajo."
+      : input.kind === "SOLICITUD_INFO"
+        ? "Pidió información al solicitante."
+        : input.kind === "INTERNA"
+          ? "Dejó una nota interna."
+          : "Comentó en el requerimiento."
+    await tx.activity.create({
+      data: { requestId, actorId: actor.id, kind: "COMMENT", message: mensaje, internal: input.kind === "INTERNA", createdAt: now },
+    })
     const leaders = await leaderIds(tx, current.team)
-    const vuelve = !internal && current.status === "EN_ESPERA" && actor.id === current.requesterId && current.previousStatus
+    const publicoDelSolicitante = publica && actor.id === current.requesterId
+    const vuelve = publicoDelSolicitante && current.status === "EN_ESPERA" && current.previousStatus
+    const pideInfo = input.kind === "SOLICITUD_INFO" && !PAUSE_STATUSES.has(current.status)
+    const marcaPublica = publica ? { lastPublicActorId: actor.id, lastPublicAt: now } : {}
     if (vuelve && current.previousStatus) {
       await tx.slaPause.updateMany({ where: { requestId, endedAt: null }, data: { endedAt: now } })
       await tx.request.update({
         where: { id: requestId },
-        data: { status: current.previousStatus, previousStatus: null, updatedAt: now },
+        data: { status: current.previousStatus, previousStatus: null, updatedAt: now, ...marcaPublica },
       })
       await tx.activity.create({
         data: {
@@ -553,10 +605,28 @@ export async function comentar(actor: Actor, requestId: string, body: string, in
           createdAt: now,
         },
       })
+    } else if (pideInfo) {
+      await tx.slaPause.create({ data: { requestId, startedAt: now, reason: "EN_ESPERA" } })
+      await tx.request.update({
+        where: { id: requestId },
+        data: { status: "EN_ESPERA", previousStatus: current.status, updatedAt: now, ...marcaPublica },
+      })
+      await tx.activity.create({
+        data: {
+          requestId,
+          actorId: actor.id,
+          kind: "STATUS",
+          field: "estado",
+          message: "Pidió información y pausó el SLA.",
+          fromValue: current.status,
+          toValue: "EN_ESPERA",
+          createdAt: now,
+        },
+      })
     } else {
-      await tx.request.update({ where: { id: requestId }, data: { updatedAt: now } })
+      await tx.request.update({ where: { id: requestId }, data: { updatedAt: now, ...marcaPublica } })
     }
-    if (!internal && !current.firstResponseStoppedAt && actor.id !== current.requesterId && (rolEn(actor, current.team) || esAdmin(actor))) {
+    if (publica && !current.firstResponseStoppedAt && actor.id !== current.requesterId && (rolEn(actor, current.team) || esAdmin(actor))) {
       await tx.request.update({
         where: { id: requestId },
         data: {
@@ -565,14 +635,19 @@ export async function comentar(actor: Actor, requestId: string, body: string, in
         },
       })
     }
-    const destinatarios = internal
+    const destinatarios = input.kind === "INTERNA" || input.kind === "REGISTRO"
       ? [current.assigneeId, ...leaders]
-      : current.status === "CERRADO" || TERMINAL_STATUSES.has(current.status)
+      : TERMINAL_STATUSES.has(current.status)
         ? leaders
         : [actor.id === current.requesterId ? current.assigneeId : current.requesterId, ...leaders]
+    const asunto = publicoDelSolicitante
+      ? `${current.code} · El solicitante respondió`
+      : input.kind === "SOLICITUD_INFO"
+        ? `${current.code} · información solicitada`
+        : `${current.code} · ${input.kind === "INTERNA" ? "nota interna" : input.kind === "REGISTRO" ? "registro de trabajo" : "comentario"}`
     await fanout(tx, destinatarios, {
       requestId,
-      subject: `${current.code} · ${internal ? "nota interna" : "comentario"}`,
+      subject: asunto,
       body: `${actor.name} escribió en ${current.code}. Abra el requerimiento con su sesión; este correo no incluye el texto de notas internas ni adjuntos.\n${link(current.code)}`,
     }, messages, actor.id)
     return created
@@ -623,7 +698,12 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
         createdAt: now,
       },
     })
-    await fanout(tx, [assignee.id, current.requesterId], {
+    await fanout(tx, [assignee.id], {
+      requestId,
+      subject: `${current.code} · Se te asignó`,
+      body: `Se te asignó ${current.code}.\n${link(current.code)}`,
+    }, messages, actor.id)
+    await fanout(tx, [current.requesterId], {
       requestId,
       subject: `${current.code} · responsable asignado`,
       body: `${assignee.name} quedó como responsable de ${current.code}.\n${link(current.code)}`,
@@ -864,7 +944,7 @@ export async function getDetalle(actor: Actor, code: string) {
   return {
     request: {
       ...request,
-      comments: request.comments.filter((comment) => seeInternal || !comment.internal),
+      comments: request.comments.filter((comment) => seeInternal || esEntradaPublica(comment.kind)),
       activities: request.activities.filter((activity) => seeInternal || !activity.internal),
     },
     sla: evaluarSla(request),
@@ -1157,22 +1237,36 @@ export async function vigilarSlas(deps?: Deps) {
   let sent = 0
   for (const request of open) {
     const sla = evaluarSla(request, now)
-    if (sla.state !== "VENCIDO" && sla.state !== "EN_RIESGO") continue
-    const clave = sla.state === "VENCIDO" ? "VENCIDO" : "RIESGO"
-    const messages: EmailMessage[] = []
     const leaders = (await prisma.areaRole.findMany({ where: { team: request.team, role: "LIDER" }, select: { userId: true } })).map((item) => item.userId)
-    await prisma.$transaction(async (tx) => {
-      await fanout(tx, [request.assigneeId, ...leaders], {
-        requestId: request.id,
-        subject: `${request.code} · ${clave === "VENCIDO" ? "SLA de solución vencido" : "SLA de solución por vencer"}`,
-        body: clave === "VENCIDO"
-          ? `${request.code} venció el SLA de solución.\n${link(request.code)}`
-          : `${request.code} ya consumió al menos el 75 % del SLA de solución.\n${link(request.code)}`,
-        dedupeKey: `sla-${clave}-${request.id}`,
-      }, messages)
-    })
-    await deliver(email, messages)
-    sent += messages.length
+    if (sla.state === "VENCIDO" || sla.state === "EN_RIESGO") {
+      const clave = sla.state === "VENCIDO" ? "VENCIDO" : "RIESGO"
+      const messages: EmailMessage[] = []
+      await prisma.$transaction(async (tx) => {
+        await fanout(tx, [request.assigneeId, ...leaders], {
+          requestId: request.id,
+          subject: `${request.code} · ${clave === "VENCIDO" ? "SLA de solución vencido" : "SLA de solución por vencer"}`,
+          body: clave === "VENCIDO"
+            ? `${request.code} venció el SLA de solución.\n${link(request.code)}`
+            : `${request.code} ya consumió al menos el 75 % del SLA de solución.\n${link(request.code)}`,
+          dedupeKey: `sla-${clave}-${request.id}`,
+        }, messages)
+      })
+      await deliver(email, messages)
+      sent += messages.length
+    }
+    if (sla.state !== "EN_PAUSA" && sla.state !== "NO_APLICA" && sla.state !== "VENCIDO" && sla.remainingMinutes > 0 && sla.remainingMinutes <= 30) {
+      const aviso: EmailMessage[] = []
+      await prisma.$transaction(async (tx) => {
+        await fanout(tx, [request.assigneeId, ...leaders], {
+          requestId: request.id,
+          subject: `${request.code} · A 30 min de vencer`,
+          body: `${request.code} está a 30 minutos o menos de vencer el SLA de solución.\n${link(request.code)}`,
+          dedupeKey: `sla-30-${request.id}`,
+        }, aviso)
+      })
+      await deliver(email, aviso)
+      sent += aviso.length
+    }
   }
   return { revisados: open.length, enviados: sent }
 }

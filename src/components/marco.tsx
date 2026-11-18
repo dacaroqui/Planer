@@ -16,6 +16,7 @@ import {
   ClockIcon,
   FilterIcon,
   HomeIcon,
+  InboxIcon,
 } from "lucide-react"
 import { Atajos, BotonAtajos } from "@/components/atajos"
 import { Migas } from "@/components/migas"
@@ -42,6 +43,7 @@ export function Marco({
   puedePlanner,
   puedeCola,
   puedeTablero,
+  puedeBandeja,
   rendimiento,
   children,
 }: {
@@ -53,6 +55,7 @@ export function Marco({
   puedePlanner: boolean
   puedeCola: boolean
   puedeTablero: boolean
+  puedeBandeja: boolean
   rendimiento: "equipo" | "propio" | null
   children: React.ReactNode
 }) {
@@ -117,6 +120,7 @@ export function Marco({
           {actor.role !== "SOLICITANTE" ? <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
           {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedeBandeja ? <Enlace href="/bandeja" activo={path.startsWith("/bandeja")} etiqueta="Bandeja de respuesta" icono={<InboxIcon className="size-4" />} compacta={!abierta} /> : null}
           <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
           {puedeCola ? <Enlace href="/cola" activo={path.startsWith("/cola")} etiqueta="Cola de entrada" icono={<FilterIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeTablero ? <Enlace href="/tablero" activo={path.startsWith("/tablero")} etiqueta="Tablero" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}

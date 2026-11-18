@@ -99,6 +99,7 @@ export async function guardarTarea(
     requestId?: string | null
     projectId?: string | null
     parentId?: string | null
+    horasEstimadas?: string | null
   },
 ) {
   const title = input.title.trim()
@@ -138,6 +139,9 @@ export async function guardarTarea(
     projectId: projectId || null,
     parentId: parentId || null,
     completedAt,
+    ...(input.horasEstimadas !== undefined
+      ? { horasEstimadas: input.horasEstimadas && Number.isFinite(Number(input.horasEstimadas)) ? Number(input.horasEstimadas) : null }
+      : {}),
   }
   const tarea = input.id
     ? await prisma.tarea.update({ where: { id: input.id }, data })

@@ -32,13 +32,14 @@ const COLUMNAS: Array<{ clave: OrdenRendimiento; etiqueta: string; titulo: strin
   { clave: "tareasAsignadas", etiqueta: "Tar. asig.", titulo: "Tareas que se le asignaron en el periodo" },
   { clave: "tareasCompletadas", etiqueta: "Tar. hechas", titulo: "Tareas hechas en el periodo" },
   { clave: "tareasSinHacer", etiqueta: "Tar. sin hacer", titulo: "Tareas asignadas en el periodo que no quedaron hechas" },
+  { clave: "horasRegistradas", etiqueta: "Horas", titulo: "Horas registradas en tareas durante el periodo" },
 ]
 
 function valor(fila: FilaRendimiento, clave: OrdenRendimiento) {
   const dato = fila[clave]
   if (typeof dato === "string") return dato
   if (clave === "cumplimiento" || clave === "pctDentroSla" || clave === "slaAbiertoPromedio") return textoPct(dato)
-  if (clave === "horasPromedio" || clave === "horasMediana" || clave === "horasDemora") return textoHoras(dato)
+  if (clave === "horasPromedio" || clave === "horasMediana" || clave === "horasDemora" || clave === "horasRegistradas") return textoHoras(dato)
   return textoEntero(dato ?? 0)
 }
 

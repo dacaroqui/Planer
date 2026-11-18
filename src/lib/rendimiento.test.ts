@@ -383,6 +383,7 @@ describe("CSV", () => {
       tareasAsignadas: 2,
       tareasCompletadas: 1,
       tareasSinHacer: 1,
+      horasRegistradas: 0,
     } satisfies FilaRendimiento
     const csv = filasACsv([fila])
     expect(csv.startsWith("\uFEFF")).toBe(true)

@@ -4,10 +4,9 @@ import { FichaSeguimiento, LineaEstados } from "@/components/seguimiento-solicit
 import { Gestion } from "@/components/gestion"
 import { TareasPanel } from "@/components/tareas-panel"
 import { EquipoBadge, EstadoBadge, SlaBadge } from "@/components/insignias"
-import { renderMarkdown } from "@/lib/markdown"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { etiquetaDeAutor } from "@/lib/permissions"
+import { Compositor } from "@/components/compositor"
+import { Cronologia, type EntradaLinea } from "@/components/cronologia-vista"
 import { formatBytes, formatDate, formatDateTime } from "@/lib/format"
 import { formatDuration } from "@/lib/sla"
 import { trasladarAction } from "@/server/actions"
@@ -47,6 +46,31 @@ export default async function DetallePage({
   const tareasRaiz = request.tasks.filter((tarea) => !tarea.parentId)
   const avance = avanceDesdeLista(request.tasks, request.status)
   const ratio = Math.max(0, Math.min(100, Math.round(sla.ratio * 100)))
+  const notaPrefill = request.comments.filter((item) => item.kind === "REGISTRO" && item.compartir).map((item) => item.body).join("\n\n")
+  const otras = await prisma.request.findMany({
+    where: { requesterId: request.requesterId, NOT: { id: request.id } },
+    orderBy: { updatedAt: "desc" },
+    take: 8,
+    select: { code: true, title: true, status: true, team: true, requesterId: true },
+  })
+  const principal = detail.transitions.find((item) => item.to !== "CANCELADO" && item.to !== "RECHAZADO")
+  const entradas: EntradaLinea[] = [
+    ...request.comments.map((item) => ({
+      tipo: (item.kind === "INTERNA" ? "interna" : item.kind === "REGISTRO" ? "registro" : item.kind === "SOLICITUD_INFO" ? "info" : "publica") as "publica" | "interna" | "registro" | "info",
+      id: item.id,
+      autor: item.author.name,
+      cuando: item.createdAt.toISOString(),
+      cuerpo: item.body,
+      minutos: item.minutes,
+      tarea: item.tarea?.title ?? null,
+    })),
+    ...request.activities.filter((item) => item.kind === "STATUS" && item.field === "estado").map((item) => ({
+      tipo: "estado" as const,
+      id: item.id,
+      cuando: item.createdAt.toISOString(),
+      texto: item.fromValue && item.toValue ? `${statusLabel(item.fromValue)} → ${statusLabel(item.toValue)}` : item.message,
+    })),
+  ].sort((a, b) => a.cuando.localeCompare(b.cuando))
 
   return (
     <div className="space-y-6">
@@ -69,7 +93,9 @@ export default async function DetallePage({
           <SlaBadge state={sla.state} />
           <EquipoBadge team={request.team} />
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">Radicado {formatDateTime(request.createdAt)} por {request.requester.name}.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Radicado {formatDateTime(request.createdAt)} por {request.requester.name}. Responsable: {request.assignee?.name ?? "Sin asignar"}.</p>
+        {request.resolutionNote ? <p className="mt-3 rounded-lg bg-[#F4F8FE] px-3 py-2 text-sm"><span className="font-medium">Qué se hizo. </span>{request.resolutionNote}</p> : null}
+        {principal ? <p className="mt-3 text-sm">Siguiente paso: <a href="#gestion" className="font-medium text-[#1658B0] hover:underline">{principal.name}</a></p> : null}
         <div className="mt-4 rounded-xl border border-[#dfe1e6] bg-white p-4">
           <FichaSeguimiento
             codigo={request.code}
@@ -108,8 +134,33 @@ export default async function DetallePage({
               </CardContent>
             </Card>
           </section>
-          <section aria-labelledby="seguimiento" className="space-y-3">
-          <h2 id="seguimiento" className="font-heading text-2xl">Seguimiento</h2>
+          {request.attachments.length > 0 ? (
+            <Card>
+              <CardHeader><CardTitle>Archivos</CardTitle></CardHeader>
+              <CardContent className="grid gap-2 text-sm">
+                {request.attachments.map((file) => (
+                  <a key={file.id} href={`/api/adjuntos/${file.id}`} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 hover:bg-muted">
+                    <span>{file.filename}</span>
+                    <span className="text-xs text-muted-foreground">{formatBytes(file.sizeBytes)} · {file.uploadedBy.name}</span>
+                  </a>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+          <section aria-labelledby="cronologia" className="space-y-3">
+            <h2 id="cronologia" className="font-heading text-2xl">Actividad</h2>
+            <Cronologia entradas={entradas} />
+            <Compositor
+              code={request.code}
+              puedePublica={detail.canCommentPublic}
+              puedeNota={detail.canCommentInternal}
+              puedeAdjuntar={detail.canAttach}
+              tareas={tareasRaiz.map((tarea) => ({ id: tarea.id, title: tarea.title }))}
+            />
+          </section>
+        </div>
+        <div className="space-y-4">
+          <h2 id="gestion" className="font-heading text-2xl">Gestión</h2>
           <Card>
             <CardHeader><CardTitle title={TEXTO_AVANCE_REQUERIMIENTO}>Tareas · {avance.porcentaje}%</CardTitle></CardHeader>
             <CardContent>
@@ -127,58 +178,12 @@ export default async function DetallePage({
                   dueDate: tarea.dueDate ? formatDate(tarea.dueDate) : null,
                   assignee: tarea.assignee?.name ?? "Sin responsable",
                   vencida: tareaVencida(tarea),
+                  horasEstimadas: tarea.horasEstimadas === null ? null : Number(tarea.horasEstimadas),
+                  horasReales: tarea.horasReales === null ? null : Number(tarea.horasReales),
                 }))}
               />
             </CardContent>
           </Card>
-          {request.attachments.length > 0 ? (
-            <Card>
-              <CardHeader><CardTitle>Archivos</CardTitle></CardHeader>
-              <CardContent className="grid gap-2 text-sm">
-                {request.attachments.map((file) => (
-                  <a key={file.id} href={`/api/adjuntos/${file.id}`} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 hover:bg-muted">
-                    <span>{file.filename}</span>
-                    <span className="text-xs text-muted-foreground">{formatBytes(file.sizeBytes)} · {file.uploadedBy.name}</span>
-                  </a>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-          <Tabs defaultValue="comentarios">
-            <TabsList>
-              <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
-              <TabsTrigger value="historial">Historial</TabsTrigger>
-            </TabsList>
-            <TabsContent value="comentarios" className="mt-4 grid gap-3">
-              {request.comments.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay comentarios.</p> : request.comments.map((comment) => (
-                <article key={comment.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                  <p className="text-sm font-medium">
-                    {comment.author.name}
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
-                      {etiquetaDeAutor(comment.author, request.team)} · {formatDateTime(comment.createdAt)}
-                      {comment.internal ? " · Nota interna" : ""}
-                    </span>
-                  </p>
-                  <div className="mt-2 text-sm [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.body) }} />
-                </article>
-              ))}
-            </TabsContent>
-            <TabsContent value="historial" className="mt-4 grid gap-3">
-              {request.activities.map((activity) => (
-                <div key={activity.id} className="border-l-2 border-primary/30 pl-3">
-                  <p className="text-sm">{activity.message}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.actor ? `${activity.actor.name} · ${etiquetaDeAutor(activity.actor, request.team)}` : "Planer"} · {formatDateTime(activity.createdAt)}
-                    {activity.internal ? " · Interno" : ""}
-                  </p>
-                </div>
-              ))}
-            </TabsContent>
-          </Tabs>
-          </section>
-        </div>
-        <div className="space-y-4">
-          <h2 id="gestion" className="font-heading text-2xl">Gestión</h2>
           <Card>
             <CardHeader><CardTitle>SLA</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
@@ -245,7 +250,17 @@ export default async function DetallePage({
                 puedeComentar={detail.canCommentPublic}
                 puedeNota={detail.canCommentInternal}
                 puedeAdjuntar={detail.canAttach}
+                notaPrefill={notaPrefill}
+                soloTransiciones
               />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Otras solicitudes de este solicitante</CardTitle></CardHeader>
+            <CardContent className="grid gap-2 text-sm">
+              {otras.filter((item) => item.requesterId === actor.id || actor.isAdmin || item.team === request.team).length === 0 ? <p className="text-muted-foreground">No hay otras solicitudes visibles.</p> : otras.filter((item) => item.requesterId === actor.id || actor.isAdmin || item.team === request.team).map((item) => (
+                <a key={item.code} href={`/requerimientos/${item.code}`} className="hover:underline">{item.code} · {item.title}</a>
+              ))}
             </CardContent>
           </Card>
         </div>

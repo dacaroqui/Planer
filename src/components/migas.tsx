@@ -23,6 +23,7 @@ const NOMBRES: Record<string, string> = {
   radicar: "Radicar solicitud",
   notificaciones: "Avisos",
   cola: "Cola de entrada",
+  bandeja: "Bandeja de respuesta",
   admin: "Administración",
   usuarios: "Usuarios",
   catalogos: "Catálogos",

@@ -17,6 +17,8 @@ export type TareaVista = {
   dueDate: string | null
   assignee: string
   vencida: boolean
+  horasEstimadas?: number | null
+  horasReales?: number | null
 }
 
 const ETIQUETA = { PENDIENTE: "Pendiente", EN_CURSO: "En curso", HECHA: "Hecha" }
@@ -72,7 +74,19 @@ export function TareasPanel({
               {tarea.assignee} · {ETIQUETA[tarea.status]}
               {tarea.dueDate ? ` · vence ${tarea.dueDate}` : ""}
               {tarea.vencida ? " · vencida" : ""}
+              {` · est. ${tarea.horasEstimadas ?? "—"} h · real ${tarea.horasReales ?? 0} h`}
             </p>
+            {puede ? (
+              <form className="mt-1 flex items-center gap-2" action={(data) => enviar(data)}>
+                <input type="hidden" name="id" value={tarea.id} />
+                <input type="hidden" name="title" value={tarea.title} />
+                <input type="hidden" name="status" value={tarea.status} />
+                {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+                {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
+                <input name="horasEstimadas" type="number" min="0" step="0.5" defaultValue={tarea.horasEstimadas ?? ""} aria-label={`Horas estimadas de ${tarea.title}`} className="h-8 w-20 rounded-lg border border-[#E4E7EC] px-2 text-xs" placeholder="Est." />
+                <Button type="submit" size="sm" variant="outline" disabled={pending}>Guardar estimación</Button>
+              </form>
+            ) : null}
           </div>
           <span className="flex flex-wrap items-center gap-2">
           {puede && tarea.status !== "HECHA" ? (

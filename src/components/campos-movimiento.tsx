@@ -19,6 +19,7 @@ export function CamposMovimiento({
   onResolucion,
   motivo,
   onMotivo,
+  etiquetaMotivo = "Motivo",
   entrega,
   onEntrega,
 }: {
@@ -35,6 +36,7 @@ export function CamposMovimiento({
   onResolucion: (valor: string) => void
   motivo: string
   onMotivo: (valor: string) => void
+  etiquetaMotivo?: string
   entrega: string
   onEntrega: (valor: string) => void
 }) {
@@ -71,8 +73,8 @@ export function CamposMovimiento({
       ) : null}
       {movimiento.requiresComment || cierra ? (
         <div className="grid gap-1">
-          <Label htmlFor={`${prefijo}-motivo`}>Motivo</Label>
-          <Textarea id={`${prefijo}-motivo`} value={motivo} onChange={(event) => onMotivo(event.target.value)} rows={3} placeholder="Queda en el historial." />
+          <Label htmlFor={`${prefijo}-motivo`}>{etiquetaMotivo}</Label>
+          <Textarea id={`${prefijo}-motivo`} value={motivo} onChange={(event) => onMotivo(event.target.value)} rows={3} placeholder={etiquetaMotivo === "Qué se hizo" ? "Opcional. El solicitante la ve solo si la escribe." : "Queda en el historial."} />
         </div>
       ) : null}
       {movimiento.requiresDelivery ? (

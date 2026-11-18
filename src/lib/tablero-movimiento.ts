@@ -1,3 +1,5 @@
+import { notaResolucionOpcional } from "@/lib/cronologia"
+
 export type MovimientoTablero = {
   name: string
   column: string
@@ -94,7 +96,7 @@ export function camposRequeridos(move: {
   requiresCommittedDate?: boolean
 }) {
   const campos: string[] = []
-  if (move.requiresComment || move.to === "CERRADO" || move.to === "RECHAZADO" || move.to === "CANCELADO") campos.push("Comentario")
+  if ((move.requiresComment || move.to === "CERRADO" || move.to === "RECHAZADO" || move.to === "CANCELADO") && !notaResolucionOpcional(move)) campos.push("Comentario")
   if (move.requiresDelivery) campos.push("Enlace o adjunto de la entrega")
   if (move.requiresAssignee) campos.push("Responsable")
   if (move.requiresCommittedDate) campos.push("Fecha comprometida")
@@ -127,8 +129,7 @@ export function validarDatosMovimiento(
 ) {
   if (move.requiresAssignee && !tarjeta?.assigneeId) return "Elija un responsable. El cambio no se aplicó."
   if (move.requiresCommittedDate && !tarjeta?.committedDate) return "Defina la fecha comprometida. El cambio no se aplicó."
-  if ((move.requiresComment || movimientoCierra(move)) && comment.trim().length < 2) return "Escriba el motivo. Queda en el historial."
-  if (movimientoCierra(move) && !comment.trim()) return "Escriba un comentario antes de cerrar."
+  if (!notaResolucionOpcional(move) && (move.requiresComment || movimientoCierra(move)) && comment.trim().length < 2) return "Escriba el motivo. Queda en el historial."
   if (move.requiresDelivery && deliveryUrl.trim().length > 0 && deliveryUrl.trim().length < 4) return "El enlace de la entrega no es válido."
   return null
 }

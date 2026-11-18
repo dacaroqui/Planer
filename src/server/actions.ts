@@ -324,6 +324,8 @@ export async function transicionarAction(formData: FormData): Promise<ActionResu
         assigneeId: String(formData.get("assigneeId") || "") || null,
         committedDate: String(formData.get("committedDate") || "") || null,
         resolution: String(formData.get("resolution") || "") || null,
+        visibilidad: formData.get("visibilidad") === "publica" ? "publica" : formData.get("visibilidad") === "interna" ? "interna" : undefined,
+        resolutionNote: formData.has("resolutionNote") ? String(formData.get("resolutionNote") || "") : undefined,
       },
     )
     refrescar(code)
@@ -356,7 +358,19 @@ export async function comentarAction(formData: FormData): Promise<ActionResult> 
     const { prisma } = await import("@/lib/prisma")
     const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
     if (!request) return { ok: false, error: "El requerimiento no existe." }
-    await comentar(actor, request.id, String(formData.get("body") || ""), formData.get("interna") === "1")
+    const kindRaw = String(formData.get("kind") || "")
+    if (kindRaw === "PUBLICA" || kindRaw === "INTERNA" || kindRaw === "REGISTRO" || kindRaw === "SOLICITUD_INFO") {
+      const { registrarEntrada } = await import("@/server/requests")
+      await registrarEntrada(actor, request.id, {
+        kind: kindRaw,
+        body: String(formData.get("body") || ""),
+        minutes: Number(formData.get("minutes") || 0),
+        tareaId: String(formData.get("tareaId") || "") || null,
+        compartir: formData.get("compartir") === "1",
+      })
+    } else {
+      await comentar(actor, request.id, String(formData.get("body") || ""), formData.get("interna") === "1")
+    }
   } catch (error) {
     return fallo(error)
   }
@@ -672,6 +686,7 @@ export async function guardarTareaAction(formData: FormData): Promise<ActionResu
       requestId: opcional("requestId"),
       projectId: opcional("projectId"),
       parentId: opcional("parentId"),
+      horasEstimadas: formData.has("horasEstimadas") ? String(formData.get("horasEstimadas") || "") : undefined,
     })
   } catch (error) {
     return fallo(error)
