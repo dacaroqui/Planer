@@ -7,7 +7,8 @@ async function main() {
   const ya = await prisma.growthCiclo.findFirst({ where: { nombre: CICLO, ilustrativo: true } })
   if (ya) {
     await asegurarAprendizaje()
-    console.log("El Ciclo 01 de ejemplo ya existe. Se revisó el aprendizaje de ejemplo y no se tocaron usuarios ni requerimientos.")
+    await asegurarPeriodoPrevio()
+    console.log("El Ciclo 01 de ejemplo ya existe. Se revisó el aprendizaje y el periodo anterior de ejemplo, sin tocar usuarios ni requerimientos.")
     return
   }
   const ciclo = await prisma.growthCiclo.create({
@@ -24,11 +25,11 @@ async function main() {
   })
   await prisma.growthEtapa.createMany({
     data: [
-      { embudoId: embudo.id, nombre: "Consultas", valor: 400, orden: 1 },
-      { embudoId: embudo.id, nombre: "Valoraciones agendadas", valor: 160, orden: 2 },
-      { embudoId: embudo.id, nombre: "Asistencias", valor: 96, orden: 3, destacado: true, llamada: "60% de asistencia", subllamada: "Oportunidad de mejora" },
-      { embudoId: embudo.id, nombre: "Compras", valor: 38, orden: 4 },
-      { embudoId: embudo.id, nombre: "Recompras", valor: 12, orden: 5 },
+      { embudoId: embudo.id, nombre: "Consultas", valor: 400, orden: 1, valorPrevio: 380 },
+      { embudoId: embudo.id, nombre: "Valoraciones agendadas", valor: 160, orden: 2, valorPrevio: 150 },
+      { embudoId: embudo.id, nombre: "Asistencias", valor: 96, orden: 3, destacado: true, llamada: "60% de asistencia", subllamada: "Oportunidad de mejora", valorPrevio: 88 },
+      { embudoId: embudo.id, nombre: "Compras", valor: 38, orden: 4, valorPrevio: 34 },
+      { embudoId: embudo.id, nombre: "Recompras", valor: 12, orden: 5, valorPrevio: 10 },
     ],
   })
   await prisma.growthExperimento.createMany({
@@ -97,7 +98,27 @@ async function main() {
     ],
   })
   await asegurarAprendizaje()
+  await asegurarPeriodoPrevio()
   console.log("Listo. Ciclo 01 de ejemplo, sin tocar usuarios ni requerimientos existentes.")
+}
+
+const PREVIOS: Record<string, number> = {
+  Consultas: 380,
+  "Valoraciones agendadas": 150,
+  Asistencias: 88,
+  Compras: 34,
+  Recompras: 10,
+}
+
+async function asegurarPeriodoPrevio() {
+  const etapas = await prisma.growthEtapa.findMany({
+    where: { valorPrevio: null, embudo: { ciclo: { ilustrativo: true } } },
+  })
+  for (const etapa of etapas) {
+    const previo = PREVIOS[etapa.nombre]
+    if (previo == null) continue
+    await prisma.growthEtapa.update({ where: { id: etapa.id }, data: { valorPrevio: previo } })
+  }
 }
 
 async function asegurarAprendizaje() {

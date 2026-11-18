@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { IconoEstado, IconoTab } from "@/components/growth-iconos"
 import { ESTADO_LABEL, type EstadoGrowth } from "@/lib/growth"
 
 const TABS = [
@@ -29,7 +30,7 @@ export function EstadoChip({ estado }: { estado: string }) {
         : estado === "CERRADO"
           ? "bg-emerald-100 text-emerald-800"
           : "bg-[#FEF3C7] text-[#92400E]"
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${clase}`}>{texto}</span>
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${clase}`}><IconoEstado estado={estado} />{texto}</span>
 }
 
 export function TabsGrowth({ tab, marca, ciclo }: { tab: string; marca: string; ciclo: string }) {
@@ -39,7 +40,8 @@ export function TabsGrowth({ tab, marca, ciclo }: { tab: string; marca: string; 
         const activo = tab === item.id
         const query = new URLSearchParams({ tab: item.id, marca, ciclo })
         return (
-          <Link key={item.id} href={`/growth?${query}`} className={activo ? "border-b-2 border-[#1658B0] pb-2 text-sm font-medium text-[#1658B0]" : "pb-2 text-sm text-[#667085] hover:text-[#15122A]"} aria-current={activo ? "page" : undefined}>
+          <Link key={item.id} href={`/growth?${query}`} className={activo ? "inline-flex items-center gap-1.5 border-b-2 border-[#1658B0] pb-2 text-sm font-medium text-[#1658B0]" : "inline-flex items-center gap-1.5 pb-2 text-sm text-[#667085] hover:text-[#15122A]"} aria-current={activo ? "page" : undefined}>
+            <IconoTab id={item.id} />
             {item.label}
           </Link>
         )

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { EmbudoDesglose } from "@/components/embudo-desglose"
 import { EstadoChip, FiltrosGrowth, MarcaChip, TabsGrowth } from "@/components/growth-panel"
 import type { Actor } from "@/lib/domain"
 import { DECISION_LABEL, puedeVerGrowth } from "@/lib/growth"
@@ -63,26 +64,19 @@ function Embudo({
           {vista.embudo ? ` · Actualizado ${vista.embudo.updatedAt.toLocaleString("es-CO", { timeZone: "America/Bogota" })}` : ""}
         </p>
         {etapas.length === 0 ? <p className="mt-6 text-sm text-muted-foreground">Todavía no hay etapas para este ciclo. Cárguelas con el script de ejemplo.</p> : (
-          <div className="mt-4 flex flex-wrap items-end gap-2">
-            {etapas.map((etapa, index) => (
-              <div key={etapa.nombre} className="flex items-end gap-2">
-                <div className="flex w-40 flex-col">
-                  {etapa.llamada ? (
-                    <p className="mb-2 rounded-lg border border-[#F5D0A9] bg-[#FFF7ED] px-2 py-1 text-center text-[11px] leading-tight text-[#C2410C]">
-                      {etapa.llamada}
-                      <span className="block text-[#667085]">{etapa.subllamada}</span>
-                    </p>
-                  ) : <span className="mb-2 block h-9" aria-hidden="true" />}
-                  <div className={`rounded-xl p-4 ${etapa.destacado ? "bg-[#FEF3C7]" : "bg-[#E7F0FB]"}`}>
-                    <p className="text-sm leading-tight text-[#3d4a63]">{etapa.nombre}</p>
-                    <p className="font-heading text-4xl text-[#1658B0]">{etapa.valor}</p>
-                    <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-white"><span className="block h-full bg-[#1658B0]" style={{ width: `${Math.min(100, etapas[0] ? (etapa.valor / etapas[0].valor) * 100 : 0)}%` }} /></span>
-                  </div>
-                </div>
-                {index < etapas.length - 1 ? <span className="mb-6 text-[#98A2B3]">→</span> : null}
-              </div>
-            ))}
-          </div>
+          <EmbudoDesglose
+            etapas={etapas}
+            fuente={vista.embudo?.fuente === "CRM" ? "CRM" : "entrada manual"}
+            actualizado={vista.embudo ? vista.embudo.updatedAt.toLocaleString("es-CO", { timeZone: "America/Bogota" }) : ""}
+            ilustrativo={vista.ilustrativo}
+            experimentos={vista.experimentos.map((item) => ({
+              id: item.id,
+              nombre: item.nombre,
+              etapaEmbudo: item.etapaEmbudo,
+              estado: item.estado,
+              responsable: item.owner?.name || item.ownerName || "Sin responsable",
+            }))}
+          />
         )}
       </section>
       <section>

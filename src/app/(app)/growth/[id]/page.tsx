@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
-import { DECISION_LABEL, ESTADO_LABEL, puedeEditarGrowth, puedeVerGrowth, siguienteEstado } from "@/lib/growth"
+import { IconoDecision, IconoSeccion } from "@/components/growth-iconos"
+import { EstadoChip } from "@/components/growth-panel"
+import { DECISION_LABEL, DECISIONES, ESTADO_LABEL, puedeEditarGrowth, puedeVerGrowth, siguienteEstado, type DecisionGrowth } from "@/lib/growth"
 import { avanzarExperimentoAction, comentarExperimentoAction, enlaceExperimentoAction, tareaExperimentoAction } from "@/server/growth-actions"
 import { fichaExperimento } from "@/server/growth"
 import { DomainError } from "@/lib/domain"
@@ -26,14 +28,14 @@ export default async function FichaPage({ params }: { params: Promise<{ id: stri
       <NombreMiga nombre={ficha.nombre} />
       <h1 className="font-heading text-4xl">{ficha.nombre}</h1>
       <section className="rounded-xl border border-[#E4E7EC] bg-white p-4">
-        <h2 className="font-medium">1. Resumen</h2>
+        <h2 className="flex items-center gap-2 font-medium text-[#1658B0]"><IconoSeccion n="1" />1. Resumen</h2>
         <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
           <div>Responsable: {responsable}</div>
           <div>Marca: {ficha.brand === "LUVANIA" ? "Luvania" : "CIFES"}</div>
           <div>Ciclo: {ficha.ciclo.nombre}</div>
           <div>Etapa del embudo: {ficha.etapaEmbudo}</div>
-          <div>Estado: {ESTADO_LABEL[ficha.estado]}</div>
-          <div>Decisión: {ficha.decision ? DECISION_LABEL[ficha.decision] : "—"}</div>
+          <div className="flex items-center gap-2">Estado: <EstadoChip estado={ficha.estado} /></div>
+          <div className="flex items-center gap-1">Decisión: {ficha.decision ? <><IconoDecision decision={ficha.decision} />{DECISION_LABEL[ficha.decision]}</> : "—"}</div>
         </dl>
       </section>
       <Seccion n="2" titulo="Problema y evidencia">
@@ -105,26 +107,34 @@ export default async function FichaPage({ params }: { params: Promise<{ id: stri
       {edita && destino ? (
         <form action={avanzarExperimentoAction} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="id" value={ficha.id} />
-          {destino === "CERRADO" ? (
-            <select name="decision" required aria-label="Decisión" className="h-10 rounded-lg border border-[#E4E7EC] px-3 text-sm">
-              <option value="">Decisión</option>
-              <option value="ADOPTAR">Adoptar</option>
-              <option value="ITERAR">Iterar</option>
-              <option value="DESCARTAR">Descartar</option>
-              <option value="INCONCLUSO">Inconcluso</option>
-            </select>
-          ) : null}
+          {destino === "CERRADO" ? <OpcionesDecision nombre="decision" /> : null}
           <button className="h-10 rounded-lg bg-[#1658B0] px-4 text-sm font-medium text-white" type="submit">Pasar a {ESTADO_LABEL[destino]}</button>
         </form>
       ) : null}
+      {ficha.estado === "CERRADO" && ficha.decision ? <OpcionesDecision valor={ficha.decision} /> : null}
     </div>
+  )
+}
+
+function OpcionesDecision({ nombre, valor }: { nombre?: string; valor?: DecisionGrowth }) {
+  return (
+    <fieldset className="grid gap-2 rounded-xl border border-[#E4E7EC] bg-white p-4 sm:grid-cols-2">
+      <legend className="px-1 text-sm font-medium">{nombre ? "Decisión al cerrar" : "Decisión registrada"}</legend>
+      {DECISIONES.map((decision) => (
+        <label key={decision} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${valor === decision ? "border-[#1658B0] bg-[#E7F0FB]" : "border-[#E4E7EC]"}`}>
+          <input type="radio" name={nombre ?? "decision-registrada"} value={decision} defaultChecked={valor === decision} disabled={!nombre} required={Boolean(nombre)} />
+          <span className="text-[#1658B0]"><IconoDecision decision={decision} /></span>
+          {DECISION_LABEL[decision]}
+        </label>
+      ))}
+    </fieldset>
   )
 }
 
 function Seccion({ n, titulo, children }: { n: string; titulo: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-[#E4E7EC] bg-white p-4 text-sm">
-      <h2 className="font-medium">{n}. {titulo}</h2>
+      <h2 className="flex items-center gap-2 font-medium text-[#1658B0]"><IconoSeccion n={n} />{n}. {titulo}</h2>
       <div className="mt-2 grid gap-1">{children}</div>
     </section>
   )

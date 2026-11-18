@@ -526,6 +526,7 @@ model GrowthEtapa {
   destacado  Boolean      @default(false)
   llamada    String       @default("")
   subllamada String       @default("")
+  valorPrevio Int?
 
   @@index([embudoId])
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { elegirFuente, fuenteCrm, puedeAvanzar, puedeVerGrowth } from "@/lib/growth"
+import { desgloseEtapa, elegirFuente, etapaCoincide, fuenteCrm, puedeAvanzar, puedeVerGrowth } from "@/lib/growth"
 import type { Actor } from "@/lib/domain"
 
 function actor(partial: Partial<Actor>): Actor {
@@ -31,6 +31,26 @@ describe("acceso y flujo de Growth", () => {
     expect(puedeAvanzar("ANALISIS").ok).toBe(false)
     expect(puedeAvanzar("ANALISIS", "ADOPTAR").destino).toBe("CERRADO")
     expect(puedeAvanzar("CERRADO").ok).toBe(false)
+  })
+
+  it("desglosa una etapa con conversión, pérdidas y delta del periodo anterior", () => {
+    const etapas = [
+      { nombre: "Consultas", valor: 400, orden: 1, valorPrevio: 380 },
+      { nombre: "Valoraciones agendadas", valor: 160, orden: 2, valorPrevio: 150 },
+      { nombre: "Asistencias", valor: 96, orden: 3, valorPrevio: 88 },
+    ]
+    expect(etapaCoincide("Asistencias", "Asistencia")).toBe(true)
+    expect(etapaCoincide("Valoraciones agendadas", "Agendamiento")).toBe(true)
+    expect(etapaCoincide("Recompras", "Recompra")).toBe(true)
+    expect(etapaCoincide("Consultas", "Recompra")).toBe(false)
+    const fila = desgloseEtapa(etapas, 2)
+    expect(fila?.valor).toBe(96)
+    expect(fila?.desdeAnterior).toBe("60%")
+    expect(fila?.desdeInicio).toBe("24%")
+    expect(fila?.perdidas).toBe(64)
+    expect(fila?.delta).toBe(8)
+    expect(desgloseEtapa(etapas, 0)?.perdidas).toBeNull()
+    expect(desgloseEtapa([{ nombre: "Consultas", valor: 10, orden: 1 }], 0)?.delta).toBeNull()
   })
 
   it("deja el CRM como fuente enchufable y hoy usa la manual", async () => {
