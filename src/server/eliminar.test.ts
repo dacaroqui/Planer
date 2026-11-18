@@ -188,4 +188,82 @@ describe("eliminar requerimientos y tareas", () => {
     expect(await eliminarRequerimientos(admin, ["DES-0004", "DES-0004"])).toBe(1)
     expect(await prisma.request.count()).toBe(0)
   })
+
+  it("niega a líder, agente y solicitante borrar requerimientos, tareas sueltas y adjuntos", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "mesa-eliminar-roles-"))
+    process.env.STORAGE_DRIVER = "local"
+    process.env.UPLOAD_DIR = dir
+    reiniciarAlmacen()
+    const almacen = await obtenerAlmacen()
+    await almacen.guardar("brief.pdf", Buffer.from("pdf"), "application/pdf")
+    try {
+      const area = await prisma.area.create({ data: { name: "Académico" } })
+      const lider = await persona("Helena", "helena.roles@cifes.edu.co", area.id, [{ team: "DESARROLLO", role: "LIDER" }])
+      const agente = await persona("Valentina", "valentina.roles@cifes.edu.co", area.id, [{ team: "DESARROLLO", role: "AGENTE" }])
+      const solicitante = await persona("Ana", "ana.roles@cifes.edu.co", area.id)
+      const admin = await persona("Admin", "admin.roles@cifes.edu.co", area.id, [], true)
+      const tipo = await prisma.requestType.findFirstOrThrow({ where: { team: "DESARROLLO" } })
+      const empresa = await prisma.empresa.findFirstOrThrow({ where: { name: "CIFES" } })
+      const request = await prisma.request.create({
+        data: {
+          code: "DES-0009",
+          title: "Caso con archivo",
+          description: "Ni el líder ni el agente ni el solicitante pueden borrarlo.",
+          brand: "CIFES",
+          empresaId: empresa.id,
+          priority: "MEDIA",
+          prioritySuggested: "MEDIA",
+          team: "DESARROLLO",
+          status: "EN_DESARROLLO",
+          typeId: tipo.id,
+          areaId: area.id,
+          requesterId: solicitante.id,
+          assigneeId: agente.id,
+          slaStartedAt: new Date(),
+          slaTargetMinutes: 480,
+        },
+      })
+      const proyecto = await prisma.proyecto.create({
+        data: {
+          empresaId: empresa.id,
+          name: "Aula demo",
+          leaderId: lider.id,
+          startsAt: new Date("2026-11-01"),
+          targetAt: new Date("2026-12-01"),
+        },
+      })
+      const delCaso = await prisma.tarea.create({
+        data: { title: "Tarea del caso", status: "PENDIENTE", requestId: request.id, createdById: lider.id },
+      })
+      const suelta = await prisma.tarea.create({
+        data: { title: "Tarea suelta del proyecto", status: "PENDIENTE", projectId: proyecto.id, createdById: lider.id },
+      })
+      await prisma.attachment.create({
+        data: { requestId: request.id, uploadedById: solicitante.id, filename: "brief.pdf", storedName: "brief.pdf", mimeType: "application/pdf", sizeBytes: 3 },
+      })
+
+      for (const actor of [lider, agente, solicitante]) {
+        await expect(eliminarRequerimiento(actor, "DES-0009")).rejects.toMatchObject({ status: 403 })
+        await expect(eliminarRequerimientos(actor, ["DES-0009"])).rejects.toMatchObject({ status: 403 })
+        await expect(eliminarTarea(actor, delCaso.id)).rejects.toMatchObject({ status: 403 })
+        await expect(eliminarTarea(actor, suelta.id)).rejects.toMatchObject({ status: 403 })
+      }
+
+      expect(await prisma.request.findUnique({ where: { code: "DES-0009" } })).not.toBeNull()
+      expect(await prisma.tarea.count()).toBe(2)
+      expect(await prisma.attachment.count()).toBe(1)
+      expect(await almacen.leer("brief.pdf")).not.toBeNull()
+
+      await eliminarTarea(admin, suelta.id)
+      expect(await prisma.tarea.findUnique({ where: { id: suelta.id } })).toBeNull()
+      expect(await prisma.tarea.findUnique({ where: { id: delCaso.id } })).not.toBeNull()
+      await eliminarRequerimiento(admin, "DES-0009")
+      expect(await prisma.request.count()).toBe(0)
+      expect(await prisma.attachment.count()).toBe(0)
+      expect(await prisma.tarea.count()).toBe(0)
+      expect(await almacen.leer("brief.pdf")).toBeNull()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
