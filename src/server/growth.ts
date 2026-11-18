@@ -38,6 +38,7 @@ export async function vistaGrowth(actor: Actor, filtros: { brand?: string; ciclo
           destacado: etapa.destacado,
           llamada: etapa.llamada,
           subllamada: etapa.subllamada,
+          valorPrevio: etapa.valorPrevio,
         })),
       }
     : null

@@ -23,6 +23,7 @@ import {
   WorkflowIcon,
 } from "lucide-react"
 import { Atajos, BotonAtajos } from "@/components/atajos"
+import { IconoExperimento } from "@/components/growth-iconos"
 import { CampanaAvisos } from "@/components/campana-avisos"
 import { PageHeader } from "@/components/page-header"
 import { salir } from "@/server/actions"
@@ -155,10 +156,10 @@ export function Marco({
               <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-md bg-[#1658B0] px-3 text-sm font-medium text-white hover:bg-[#222B7C]">
                 <PlusIcon className="size-4" /> Crear
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="min-w-56">
                 {puedeRadicar ? <DropdownMenuItem asChild><Link href="/mis-solicitudes/radicar">Requerimiento</Link></DropdownMenuItem> : null}
                 {puedePlanner ? <DropdownMenuItem asChild><Link href="/planner">Tarea en Planner</Link></DropdownMenuItem> : null}
-                {puedeGrowth ? <DropdownMenuItem asChild><Link href="/growth/nuevo">Experimento Growth</Link></DropdownMenuItem> : null}
+                {puedeGrowth ? <DropdownMenuItem asChild><Link href="/growth/nuevo" className="flex items-center gap-2 whitespace-nowrap"><IconoExperimento />Experimento Growth</Link></DropdownMenuItem> : null}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
