@@ -25,6 +25,8 @@ export async function radicarDesdeFormulario(actor: Actor, formData: FormData): 
     stepsToReproduce: String(formData.get("stepsToReproduce") || "") || undefined,
     channels: String(formData.get("channels") || "") || undefined,
     publishAt: String(formData.get("publishAt") || "") || undefined,
+    moduleName: String(formData.get("moduleName") || "") || undefined,
+    reviewedPersonalData: formData.get("reviewedPersonalData") || undefined,
     declares: formData.get("declares"),
   })
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }

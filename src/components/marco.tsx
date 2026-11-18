@@ -9,6 +9,7 @@ import {
   HelpCircleIcon,
   ChartColumnIcon,
   LayoutDashboardIcon,
+  UsersIcon,
   PanelLeftIcon,
   PlusIcon,
   StarIcon,
@@ -112,7 +113,8 @@ export function Marco({
             ) : null}
           </div>
           <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Filtros" icono={<FilterIcon className="size-4" />} compacta={!abierta} />
-          {puedeTablero ? <Enlace href="/gerencia" activo={path.startsWith("/gerencia") || path.startsWith("/paneles")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedeTablero ? <Enlace href="/paneles" activo={path.startsWith("/paneles") || path.startsWith("/gerencia")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+          {actor.role !== "SOLICITANTE" ? <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
           {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
@@ -140,7 +142,7 @@ export function Marco({
                 <PlusIcon className="size-4" /> Crear
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {puedeRadicar ? <DropdownMenuItem asChild><Link href="/requerimientos/nuevo">Requerimiento</Link></DropdownMenuItem> : null}
+                {puedeRadicar ? <DropdownMenuItem asChild><Link href="/mis-solicitudes/radicar">Requerimiento</Link></DropdownMenuItem> : null}
                 {puedePlanner ? <DropdownMenuItem asChild><Link href="/planner">Tarea en Planner</Link></DropdownMenuItem> : null}
               </DropdownMenuContent>
             </DropdownMenu>

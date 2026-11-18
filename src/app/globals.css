@@ -49,7 +49,7 @@
 }
 
 :root {
-  --background: #F5F7FB;
+  --background: #F7F8FA;
   --foreground: #15122A;
   --card: #ffffff;
   --card-foreground: #15122A;
@@ -64,8 +64,8 @@
   --accent: #4FB3DB;
   --accent-foreground: #15122A;
   --destructive: #9f1239;
-  --border: #c5d4ea;
-  --input: #c5d4ea;
+  --border: #E4E7EC;
+  --input: #E4E7EC;
   --ring: #1658B0;
   --chart-1: #1658B0;
   --chart-2: #4FB3DB;
@@ -77,9 +77,9 @@
   --sidebar-foreground: #15122A;
   --sidebar-primary: #1658B0;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #E1EBF9;
+  --sidebar-accent: #F3F4F6;
   --sidebar-accent-foreground: #222B7C;
-  --sidebar-border: #d5e2f2;
+  --sidebar-border: #E4E7EC;
   --sidebar-ring: #1658B0;
   --luvania: #EE876B;
   --luvania-soft: #F1CEB3;

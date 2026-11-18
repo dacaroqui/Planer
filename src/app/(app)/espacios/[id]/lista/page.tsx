@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { IconoPrioridad, IconoTipo } from "@/components/iconos-planer"
+import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
+import { Avatar, IconoPrioridad, IconoTipo } from "@/components/iconos-planer"
 import { EstadoBadge } from "@/components/insignias"
 import { prisma } from "@/lib/prisma"
 import { listar } from "@/server/requests"
@@ -12,6 +13,7 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
   const empresa = await prisma.empresa.findUnique({ where: { id } })
   if (!empresa) notFound()
   const casos = await listar(actor, { empresaId: id, pageSize: 100, conPausas: false, conTareas: false })
+  const puedeEliminar = actor.isAdmin
   return (
     <div className="overflow-hidden rounded-md border border-[#dfe1e6] bg-white">
       <table className="w-full text-left text-sm">
@@ -22,6 +24,8 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
             <th className="px-3 py-2">Estado</th>
             <th className="px-3 py-2">Prioridad</th>
             <th className="px-3 py-2">Área</th>
+            <th className="px-3 py-2">Responsable</th>
+            {puedeEliminar ? <th className="px-3 py-2"><span className="sr-only">Acciones</span></th> : null}
           </tr>
         </thead>
         <tbody>
@@ -36,6 +40,12 @@ export default async function ListaEspacio({ params }: { params: Promise<{ id: s
               <td className="px-3 py-2"><EstadoBadge status={item.status} /></td>
               <td className="px-3 py-2"><IconoPrioridad prioridad={item.priority} /></td>
               <td className="px-3 py-2">{item.area.name}</td>
+              <td className="px-3 py-2">
+                {item.assignee ? (
+                  <span className="inline-flex items-center gap-2"><Avatar nombre={item.assignee.name} marca={item.brand} />{item.assignee.name}</span>
+                ) : <span className="text-muted-foreground">Sin asignar</span>}
+              </td>
+              {puedeEliminar ? <td className="px-3 py-2"><MenuEliminarRequerimiento code={item.code} title={item.title} /></td> : null}
             </tr>
           ))}
         </tbody>

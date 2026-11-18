@@ -5,6 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { deshacerTransicionAction, transicionarAction } from "@/server/actions"
+import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
+import { Avatar } from "@/components/iconos-planer"
 import { SlaBadge } from "@/components/insignias"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -32,7 +34,7 @@ export type Tarjeta = {
   moves: MovimientoTablero[]
 }
 
-export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { columnas: string[]; tarjetas: Tarjeta[]; soloLectura: boolean; agentes?: { id: string; name: string }[] }) {
+export function Tablero({ columnas, tarjetas, soloLectura, agentes = [], puedeEliminar = false }: { columnas: string[]; tarjetas: Tarjeta[]; soloLectura: boolean; agentes?: { id: string; name: string }[]; puedeEliminar?: boolean }) {
 
   const router = useRouter()
   const arrastrada = useRef<string | null>(null)
@@ -186,9 +188,12 @@ export function Tablero({ columnas, tarjetas, soloLectura, agentes = [] }: { col
                   onDragStart={iniciarArrastre}
                   className="rounded-lg border border-border bg-card p-3 text-sm"
                 >
-                  <Link href={`/requerimientos/${item.code}`} draggable={false} className="font-medium hover:underline">{item.title}</Link>
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/requerimientos/${item.code}`} draggable={false} className="font-medium hover:underline">{item.title}</Link>
+                    {puedeEliminar ? <MenuEliminarRequerimiento code={item.code} title={item.title} /> : null}
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground">{item.code} · {BRAND_LABEL[item.brand as BrandName] ?? item.brand} · {PRIORITY_LABEL[item.priority as PriorityName] ?? item.priority}</p>
-                  <p className="text-xs text-muted-foreground">{item.assignee}</p>
+                  <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Avatar nombre={item.assignee} marca={item.brand} />{item.assignee || "Sin asignar"}</p>
                   <div className="mt-2"><SlaBadge state={item.sla} /></div>
                 </article>
               ))}

@@ -34,7 +34,7 @@ export function ControlesPanel({
     if (!valor) next.delete(clave)
     else next.set(clave, valor)
     const query = next.toString()
-    router.push(query ? `/gerencia?${query}` : "/gerencia")
+    router.push(query ? `/paneles?${query}` : "/paneles")
   }
 
   const select = "h-10 rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm"

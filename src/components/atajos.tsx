@@ -52,7 +52,7 @@ export function Atajos() {
         return
       }
       if (event.key === "c") {
-        router.push("/requerimientos/nuevo")
+        router.push("/mis-solicitudes/radicar")
         return
       }
       if (previo === "g" && event.key === "i") router.push("/panel")

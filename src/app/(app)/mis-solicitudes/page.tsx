@@ -31,7 +31,7 @@ export default async function MisSolicitudesPage() {
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Aquí ve en qué etapa va cada solicitud que usted radicó, quién la tiene y qué se espera ahora.</p>
         </div>
         {puedeRadicar(actor) ? (
-          <Link href="/requerimientos/nuevo" className="inline-flex h-9 items-center rounded-md bg-[#1658B0] px-3 text-sm font-medium text-white hover:bg-[#222B7C]">
+          <Link href="/mis-solicitudes/radicar" className="inline-flex h-9 items-center rounded-md bg-[#1658B0] px-3 text-sm font-medium text-white hover:bg-[#222B7C]">
             Radicar solicitud
           </Link>
         ) : null}

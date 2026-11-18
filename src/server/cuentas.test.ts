@@ -162,4 +162,30 @@ describe("RQ-52 RQ-54 autenticación e invitación", () => {
     expect(user.cargo).toBe("Coordinadora")
     expect(user.areaId).toBe(area.id)
   })
+
+  it("guarda las áreas adicionales y las empresas y las aplica al aceptar", async () => {
+    const { actor, area } = await admin()
+    const extra = await prisma.area.create({ data: { name: "Mercadeo" } })
+    const empresas = await prisma.empresa.findMany({ where: { name: { in: ["CIFES", "Luvania"] } } })
+    const creada = await crearInvitacion(actor, {
+      email: "org.ejemplo@cifes.edu.co",
+      rol: "SOLICITANTE",
+      areaId: area.id,
+      areaIds: [extra.id],
+      empresaIds: empresas.map((item) => item.id),
+      teams: [],
+    })
+    const fila = await prisma.invitacion.findFirstOrThrow({ where: { email: "org.ejemplo@cifes.edu.co" } })
+    expect(fila.areaIds.split(",").sort()).toEqual([area.id, extra.id].sort())
+    expect(fila.empresaIds.split(",").sort()).toEqual(empresas.map((item) => item.id).sort())
+    const token = creada.enlace.split("/").pop() || ""
+    await aceptarInvitacion(token, "Org Ejemplo", "clave-segura")
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: "org.ejemplo@cifes.edu.co" },
+      include: { areasExtra: true, empresas: true },
+    })
+    expect(user.areaId).toBe(area.id)
+    expect(user.areasExtra.map((item) => item.areaId).sort()).toEqual([area.id, extra.id].sort())
+    expect(user.empresas.map((item) => item.empresaId).sort()).toEqual(empresas.map((item) => item.id).sort())
+  })
 })

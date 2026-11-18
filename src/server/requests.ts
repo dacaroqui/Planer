@@ -590,9 +590,22 @@ export async function asignar(actor: Actor, requestId: string, assigneeId: strin
   }
   if (!self && !puedeAsignar(actor, current)) throw new DomainError("Solo el líder del área asigna el responsable.")
   const assignee = await prisma.user.findFirst({
-    where: { id: assigneeId, active: true, areaRoles: { some: { team: current.team, role: { in: ["AGENTE", "LIDER"] } } } },
+    where: esAdmin(actor)
+      ? {
+          id: assigneeId,
+          active: true,
+          OR: [
+            { role: "ADMINISTRADOR" },
+            { areaRoles: { some: { role: { in: ["AGENTE", "LIDER"] } } } },
+          ],
+        }
+      : { id: assigneeId, active: true, areaRoles: { some: { team: current.team, role: { in: ["AGENTE", "LIDER"] } } } },
   })
-  if (!assignee) throw new DomainError("Elija un agente o líder activo de esa área.")
+  if (!assignee) {
+    const persona = await prisma.user.findUnique({ where: { id: assigneeId }, select: { name: true, active: true } })
+    if (!persona?.active) throw new DomainError("Esa persona no está activa.")
+    throw new DomainError(`${persona.name} no es agente ni líder de ${TEAM_LABEL[current.team]}.`)
+  }
   const now = clock(deps)
   const email = mailer(deps)
   const messages: EmailMessage[] = []
@@ -1404,16 +1417,20 @@ export async function transicionarMasiva(actor: Actor, codes: string[], name: st
 
 export async function asignarMasiva(actor: Actor, codes: string[], assigneeId: string) {
   if (!assigneeId) throw new DomainError("Elija un responsable.")
-  let cambiados = 0
+  const errores: { code: string; mensaje: string }[] = []
+  let hechos = 0
   for (const code of codes) {
     const request = await prisma.request.findUnique({ where: { code }, select: { id: true } })
-    if (!request) continue
+    if (!request) {
+      errores.push({ code, mensaje: "El requerimiento no existe." })
+      continue
+    }
     try {
       await asignar(actor, request.id, assigneeId)
-      cambiados += 1
-    } catch {
-      // Se conservan permisos de asignación; los que no aplican se omiten.
+      hechos += 1
+    } catch (error) {
+      errores.push({ code, mensaje: error instanceof Error ? error.message : "No se pudo asignar." })
     }
   }
-  return cambiados
+  return { hechos, errores }
 }

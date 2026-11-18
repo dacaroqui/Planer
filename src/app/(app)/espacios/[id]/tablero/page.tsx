@@ -32,6 +32,7 @@ export default async function TableroEspacioPage({
       <TableroEspacio
         actorId={actor.id}
         espacioId={id}
+        puedeEliminar={actor.isAdmin}
         estados={estados.map((item) => ({ key: item.key, name: item.name, category: item.category }))}
         tarjetas={casos.items.map((item) => {
           const catalogo = porEquipo.get(item.team) ?? []

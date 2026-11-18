@@ -119,7 +119,7 @@ export function ListaJira({
         </table>
       </div>
       <div className="flex items-center justify-between border-t border-border px-3 py-2 text-sm">
-        {puedeCrear ? <Link href="/requerimientos/nuevo" className="inline-flex items-center gap-1 text-[#1658B0] hover:underline"><PlusIcon className="size-4" /> Crear</Link> : <span />}
+        {puedeCrear ? <Link href="/mis-solicitudes/radicar" className="inline-flex items-center gap-1 text-[#1658B0] hover:underline"><PlusIcon className="size-4" /> Crear</Link> : <span />}
         <span className="text-xs text-muted-foreground">{items.length} de {total}</span>
       </div>
       {puedePrioridad && elegidos.length > 0 ? (

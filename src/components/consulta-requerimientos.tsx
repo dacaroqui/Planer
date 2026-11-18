@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { BookmarkIcon, FilterIcon, SearchIcon, XIcon } from "lucide-react"
 import { AccionesMasivas } from "@/components/acciones-masivas"
+import { MenuEliminarRequerimiento } from "@/components/confirmar-eliminar"
 import { EstadoBadge, SlaBadge } from "@/components/insignias"
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { PRIORITY_LABEL, STATUS_LABEL, statusLabel, type PriorityName, type SlaState } from "@/lib/domain"
@@ -191,11 +192,12 @@ export function ConsultaRequerimientos({
                 <th className="px-3 py-3 font-medium">Estado</th>
                 <th className="px-3 py-3 font-medium">SLA</th>
                 <th className="px-3 py-3 font-medium">Actualizado</th>
+                {puedeEliminar ? <th className="px-3 py-3"><span className="sr-only">Acciones</span></th> : null}
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-10 text-center text-sm text-muted-foreground">No hay requerimientos con esos filtros.</td></tr>
+                <tr><td colSpan={puedeEliminar ? 6 : 5} className="px-3 py-10 text-center text-sm text-muted-foreground">No hay requerimientos con esos filtros.</td></tr>
               ) : items.map((item) => (
                 <tr key={item.code} className="border-b border-[#F0F4FA] last:border-0 hover:bg-[#F8FAFD]">
                   <td className="px-3 py-3 align-top">
@@ -208,6 +210,7 @@ export function ConsultaRequerimientos({
                   <td className="px-3 py-3"><EstadoBadge status={item.status} etiqueta={etiquetaEstado(item.status)} /></td>
                   <td className="px-3 py-3"><SlaBadge state={item.sla} /></td>
                   <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">{fechaLista(item.updatedAt)}</td>
+                  {puedeEliminar ? <td className="px-3 py-3"><MenuEliminarRequerimiento code={item.code} title={item.title} /></td> : null}
                 </tr>
               ))}
             </tbody>
