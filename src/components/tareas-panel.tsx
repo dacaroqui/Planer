@@ -187,7 +187,7 @@ function FilaTarea({
   }
 
   return (
-    <div className="grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm">
+    <div id={`tarea-${tarea.id}`} className="grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm">
       <p className={tarea.status === "HECHA" ? "font-medium line-through" : "font-medium"}>{tarea.title}</p>
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Avatar nombre={tarea.assignee === "Sin responsable" ? "?" : tarea.assignee} />
