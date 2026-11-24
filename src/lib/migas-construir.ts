@@ -7,6 +7,7 @@ export const NOMBRES_MIGA: Record<string, string> = {
   tablero: "Tablero",
   proyectos: "Proyectos",
   planner: "Planner",
+  plan: "Plan de trabajo",
   growth: "Growth",
   gerencia: "Panel de gestión",
   rendimiento: "Rendimiento",

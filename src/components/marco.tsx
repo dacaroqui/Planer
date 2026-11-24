@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   HelpCircleIcon,
   ChartColumnIcon,
+  ClipboardListIcon,
   LayoutDashboardIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -129,6 +130,7 @@ export function Marco({
           {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeGrowth ? <Enlace href="/growth" activo={path.startsWith("/growth")} etiqueta="Growth" icono={<TrendingUpIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedePlanner ? <Enlace href="/plan" activo={path.startsWith("/plan")} etiqueta="Plan de trabajo" icono={<ClipboardListIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeBandeja ? <Enlace href="/bandeja" activo={path.startsWith("/bandeja")} etiqueta="Bandeja de respuesta" icono={<InboxIcon className="size-4" />} compacta={!abierta} /> : null}
           <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
           {puedeCola ? <Enlace href="/cola" activo={path.startsWith("/cola")} etiqueta="Cola de entrada" icono={<FilterIcon className="size-4" />} compacta={!abierta} /> : null}

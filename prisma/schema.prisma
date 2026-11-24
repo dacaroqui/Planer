@@ -227,6 +227,9 @@ model Tarea {
   horasReales     Decimal?    @db.Decimal(8, 2)
   experimentoId   String?
   experimento     GrowthExperimento? @relation(fields: [experimentoId], references: [id], onDelete: SetNull)
+  participantes   String?
+  bloqueo         String?
+  notaRol         String?
   registros       Comment[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
