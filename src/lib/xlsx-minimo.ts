@@ -71,7 +71,13 @@ function zipSinComprimir(archivos: { nombre: string; datos: string }[]) {
   return Buffer.concat([...locales, directorio, fin])
 }
 
-export function libroXlsx(filas: string[][]) {
+export function libroHojas(hojas: { nombre: string; filas: string[][] }[]) {
+  const hojasXml = hojas.map((hojaItem, indice) => ({
+    nombre: `xl/worksheets/sheet${indice + 1}.xml`,
+    datos: hoja(hojaItem.filas),
+    id: `rId${indice + 1}`,
+    titulo: hojaItem.nombre,
+  }))
   return zipSinComprimir([
     {
       nombre: "[Content_Types].xml",
@@ -80,31 +86,35 @@ export function libroXlsx(filas: string[][]) {
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+${hojasXml.map((item) => `<Override PartName="/${item.nombre}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}
 </Types>`,
     },
     {
       nombre: "_rels/.rels",
       datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+<Relationship Id="rIdWorkbook" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`,
     },
     {
       nombre: "xl/workbook.xml",
       datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Plan de trabajo" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+<sheets>${hojasXml.map((item, indice) => `<sheet name="${xml(item.titulo)}" sheetId="${indice + 1}" r:id="${item.id}"/>`).join("")}</sheets></workbook>`,
     },
     {
       nombre: "xl/_rels/workbook.xml.rels",
       datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+${hojasXml.map((item) => `<Relationship Id="${item.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${item.id.slice(3)}.xml"/>`).join("")}
 </Relationships>`,
     },
-    { nombre: "xl/worksheets/sheet1.xml", datos: hoja(filas) },
+    ...hojasXml.map((item) => ({ nombre: item.nombre, datos: item.datos })),
   ])
+}
+
+export function libroXlsx(filas: string[][]) {
+  return libroHojas([{ nombre: "Plan de trabajo", filas }])
 }
 
 export function filasExportables(filas: { proyecto: string; area: string; actividad: string; responsable: string; participantes: string[]; estado: string; bloqueo: string; inicio: string; fin: string; horasEstimadas: string; horasReales: string; kpi: string }[]) {

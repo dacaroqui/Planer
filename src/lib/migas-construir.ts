@@ -8,6 +8,10 @@ export const NOMBRES_MIGA: Record<string, string> = {
   proyectos: "Proyectos",
   planner: "Planner",
   plan: "Plan de trabajo",
+  objetivos: "Objetivos",
+  kpis: "KPIs",
+  areas: "Por área",
+  mios: "Mis KPIs",
   growth: "Growth",
   gerencia: "Panel de gestión",
   rendimiento: "Rendimiento",
@@ -39,7 +43,9 @@ export function construirMigas(path: string, nombre = "", conocidas: Record<stri
   partes.forEach((parte, index) => {
     if (parte === "panel") return
     acumulado += `/${parte}`
-    migas.push({ href: acumulado, label: etiquetaMiga(parte, index, partes, nombre, conocidas) })
+    const label = etiquetaMiga(parte, index, partes, nombre, conocidas)
+    if (!label) return
+    migas.push({ href: acumulado, label })
   })
   return migas
 }

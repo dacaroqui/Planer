@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Barra } from "@/components/barra"
 import { FormularioEmpresa, FormularioProyecto } from "@/components/formularios-proyecto"
+import { listarFases } from "@/server/objetivos"
 import { puedeCrearProyecto } from "@/server/proyectos"
 import { requireActor } from "@/server/session"
 import { listarProyectos } from "@/server/proyectos"
@@ -17,6 +18,10 @@ export default async function ProyectosPage({
   const params = await searchParams
   const empresas = await prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } })
   const proyectos = await listarProyectos(actor, params.empresa)
+  const [objetivos, fases] = await Promise.all([
+    prisma.objetivo.findMany({ orderBy: { titulo: "asc" }, select: { id: true, titulo: true } }),
+    listarFases(),
+  ])
   const lideres = await prisma.user.findMany({
     where: { active: true, OR: [{ role: "ADMINISTRADOR" }, { areaRoles: { some: { role: "LIDER" } } }] },
     orderBy: { name: "asc" },
@@ -59,7 +64,7 @@ export default async function ProyectosPage({
           </section>
           <section className="rounded-xl border border-border bg-card p-4">
             <h2 className="font-heading text-xl">Nuevo proyecto</h2>
-            <div className="mt-3"><FormularioProyecto empresas={empresas} lideres={lideres} /></div>
+            <div className="mt-3"><FormularioProyecto empresas={empresas} lideres={lideres} objetivos={objetivos} fases={[...new Set(fases.map((fase) => fase.nombre))]} /></div>
           </section>
         </div>
       ) : null}

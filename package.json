@@ -9,6 +9,7 @@
     "seed:inicial": "tsx scripts/seed-inicial.ts",
     "seed:growth-demo": "tsx scripts/seed-growth-demo.ts",
     "seed:plan-demo": "tsx scripts/seed-plan-demo.ts",
+    "seed:objetivos-demo": "tsx scripts/seed-objetivos-demo.ts",
     "plan:sufijos": "tsx scripts/mover-sufijos-tarea.ts",
     "start": "sh scripts/start.sh",
     "create-admin": "tsx scripts/create-admin.ts",

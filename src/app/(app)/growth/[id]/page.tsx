@@ -7,6 +7,8 @@ import { fichaExperimento } from "@/server/growth"
 import { DomainError } from "@/lib/domain"
 import { requireActor } from "@/server/session"
 import { NombreMiga } from "@/components/migas"
+import { prisma } from "@/lib/prisma"
+import { vincularExperimentoAction } from "@/server/objetivos-actions"
 
 export default async function FichaPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireActor()
@@ -19,8 +21,14 @@ export default async function FichaPage({ params }: { params: Promise<{ id: stri
     if (error instanceof DomainError) notFound()
     throw error
   }
-  const destino = siguienteEstado(ficha.estado)
   const edita = puedeEditarGrowth(actor)
+  const [objetivos, kpis] = edita
+    ? await Promise.all([
+        prisma.objetivo.findMany({ orderBy: { titulo: "asc" }, select: { id: true, titulo: true } }),
+        prisma.kpi.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+      ])
+    : [[], []]
+  const destino = siguienteEstado(ficha.estado)
   const hechas = ficha.tareas.filter((tarea) => tarea.status === "HECHA").length
   const responsable = ficha.owner?.name || ficha.ownerName
   return (
@@ -112,6 +120,24 @@ export default async function FichaPage({ params }: { params: Promise<{ id: stri
         </form>
       ) : null}
       {ficha.estado === "CERRADO" && ficha.decision ? <OpcionesDecision valor={ficha.decision} /> : null}
+      {edita ? (
+        <form action={vincularExperimentoAction} className="grid gap-2 rounded-xl border border-[#E4E7EC] bg-white p-4 text-sm sm:grid-cols-2">
+          <input type="hidden" name="id" value={ficha.id} />
+          <label className="grid gap-1">Objetivo
+            <select name="objetivoId" defaultValue={ficha.objetivoId ?? ""} aria-label="Objetivo del experimento" className="h-10 rounded-lg border border-[#E4E7EC] px-3">
+              <option value="">Sin objetivo</option>
+              {objetivos.map((item) => <option key={item.id} value={item.id}>{item.titulo}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1">KPI
+            <select name="kpiId" defaultValue={ficha.kpiId ?? ""} aria-label="KPI del experimento" className="h-10 rounded-lg border border-[#E4E7EC] px-3">
+              <option value="">Sin KPI</option>
+              {kpis.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
+            </select>
+          </label>
+          <button className="h-10 rounded-lg border border-[#1658B0] text-[#1658B0] sm:col-span-2" type="submit">Vincular objetivo y KPI</button>
+        </form>
+      ) : null}
     </div>
   )
 }
