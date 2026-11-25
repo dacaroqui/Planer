@@ -251,6 +251,32 @@ export async function aprobarMeta(actor: Actor, kpiId: string) {
   return prisma.kpi.update({ where: { id: kpiId }, data: { estadoMeta: "APROBADA" } })
 }
 
+export async function moverProyectoAObjetivo(actor: Actor, input: { proyectoId: string; objetivoId: string }) {
+  const proyecto = await prisma.proyecto.findUnique({ where: { id: input.proyectoId } })
+  const objetivo = await prisma.objetivo.findUnique({ where: { id: input.objetivoId } })
+  if (!proyecto || !objetivo) throw new DomainError("El proyecto o el objetivo no existe.")
+  if (!proyecto.team || !puedeEditarArea(actor, proyecto.team)) throw new PermisoDenegado("Solo el líder del área o un administrador mueve el proyecto.")
+  if (!puedeEditarArea(actor, objetivo.area)) throw new PermisoDenegado("Solo el líder del área de destino recibe el proyecto.")
+  return prisma.proyecto.update({ where: { id: proyecto.id }, data: { objetivoId: objetivo.id } })
+}
+
+export async function ajustarKpi(actor: Actor, input: { id: string; actual?: string; meta?: string }) {
+  const kpi = await prisma.kpi.findUnique({ where: { id: input.id }, include: { objetivo: true } })
+  if (!kpi) throw new DomainError("El KPI no existe.")
+  const area = kpi.area || kpi.objetivo?.area || null
+  const propio = kpi.personaId === actor.id
+  if (!esAdmin(actor) && !propio && !(area && puedeEditarArea(actor, area))) throw new PermisoDenegado("Solo el líder del área o un administrador edita este KPI.")
+  if (input.meta !== undefined && !puedeAprobarMeta(actor)) throw new PermisoDenegado("Solo un administrador cambia la meta.")
+  const valor = (texto: string | undefined) => (texto == null || texto.trim() === "" ? null : num(texto))
+  return prisma.kpi.update({
+    where: { id: kpi.id },
+    data: {
+      ...(input.actual !== undefined ? { actual: valor(input.actual) } : {}),
+      ...(input.meta !== undefined ? { meta: valor(input.meta) } : {}),
+    },
+  })
+}
+
 export async function asignarProyecto(actor: Actor, input: { proyectoId: string; objetivoId: string; fase: string; medio: string; costo: string }) {
   const proyecto = await prisma.proyecto.findUnique({ where: { id: input.proyectoId } })
   if (!proyecto) throw new DomainError("El proyecto no existe.")

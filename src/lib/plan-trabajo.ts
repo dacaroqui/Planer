@@ -98,6 +98,8 @@ export type FilaPlan = {
   kpiMeta: number | null
   kpiUnidad: string
   kpiActual: number | null
+  parentId: string | null
+  orden: number
   puedeEditar: boolean
   puedeRegistrar: boolean
 }
@@ -132,6 +134,8 @@ export function presentarTarea(input: {
   kpiMeta?: { toString(): string } | number | null
   kpiUnidad?: string | null
   kpiActual?: { toString(): string } | number | null
+  parentId?: string | null
+  orden?: number
   puedeEditar: boolean
   puedeRegistrar: boolean
 }): FilaPlan {
@@ -163,6 +167,8 @@ export function presentarTarea(input: {
     kpiMeta: cantidad(input.kpiMeta),
     kpiUnidad: input.kpiUnidad?.trim() || "",
     kpiActual: cantidad(input.kpiActual),
+    parentId: input.parentId ?? null,
+    orden: input.orden ?? 0,
     puedeEditar: input.puedeEditar,
     puedeRegistrar: input.puedeRegistrar,
   }

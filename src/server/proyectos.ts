@@ -363,7 +363,7 @@ export async function detalleProyecto(actor: Actor, id: string) {
       empresa: true,
       leader: true,
       requests: { include: { requester: true, assignee: true, type: true, tasks: true }, orderBy: { updatedAt: "desc" } },
-      tasks: { include: { assignee: true, request: true }, orderBy: { createdAt: "asc" } },
+      tasks: { include: { assignee: true, request: true }, orderBy: [{ orden: "asc" }, { createdAt: "asc" }] },
     },
   })
   if (!proyecto) return null

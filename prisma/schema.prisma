@@ -245,12 +245,13 @@ model Tarea {
   participantes   String?
   bloqueo         String?
   notaRol         String?
+  orden           Int         @default(0)
   registros       Comment[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([requestId])
-  @@index([projectId])
+  @@index([projectId, orden])
   @@index([assigneeId, createdAt])
   @@index([assigneeId, completedAt])
   @@index([experimentoId])

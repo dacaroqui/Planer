@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/prisma"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { toActor } from "@/lib/actor"
-import { crearActividadPlan, editarFilaPlan, listarPlan } from "@/server/plan-trabajo"
+import { crearActividadPlan, editarFilaPlan, editarMasivo, listarPlan, moverActividad, reordenarActividades } from "@/server/plan-trabajo"
 
 const SUFIJO = ".plan@cifes.edu.co"
 
@@ -186,5 +186,30 @@ describe("permisos del plan de trabajo", () => {
     expect(fila.assigneeId).toBeNull()
     const aviso = await prisma.notification.findFirst({ where: { userId: lider.id, subject: { contains: "sin responsable" } } })
     expect(aviso?.subject).toContain("Grabar el aula")
+  })
+
+  it("reordena y mueve actividades y respeta el permiso del líder", async () => {
+    const lider = await persona("Líder Orden", "LIDER")
+    const agente = await persona("Agente Orden", "AGENTE")
+    const empresa = await prisma.empresa.create({ data: { name: `Empresa plan orden ${Date.now()}` } })
+    const base = { empresaId: empresa.id, leaderId: lider.id, team: "MARKETING" as const, startsAt: new Date("2026-11-01"), targetAt: new Date("2026-11-30") }
+    const origen = await prisma.proyecto.create({ data: { ...base, name: "Origen orden" } })
+    const destino = await prisma.proyecto.create({ data: { ...base, name: "Destino orden" } })
+    const primera = await prisma.tarea.create({ data: { title: "Primera actividad", projectId: origen.id, createdById: lider.id, status: "PENDIENTE", orden: 0, fechaInicio: new Date("2026-11-02") } })
+    const segunda = await prisma.tarea.create({ data: { title: "Segunda actividad", projectId: origen.id, createdById: lider.id, status: "PENDIENTE", orden: 1, fechaInicio: new Date("2026-11-03") } })
+    await expect(reordenarActividades(agente.actor, [segunda.id, primera.id])).rejects.toBeInstanceOf(PermisoDenegado)
+    await reordenarActividades(lider.actor, [segunda.id, primera.id])
+    const ordenadas = await prisma.tarea.findMany({ where: { projectId: origen.id }, orderBy: { orden: "asc" } })
+    expect(ordenadas.map((item) => item.id)).toEqual([segunda.id, primera.id])
+    await expect(moverActividad(agente.actor, { id: primera.id, projectId: destino.id, parentId: null })).rejects.toBeInstanceOf(PermisoDenegado)
+    await moverActividad(lider.actor, { id: primera.id, projectId: destino.id, parentId: null })
+    const movida = await prisma.tarea.findUniqueOrThrow({ where: { id: primera.id } })
+    expect(movida.projectId).toBe(destino.id)
+    await moverActividad(lider.actor, { id: primera.id, projectId: origen.id, parentId: segunda.id })
+    const anidada = await prisma.tarea.findUniqueOrThrow({ where: { id: primera.id } })
+    expect(anidada.parentId).toBe(segunda.id)
+    await expect(editarMasivo(agente.actor, { ids: [segunda.id], status: "EN_CURSO" })).rejects.toBeInstanceOf(PermisoDenegado)
+    await editarMasivo(lider.actor, { ids: [segunda.id], status: "EN_CURSO" })
+    expect((await prisma.tarea.findUniqueOrThrow({ where: { id: segunda.id } })).status).toBe("EN_CURSO")
   })
 })

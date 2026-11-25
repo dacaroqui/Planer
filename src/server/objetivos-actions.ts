@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { requireActor } from "@/server/session"
-import { aprobarMeta, asignarProyecto, guardarKpi, guardarObjetivo, proponerMeta, registrarMedicion, vincularExperimento } from "@/server/objetivos"
+import { ajustarKpi, aprobarMeta, asignarProyecto, guardarKpi, guardarObjetivo, moverProyectoAObjetivo, proponerMeta, registrarMedicion, vincularExperimento } from "@/server/objetivos"
 
 function fallo(error: unknown): never {
   if (error instanceof PermisoDenegado || error instanceof DomainError) throw error
@@ -109,6 +109,32 @@ export async function aprobarMetaAction(formData: FormData) {
     fallo(error)
   }
   refrescar()
+}
+
+export async function moverProyectoObjetivoAction(input: { proyectoId: string; objetivoId: string }) {
+  const actor = await requireActor()
+  try {
+    await moverProyectoAObjetivo(actor, input)
+  } catch (error) {
+    if (error instanceof PermisoDenegado || error instanceof DomainError) return { ok: false as const, error: error.message }
+    console.error(error)
+    return { ok: false as const, error: "No se pudo mover el proyecto." }
+  }
+  refrescar()
+  return { ok: true as const }
+}
+
+export async function ajustarKpiAction(input: { id: string; actual?: string; meta?: string }) {
+  const actor = await requireActor()
+  try {
+    await ajustarKpi(actor, input)
+  } catch (error) {
+    if (error instanceof PermisoDenegado || error instanceof DomainError) return { ok: false as const, error: error.message }
+    console.error(error)
+    return { ok: false as const, error: "No se pudo guardar el KPI." }
+  }
+  refrescar()
+  return { ok: true as const }
 }
 
 export async function asignarProyectoAction(formData: FormData) {
