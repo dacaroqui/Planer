@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVerticalIcon } from "lucide-react"
 import { toast } from "sonner"
+import { reordenarPlanAction } from "@/server/plan-actions"
 import { EliminarTarea } from "@/components/confirmar-eliminar"
 import { EstadoVacio } from "@/components/estado-vacio"
 import { Avatar } from "@/components/iconos-planer"
@@ -27,6 +32,9 @@ export type TareaVista = {
   kpiMeta?: number | null
   kpiUnidad?: string | null
   kpiActual?: number | null
+  assigneeId?: string | null
+  parentId?: string | null
+  orden?: number
 }
 
 const ESTADOS = [
@@ -86,9 +94,9 @@ export function TareasPanel({
         <span className="text-muted-foreground">{tareas.filter((tarea) => tarea.status === "HECHA").length}/{tareas.length || 0} hechas</span>
       </div>
       <Barra porcentaje={porcentaje} />
-      {tareas.length === 0 ? <EstadoVacio compacto titulo="Aún no hay tareas" texto="Agregue la primera tarea de esta solicitud." /> : tareas.map((tarea) => (
-        <FilaTarea key={tarea.id} tarea={tarea} puede={puede} puedeEliminar={puedeEliminar} requestId={requestId} projectId={projectId} pending={pending} start={start} refrescar={() => router.refresh()} />
-      ))}
+      {tareas.length === 0 ? <EstadoVacio compacto titulo="Aún no hay tareas" texto="Agregue la primera tarea de esta solicitud." /> : (
+        <ListaTareas tareas={[...tareas].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))} puede={puede} puedeEliminar={puedeEliminar} requestId={requestId} projectId={projectId} pending={pending} start={start} refrescar={() => router.refresh()} agentes={agentes} />
+      )}
       {puede && !agregar ? (
         <button type="button" className="h-11 rounded-lg border border-dashed border-[#1658B0] text-sm font-medium text-[#1658B0]" onClick={() => setAgregar(true)}>+ Agregar tarea</button>
       ) : null}
@@ -125,6 +133,46 @@ export function TareasPanel({
   )
 }
 
+function ListaTareas({ tareas, puede, puedeEliminar, requestId, projectId, pending, start, refrescar, agentes }: {
+  tareas: TareaVista[]
+  puede: boolean
+  puedeEliminar: boolean
+  requestId?: string
+  projectId?: string
+  pending: boolean
+  start: (trabajo: () => Promise<void>) => void
+  refrescar: () => void
+  agentes: { id: string; name: string; grupo?: string }[]
+}) {
+  const [orden, setOrden] = useState(tareas)
+  useEffect(() => { setOrden(tareas) }, [tareas])
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  async function alSoltar(event: DragEndEvent) {
+    if (!projectId || !event.over) return
+    const ids = orden.map((item) => item.id)
+    const desde = ids.indexOf(String(event.active.id))
+    const hacia = ids.indexOf(String(event.over.id))
+    if (desde < 0 || hacia < 0 || desde === hacia) return
+    const siguiente = arrayMove(ids, desde, hacia)
+    setOrden(arrayMove(orden, desde, hacia))
+    const resultado = await reordenarPlanAction(siguiente)
+    if (!resultado.ok) toast.error(resultado.error)
+    else toast.success("Orden actualizado.", { duration: 5000, action: { label: "Deshacer", onClick: () => { void reordenarPlanAction(ids) } } })
+    refrescar()
+  }
+  const lista = orden.map((tarea) => (
+    <FilaTarea key={tarea.id} tarea={tarea} puede={puede} puedeEliminar={puedeEliminar} requestId={requestId} projectId={projectId} pending={pending} start={start} refrescar={refrescar} agentes={agentes} />
+  ))
+  if (!projectId) return <div className="grid gap-3">{lista}</div>
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => { void alSoltar(event) }}>
+      <SortableContext items={orden.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+        <div className="grid gap-3">{lista}</div>
+      </SortableContext>
+    </DndContext>
+  )
+}
+
 function FilaTarea({
   tarea,
   puede,
@@ -134,6 +182,7 @@ function FilaTarea({
   pending,
   start,
   refrescar,
+  agentes,
 }: {
   tarea: TareaVista
   puede: boolean
@@ -143,22 +192,29 @@ function FilaTarea({
   pending: boolean
   start: (trabajo: () => Promise<void>) => void
   refrescar: () => void
+  agentes: { id: string; name: string; grupo?: string }[]
 }) {
+  const sortable = useSortable({ id: tarea.id, disabled: !projectId || !puede })
   const inicial = tarea.horasEstimadas == null ? "" : String(tarea.horasEstimadas)
   const [horas, setHoras] = useState(inicial)
   const [aviso, setAviso] = useState<"idle" | "guardando" | "guardado">("idle")
   const [pedir, setPedir] = useState(false)
   const [trabajadas, setTrabajadas] = useState(tarea.horasReales == null ? "" : String(tarea.horasReales))
+  const [titulo, setTitulo] = useState(tarea.title)
+  const [editando, setEditando] = useState(false)
   const ultima = useRef(inicial)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  function guardar(extra: { status?: TareaVista["status"]; horasEstimadas?: string; horasReales?: string }) {
+  function guardar(extra: { status?: TareaVista["status"]; horasEstimadas?: string; horasReales?: string; title?: string; assigneeId?: string; fechaInicio?: string; dueDate?: string }) {
     const data = new FormData()
     data.set("id", tarea.id)
-    data.set("title", tarea.title)
+    data.set("title", extra.title ?? titulo)
     data.set("status", extra.status ?? tarea.status)
+    if (extra.assigneeId !== undefined) data.set("assigneeId", extra.assigneeId)
+    if (extra.fechaInicio !== undefined) data.set("fechaInicio", extra.fechaInicio)
+    if (extra.dueDate !== undefined) data.set("dueDate", extra.dueDate)
     if (requestId) data.set("requestId", requestId)
     if (projectId) data.set("projectId", projectId)
     if (extra.horasEstimadas !== undefined) data.set("horasEstimadas", extra.horasEstimadas)
@@ -197,13 +253,21 @@ function FilaTarea({
   }
 
   return (
-    <div id={`tarea-${tarea.id}`} className="grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm">
-      <p className={tarea.status === "HECHA" ? "font-medium line-through" : "font-medium"}>{tarea.title}</p>
+    <div id={`tarea-${tarea.id}`} ref={sortable.setNodeRef} style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }} className={`grid gap-2 rounded-lg border border-[#E4E7EC] px-3 py-3 text-sm ${tarea.parentId ? "ml-6" : ""}`}>
+      <div className="flex items-center gap-2">
+        {projectId && puede ? <button type="button" className="cursor-grab text-[#98A2B3]" aria-label={`Arrastrar ${tarea.title}`} {...sortable.attributes} {...sortable.listeners}><GripVerticalIcon className="size-4" /></button> : null}
+        {editando && puede ? (
+          <input autoFocus aria-label="Título de la tarea" value={titulo} onChange={(event) => setTitulo(event.target.value)} onBlur={() => { setEditando(false); if (titulo.trim().length >= 3 && titulo !== tarea.title) guardar({ title: titulo }) }} onKeyDown={(event) => { if (event.key === "Enter") { setEditando(false); guardar({ title: titulo }) } if (event.key === "Escape") { setTitulo(tarea.title); setEditando(false) } }} className="h-9 w-full rounded-lg border border-[#1658B0] px-2" />
+        ) : (
+          <button type="button" className={tarea.status === "HECHA" ? "text-left font-medium line-through" : "text-left font-medium"} onClick={() => puede && setEditando(true)} title={puede ? "Clic para editar" : "Solo el equipo del área edita esta tarea."}>{titulo}</button>
+        )}
+      </div>
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Avatar nombre={tarea.assignee === "Sin responsable" ? "?" : tarea.assignee} />
         <span>{tarea.assignee}</span>
-        <span>{tarea.fechaInicio ? `Inicio ${tarea.fechaInicio}` : "Sin inicio"}</span>
-        <span>{tarea.dueDate ? `Fin ${tarea.dueDate}` : "Sin fin"}</span>
+        {puede ? <select aria-label="Responsable de la tarea" defaultValue={tarea.assigneeId ?? ""} onChange={(event) => guardar({ assigneeId: event.target.value })} className="h-8 rounded-lg border border-[#E4E7EC] px-2"><option value="">Sin responsable</option>{agentes.map((agente) => <option key={agente.id} value={agente.id}>{agente.name}</option>)}</select> : <span>{tarea.assignee}</span>}
+        {puede && (!tarea.fechaInicio || /^\d{4}-\d{2}-\d{2}/.test(tarea.fechaInicio)) ? <input type="date" lang="es-CO" aria-label="Inicio de la tarea" defaultValue={tarea.fechaInicio ?? ""} onBlur={(event) => guardar({ fechaInicio: event.target.value })} className="h-8 w-40 rounded-lg border border-[#E4E7EC] px-2" /> : <span>{tarea.fechaInicio ? `Inicio ${tarea.fechaInicio}` : "Sin inicio"}</span>}
+        {puede && (!tarea.dueDate || /^\d{4}-\d{2}-\d{2}/.test(tarea.dueDate)) ? <input type="date" lang="es-CO" aria-label="Fin de la tarea" defaultValue={tarea.dueDate ?? ""} onBlur={(event) => guardar({ dueDate: event.target.value })} className="h-8 w-40 rounded-lg border border-[#E4E7EC] px-2" /> : <span>{tarea.dueDate ? `Fin ${tarea.dueDate}` : "Sin fin"}</span>}
         <span>{tarea.horasEstimadas != null ? `${tarea.horasEstimadas} h est.` : "Sin horas"}</span>
         {tarea.kpiNombre ? <span>{tarea.kpiActual ?? "—"} / {tarea.kpiMeta ?? "—"} {tarea.kpiUnidad}</span> : null}
         {tarea.vencida ? <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">Vencida</span> : null}

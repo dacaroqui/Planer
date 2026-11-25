@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { ESTADOS_TAREA, type EstadoTareaPlan } from "@/lib/plan-trabajo"
 import { requireActor } from "@/server/session"
-import { crearActividadPlan, crearProyectoPlan, editarFilaPlan } from "@/server/plan-trabajo"
+import { crearActividadPlan, crearProyectoPlan, deshacerAlta, editarFilaPlan, editarMasivo, moverActividad, reordenarActividades } from "@/server/plan-trabajo"
 
-export type ResultadoPlan = { ok: true; message: string } | { ok: false; error: string }
+export type ResultadoPlan = { ok: true; message: string; id?: string } | { ok: false; error: string }
 
 function fallo(error: unknown): ResultadoPlan {
   if (error instanceof PermisoDenegado || error instanceof DomainError) return { ok: false, error: error.message }
@@ -47,7 +47,7 @@ export async function editarPlanAction(formData: FormData): Promise<ResultadoPla
 export async function crearActividadAction(formData: FormData): Promise<ResultadoPlan> {
   const actor = await requireActor()
   try {
-    await crearActividadPlan(actor, {
+    const tarea = await crearActividadPlan(actor, {
       proyectoId: String(formData.get("proyectoId") || ""),
       titulo: String(formData.get("titulo") || ""),
       assigneeId: String(formData.get("assigneeId") || "") || null,
@@ -64,7 +64,7 @@ export async function crearActividadAction(formData: FormData): Promise<Resultad
     revalidatePath("/plan")
     revalidatePath("/planner")
     revalidatePath("/proyectos")
-    return { ok: true, message: "Actividad agregada." }
+    return { ok: true, message: "Actividad agregada.", id: tarea.id }
   } catch (error) {
     return fallo(error)
   }
@@ -83,6 +83,109 @@ export async function crearProyectoPlanAction(formData: FormData): Promise<Resul
     revalidatePath("/plan")
     revalidatePath("/proyectos")
     return { ok: true, message: "Proyecto creado." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function guardarCeldaAction(input: {
+  id: string
+  title?: string
+  status?: string
+  assigneeId?: string | null
+  bloqueo?: string | null
+  participantes?: string | null
+  fechaInicio?: string | null
+  fechaFin?: string | null
+  horasEstimadas?: string | null
+  horasReales?: string | null
+  kpiNombre?: string | null
+  kpiMeta?: string | null
+  kpiUnidad?: string | null
+  kpiActual?: string | null
+  projectId?: string
+  parentId?: string | null
+}): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await editarFilaPlan(actor, {
+      id: input.id,
+      title: input.title,
+      status: ESTADOS_TAREA.includes(input.status as EstadoTareaPlan) ? input.status as EstadoTareaPlan : undefined,
+      assigneeId: input.assigneeId,
+      bloqueo: input.bloqueo,
+      participantes: input.participantes,
+      fechaInicio: input.fechaInicio,
+      fechaFin: input.fechaFin,
+      horasEstimadas: input.horasEstimadas,
+      horasReales: input.horasReales,
+      kpiNombre: input.kpiNombre,
+      kpiMeta: input.kpiMeta,
+      kpiUnidad: input.kpiUnidad,
+      kpiActual: input.kpiActual,
+      projectId: input.projectId,
+      parentId: input.parentId,
+    })
+    revalidatePath("/plan")
+    revalidatePath("/planner")
+    revalidatePath("/proyectos")
+    return { ok: true, message: "Cambio guardado." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function reordenarPlanAction(ids: string[]): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await reordenarActividades(actor, ids)
+    revalidatePath("/plan")
+    revalidatePath("/proyectos")
+    return { ok: true, message: "Orden actualizado." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function moverActividadAction(input: { id: string; projectId: string; parentId: string | null }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await moverActividad(actor, input)
+    revalidatePath("/plan")
+    revalidatePath("/proyectos")
+    revalidatePath("/objetivos")
+    return { ok: true, message: "Actividad movida." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function editarMasivoAction(input: { ids: string[]; assigneeId?: string | null; status?: string; fechaInicio?: string | null; fechaFin?: string | null; projectId?: string }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await editarMasivo(actor, {
+      ids: input.ids,
+      assigneeId: input.assigneeId,
+      status: ESTADOS_TAREA.includes(input.status as EstadoTareaPlan) ? input.status as EstadoTareaPlan : undefined,
+      fechaInicio: input.fechaInicio,
+      fechaFin: input.fechaFin,
+      projectId: input.projectId,
+    })
+    revalidatePath("/plan")
+    revalidatePath("/proyectos")
+    return { ok: true, message: "Actividades actualizadas." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function deshacerAltaAction(id: string): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await deshacerAlta(actor, id)
+    revalidatePath("/plan")
+    revalidatePath("/proyectos")
+    return { ok: true, message: "Alta deshecha." }
   } catch (error) {
     return fallo(error)
   }

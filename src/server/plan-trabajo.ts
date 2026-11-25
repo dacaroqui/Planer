@@ -18,14 +18,13 @@ export async function listarPlan(actor: Actor): Promise<FilaPlan[]> {
   if (proyectos.length === 0) return []
   const tareas = await prisma.tarea.findMany({
     where: {
-      parentId: null,
       OR: [
         { projectId: { in: proyectos.map((proyecto) => proyecto.id) } },
         { assigneeId: actor.id, projectId: { not: null } },
       ],
     },
     include: { assignee: { select: { id: true, name: true } }, project: true },
-    orderBy: [{ project: { name: "asc" } }, { createdAt: "asc" }],
+    orderBy: [{ project: { name: "asc" } }, { orden: "asc" }, { createdAt: "asc" }],
   })
   return tareas.flatMap((tarea) => {
     if (!tarea.project) return []
@@ -52,6 +51,8 @@ export async function listarPlan(actor: Actor): Promise<FilaPlan[]> {
       kpiMeta: tarea.kpiMeta,
       kpiUnidad: tarea.kpiUnidad,
       kpiActual: tarea.kpiActual,
+      parentId: tarea.parentId,
+      orden: tarea.orden,
       puedeEditar: puedeEditarPlan(actor, tarea.project.team),
       puedeRegistrar: puedeRegistrarAvance(actor.id, tarea.assigneeId, puedeEditarPlan(actor, tarea.project.team)),
     })]
@@ -104,6 +105,7 @@ export async function crearActividadPlan(actor: Actor, input: {
   const proyecto = await proyectoVisible(actor, input.proyectoId)
   const asigna = puedeEditarPlan(actor, proyecto.team)
   const responsable = asigna ? (input.assigneeId || null) : null
+  const tope = await prisma.tarea.aggregate({ where: { projectId: proyecto.id, parentId: null }, _max: { orden: true } })
   const tarea = await guardarTarea(actor, {
     title: input.titulo,
     status: "PENDIENTE",
@@ -120,6 +122,7 @@ export async function crearActividadPlan(actor: Actor, input: {
     kpiActual: input.kpiActual,
     desdePlan: true,
   })
+  await prisma.tarea.update({ where: { id: tarea.id }, data: { orden: (tope._max.orden ?? -1) + 1 } })
   if (!asigna && proyecto.team) {
     const lideres = await prisma.areaRole.findMany({
       where: { team: proyecto.team, role: "LIDER", user: { active: true, deactivatedAt: null } },
@@ -177,6 +180,9 @@ export async function editarFilaPlan(
     kpiUnidad?: string | null
     kpiActual?: string | null
     soloAvance?: boolean
+    title?: string
+    projectId?: string
+    parentId?: string | null
   },
 ) {
   const tarea = await prisma.tarea.findUnique({
@@ -185,11 +191,17 @@ export async function editarFilaPlan(
   })
   if (!tarea?.projectId || !tarea.project) throw new DomainError("La tarea no está en un proyecto del plan.")
   await proyectoVisible(actor, tarea.projectId)
+  let projectId = tarea.projectId
+  if (input.projectId && input.projectId !== tarea.projectId) {
+    const destino = await proyectoVisible(actor, input.projectId)
+    if (!puedeEditarPlan(actor, destino.team)) throw new PermisoDenegado("Solo el líder del área de destino mueve la actividad.")
+    projectId = destino.id
+  }
   const edita = puedeEditarPlan(actor, tarea.project.team)
   const registra = puedeRegistrarAvance(actor.id, tarea.assigneeId, edita)
   if (!edita) {
     if (!registra) throw new PermisoDenegado("Solo el líder del área o un administrador edita el plan.")
-    const pideMas = input.status || input.assigneeId !== undefined || input.bloqueo !== undefined || input.participantes !== undefined || input.fechaInicio !== undefined || input.fechaFin !== undefined || input.horasEstimadas !== undefined || input.kpiNombre !== undefined || input.kpiMeta !== undefined || input.kpiUnidad !== undefined
+    const pideMas = input.status || input.assigneeId !== undefined || input.bloqueo !== undefined || input.participantes !== undefined || input.fechaInicio !== undefined || input.fechaFin !== undefined || input.horasEstimadas !== undefined || input.kpiNombre !== undefined || input.kpiMeta !== undefined || input.kpiUnidad !== undefined || input.title !== undefined || input.projectId !== undefined || input.parentId !== undefined
     if (pideMas) throw new PermisoDenegado("Solo el responsable registra horas reales y el valor actual del KPI.")
     await prisma.tarea.update({
       where: { id: tarea.id },
@@ -203,13 +215,23 @@ export async function editarFilaPlan(
   if (input.status && !transicionTareaValida(tarea.status, input.status)) {
     throw new DomainError("Ese cambio de estado no está permitido. Pase por En curso.")
   }
+  if (input.parentId) {
+    if (input.parentId === tarea.id) throw new DomainError("Una actividad no puede ser subtarea de sí misma.")
+    const padre = await prisma.tarea.findUnique({ where: { id: input.parentId }, include: { children: { select: { id: true } } } })
+    if (!padre || padre.parentId) throw new DomainError("Una subtarea no puede contener otra subtarea.")
+    if (padre.projectId !== projectId) throw new DomainError("La subtarea tiene que vivir en el mismo proyecto.")
+    const propias = await prisma.tarea.count({ where: { parentId: tarea.id } })
+    if (propias) throw new DomainError("Una actividad con subtareas no puede anidarse.")
+  }
   await guardarTarea(actor, {
     id: tarea.id,
-    title: tarea.title,
+    title: input.title?.trim() || tarea.title,
     status: input.status ?? tarea.status,
     assigneeId: input.assigneeId !== undefined ? input.assigneeId : tarea.assigneeId,
-    projectId: tarea.projectId,
+    projectId,
+    parentId: input.parentId !== undefined ? input.parentId : tarea.parentId,
     requestId: tarea.requestId,
+    desdePlan: true,
     ...(input.fechaFin !== undefined ? { dueDate: input.fechaFin } : {}),
     ...(input.fechaInicio !== undefined ? { fechaInicio: input.fechaInicio } : {}),
     ...(input.horasEstimadas !== undefined ? { horasEstimadas: input.horasEstimadas } : {}),
@@ -221,4 +243,59 @@ export async function editarFilaPlan(
     ...(input.kpiUnidad !== undefined ? { kpiUnidad: input.kpiUnidad } : {}),
     ...(input.kpiActual !== undefined ? { kpiActual: input.kpiActual } : {}),
   })
+  if (projectId !== tarea.projectId) {
+    await prisma.tarea.updateMany({ where: { parentId: tarea.id }, data: { projectId } })
+  }
+}
+
+export async function reordenarActividades(actor: Actor, ids: string[]) {
+  if (ids.length === 0) return
+  const tareas = await prisma.tarea.findMany({ where: { id: { in: ids } }, include: { project: true } })
+  if (tareas.length !== ids.length) throw new DomainError("Hay una actividad que no existe.")
+  const proyectoId = tareas[0]?.projectId
+  const padre = tareas[0]?.parentId ?? null
+  if (!proyectoId || tareas.some((item) => item.projectId !== proyectoId || (item.parentId ?? null) !== padre)) {
+    throw new DomainError("Solo se reordenan actividades del mismo grupo.")
+  }
+  const proyecto = tareas[0]?.project
+  if (!proyecto || !puedeEditarPlan(actor, proyecto.team)) throw new PermisoDenegado("Solo el líder del área o un administrador reordena el plan.")
+  await proyectoVisible(actor, proyectoId)
+  await prisma.$transaction(ids.map((id, orden) => prisma.tarea.update({ where: { id }, data: { orden } })))
+}
+
+export async function moverActividad(actor: Actor, input: { id: string; projectId: string; parentId: string | null }) {
+  await editarFilaPlan(actor, { id: input.id, projectId: input.projectId, parentId: input.parentId })
+  const hermanas = await prisma.tarea.count({ where: { projectId: input.projectId, parentId: input.parentId, NOT: { id: input.id } } })
+  await prisma.tarea.update({ where: { id: input.id }, data: { orden: hermanas } })
+}
+
+export async function editarMasivo(
+  actor: Actor,
+  input: { ids: string[]; assigneeId?: string | null; status?: EstadoTareaPlan; fechaInicio?: string | null; fechaFin?: string | null; projectId?: string },
+) {
+  if (input.ids.length === 0) return
+  const tareas = await prisma.tarea.findMany({ where: { id: { in: input.ids } }, include: { project: true } })
+  if (tareas.length !== input.ids.length) throw new DomainError("Hay una actividad que no existe.")
+  for (const tarea of tareas) {
+    if (!tarea.project || !puedeEditarPlan(actor, tarea.project.team)) throw new PermisoDenegado("Solo el líder del área o un administrador edita el plan.")
+    if (input.status && !transicionTareaValida(tarea.status, input.status)) throw new DomainError("Ese cambio de estado no está permitido. Pase por En curso.")
+  }
+  for (const id of input.ids) {
+    await editarFilaPlan(actor, {
+      id,
+      ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.fechaInicio !== undefined ? { fechaInicio: input.fechaInicio } : {}),
+      ...(input.fechaFin !== undefined ? { fechaFin: input.fechaFin } : {}),
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    })
+  }
+}
+
+export async function deshacerAlta(actor: Actor, id: string) {
+  const tarea = await prisma.tarea.findUnique({ where: { id }, include: { project: true } })
+  if (!tarea?.projectId || !tarea.project) throw new DomainError("La actividad no está en el plan.")
+  if (tarea.createdById !== actor.id) throw new PermisoDenegado("Solo puede deshacer una actividad que acaba de agregar.")
+  await proyectoVisible(actor, tarea.projectId)
+  await prisma.tarea.delete({ where: { id: tarea.id } })
 }

@@ -117,6 +117,8 @@ function fila(
     estado,
     bloqueo,
     notaRol: "",
+    parentId: null,
+    orden: 0,
     inicio: null,
     fin: null,
     inicioProyecto: null,
@@ -140,5 +142,14 @@ describe("migración de fechas y KPI", () => {
     }
     expect(sql.toLowerCase()).not.toContain("drop ")
     expect(sql.toLowerCase()).not.toContain("update ")
+  })
+
+  it("agrega orden y lo rellena con la fecha de inicio sin borrar filas", () => {
+    const sql = readFileSync("prisma/migrations/20261125233000_tarea_orden/migration.sql", "utf8")
+    expect(sql).toContain('ADD COLUMN "orden"')
+    expect(sql).toContain("fechaInicio")
+    expect(sql).toContain("createdAt")
+    expect(sql.toLowerCase()).not.toContain("drop ")
+    expect(sql.toLowerCase()).not.toContain("delete ")
   })
 })
