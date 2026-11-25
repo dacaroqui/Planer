@@ -1,4 +1,4 @@
-import { ESTADO_TAREA_LABEL, filtrarPlan, textoFechas } from "@/lib/plan-trabajo"
+import { ESTADO_TAREA_LABEL, filtrarPlan, textoFecha, textoKpi } from "@/lib/plan-trabajo"
 import { filasExportables, libroXlsx } from "@/lib/xlsx-minimo"
 import { listarPlan } from "@/server/plan-trabajo"
 import { requireActor } from "@/server/session"
@@ -23,7 +23,11 @@ export async function GET(request: Request) {
     participantes: fila.participantes,
     estado: ESTADO_TAREA_LABEL[fila.estado],
     bloqueo: fila.bloqueo,
-    fechas: textoFechas(fila),
+    inicio: textoFecha(fila.inicio, fila.inicioProyecto),
+    fin: textoFecha(fila.fin, fila.finProyecto),
+    horasEstimadas: fila.horasEstimadas == null ? "" : String(fila.horasEstimadas),
+    horasReales: fila.horasReales == null ? "" : String(fila.horasReales),
+    kpi: textoKpi(fila),
   }))))
   return new Response(new Uint8Array(libro), {
     headers: {

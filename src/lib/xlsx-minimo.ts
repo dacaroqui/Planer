@@ -107,9 +107,9 @@ export function libroXlsx(filas: string[][]) {
   ])
 }
 
-export function filasExportables(filas: { proyecto: string; area: string; actividad: string; responsable: string; participantes: string[]; estado: string; bloqueo: string; fechas: string }[]) {
+export function filasExportables(filas: { proyecto: string; area: string; actividad: string; responsable: string; participantes: string[]; estado: string; bloqueo: string; inicio: string; fin: string; horasEstimadas: string; horasReales: string; kpi: string }[]) {
   return [
-    ["Proyecto", "Área", "Actividad", "Responsable", "Participantes", "Estado", "Bloqueo", "Fechas"],
-    ...filas.map((fila) => [fila.proyecto, fila.area, fila.actividad, fila.responsable, fila.participantes.join(", "), fila.estado, fila.bloqueo, fila.fechas]),
+    ["Proyecto", "Área", "Actividad", "Responsable", "Participantes", "Estado", "Bloqueo", "Inicio", "Fin", "Horas est.", "Horas reales", "KPI"],
+    ...filas.map((fila) => [fila.proyecto, fila.area, fila.actividad, fila.responsable, fila.participantes.join(", "), fila.estado, fila.bloqueo, fila.inicio, fila.fin, fila.horasEstimadas, fila.horasReales, fila.kpi]),
   ]
 }

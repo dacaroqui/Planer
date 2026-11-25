@@ -212,6 +212,7 @@ model Tarea {
   assigneeId  String?
   assignee    User?       @relation("TaskAssignee", fields: [assigneeId], references: [id])
   dueDate     DateTime?
+  fechaInicio DateTime?
   status      EstadoTarea @default(PENDIENTE)
   requestId   String?
   request     Request?    @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -225,6 +226,10 @@ model Tarea {
   completedAt     DateTime?
   horasEstimadas  Decimal?    @db.Decimal(8, 2)
   horasReales     Decimal?    @db.Decimal(8, 2)
+  kpiNombre       String?
+  kpiMeta         Decimal?    @db.Decimal(12, 2)
+  kpiUnidad       String?
+  kpiActual       Decimal?    @db.Decimal(12, 2)
   experimentoId   String?
   experimento     GrowthExperimento? @relation(fields: [experimentoId], references: [id], onDelete: SetNull)
   participantes   String?

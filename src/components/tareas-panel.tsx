@@ -18,10 +18,15 @@ export type TareaVista = {
   title: string
   status: "PENDIENTE" | "EN_CURSO" | "HECHA"
   dueDate: string | null
+  fechaInicio?: string | null
   assignee: string
   vencida: boolean
   horasEstimadas?: number | null
   horasReales?: number | null
+  kpiNombre?: string | null
+  kpiMeta?: number | null
+  kpiUnidad?: string | null
+  kpiActual?: number | null
 }
 
 const ESTADOS = [
@@ -103,7 +108,12 @@ export function TareasPanel({
           <div className="grid gap-2 sm:grid-cols-3">
             <Elegir ariaLabel="Estado" value={status} onValueChange={(valor) => setStatus(valor as typeof status)} opciones={ESTADOS.map((item) => ({ value: item.value, label: item.label }))} />
             <Elegir ariaLabel="Responsable" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin responsable" opciones={[{ value: "", label: "Sin responsable" }, ...agentes.map((agente) => ({ value: agente.id, label: agente.name, iniciales: iniciales(agente.name), grupo: agente.grupo }))]} />
-            <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" />
+            <Input name="fechaInicio" type="date" lang="es-CO" aria-label="Fecha de inicio" />
+            <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha de fin" />
+            <Input name="horasEstimadas" inputMode="decimal" aria-label="Horas estimadas" placeholder="Horas estimadas" />
+            <Input name="kpiNombre" aria-label="Nombre del KPI" placeholder="KPI (opcional)" />
+            <Input name="kpiMeta" inputMode="decimal" aria-label="Meta del KPI" placeholder="Meta" />
+            <Input name="kpiUnidad" aria-label="Unidad del KPI" placeholder="%, videos, leads" />
           </div>
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={pending}>Agregar tarea</Button>
@@ -192,7 +202,10 @@ function FilaTarea({
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Avatar nombre={tarea.assignee === "Sin responsable" ? "?" : tarea.assignee} />
         <span>{tarea.assignee}</span>
-        <span>{tarea.dueDate ? `Fecha ${tarea.dueDate}` : "Sin fecha"}</span>
+        <span>{tarea.fechaInicio ? `Inicio ${tarea.fechaInicio}` : "Sin inicio"}</span>
+        <span>{tarea.dueDate ? `Fin ${tarea.dueDate}` : "Sin fin"}</span>
+        <span>{tarea.horasEstimadas != null ? `${tarea.horasEstimadas} h est.` : "Sin horas"}</span>
+        {tarea.kpiNombre ? <span>{tarea.kpiActual ?? "—"} / {tarea.kpiMeta ?? "—"} {tarea.kpiUnidad}</span> : null}
         {tarea.vencida ? <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">Vencida</span> : null}
         {puedeEliminar ? <EliminarTarea id={tarea.id} title={tarea.title} menu /> : null}
       </p>

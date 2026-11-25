@@ -62,6 +62,10 @@ export function puedeEditarPlan(actor: Pick<Actor, "active" | "isAdmin" | "role"
   return rolEn(actor as Actor, team) === "LIDER"
 }
 
+export function puedeRegistrarAvance(actorId: string, responsableId: string | null, puedeEditar: boolean) {
+  return Boolean(responsableId) && responsableId === actorId && !puedeEditar
+}
+
 export function transicionTareaValida(desde: EstadoTareaPlan, hacia: EstadoTareaPlan) {
   if (desde === hacia) return true
   return SIGUIENTE[desde].includes(hacia)
@@ -84,10 +88,18 @@ export type FilaPlan = {
   estado: EstadoTareaPlan
   bloqueo: string
   notaRol: string
-  fecha: string | null
-  fechaInicio: string | null
-  fechaFin: string | null
+  inicio: string | null
+  fin: string | null
+  inicioProyecto: string | null
+  finProyecto: string | null
+  horasEstimadas: number | null
+  horasReales: number | null
+  kpiNombre: string
+  kpiMeta: number | null
+  kpiUnidad: string
+  kpiActual: number | null
   puedeEditar: boolean
+  puedeRegistrar: boolean
 }
 
 export function etiquetaArea(team: string | null, description = "") {
@@ -105,6 +117,7 @@ export function presentarTarea(input: {
   notaRol: string | null
   status: EstadoTareaPlan
   dueDate: Date | null
+  fechaInicio: Date | null
   assigneeId: string | null
   assigneeName: string | null
   proyectoId: string
@@ -113,12 +126,20 @@ export function presentarTarea(input: {
   description?: string
   startsAt?: Date | null
   targetAt?: Date | null
+  horasEstimadas?: { toString(): string } | number | null
+  horasReales?: { toString(): string } | number | null
+  kpiNombre?: string | null
+  kpiMeta?: { toString(): string } | number | null
+  kpiUnidad?: string | null
+  kpiActual?: { toString(): string } | number | null
   puedeEditar: boolean
+  puedeRegistrar: boolean
 }): FilaPlan {
   const parsed = parsearTituloPlan(input.title)
   const guardados = input.participantes ? partirParticipantes(input.participantes) : []
   const delRol = partirParticipantes(input.notaRol || parsed.notaRol)
   const fecha = (valor: Date | null | undefined) => (valor ? valor.toISOString().slice(0, 10) : null)
+  const cantidad = (valor: { toString(): string } | number | null | undefined) => (valor == null ? null : Number(valor))
   return {
     id: input.id,
     proyectoId: input.proyectoId,
@@ -132,10 +153,37 @@ export function presentarTarea(input: {
     estado: input.status,
     bloqueo: input.bloqueo?.trim() || parsed.bloqueo,
     notaRol: input.notaRol?.trim() || parsed.notaRol,
-    fecha: fecha(input.dueDate),
-    fechaInicio: fecha(input.startsAt),
-    fechaFin: fecha(input.targetAt),
+    inicio: fecha(input.fechaInicio),
+    fin: fecha(input.dueDate),
+    inicioProyecto: fecha(input.startsAt),
+    finProyecto: fecha(input.targetAt),
+    horasEstimadas: cantidad(input.horasEstimadas),
+    horasReales: cantidad(input.horasReales),
+    kpiNombre: input.kpiNombre?.trim() || "",
+    kpiMeta: cantidad(input.kpiMeta),
+    kpiUnidad: input.kpiUnidad?.trim() || "",
+    kpiActual: cantidad(input.kpiActual),
     puedeEditar: input.puedeEditar,
+    puedeRegistrar: input.puedeRegistrar,
+  }
+}
+
+export function textoKpi(fila: Pick<FilaPlan, "kpiNombre" | "kpiActual" | "kpiMeta" | "kpiUnidad">) {
+  if (!fila.kpiNombre && fila.kpiActual == null && fila.kpiMeta == null) return ""
+  const actual = fila.kpiActual == null ? "—" : String(fila.kpiActual)
+  const meta = fila.kpiMeta == null ? "—" : String(fila.kpiMeta)
+  return `${actual} / ${meta}${fila.kpiUnidad ? ` ${fila.kpiUnidad}` : ""}`
+}
+
+export function avanceKpi(actual: number | null, meta: number | null) {
+  if (actual == null || meta == null || meta <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((actual / meta) * 100)))
+}
+
+export function sumarHoras(filas: Pick<FilaPlan, "horasEstimadas" | "horasReales">[]) {
+  return {
+    estimadas: filas.reduce((total, fila) => total + (fila.horasEstimadas ?? 0), 0),
+    reales: filas.reduce((total, fila) => total + (fila.horasReales ?? 0), 0),
   }
 }
 
@@ -179,10 +227,8 @@ export function resumenEstados(filas: FilaPlan[]) {
   }))
 }
 
-export function textoFechas(fila: Pick<FilaPlan, "fecha" | "fechaInicio" | "fechaFin">) {
-  if (fila.fecha) return fila.fecha
-  if (fila.fechaInicio && fila.fechaFin) return `${fila.fechaInicio} a ${fila.fechaFin}`
-  return "Sin fecha"
+export function textoFecha(propia: string | null, respaldo: string | null) {
+  return propia || respaldo || ""
 }
 
 export function areasDelPlan(filas: FilaPlan[]) {
