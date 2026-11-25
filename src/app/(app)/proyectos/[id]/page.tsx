@@ -67,7 +67,14 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
               title: tarea.title,
               status: tarea.status,
               dueDate: tarea.dueDate ? formatDate(tarea.dueDate) : null,
+              fechaInicio: tarea.fechaInicio ? formatDate(tarea.fechaInicio) : null,
               assignee: tarea.assignee?.name ?? "Sin responsable",
+              horasEstimadas: tarea.horasEstimadas == null ? null : Number(tarea.horasEstimadas),
+              horasReales: tarea.horasReales == null ? null : Number(tarea.horasReales),
+              kpiNombre: tarea.kpiNombre,
+              kpiMeta: tarea.kpiMeta == null ? null : Number(tarea.kpiMeta),
+              kpiUnidad: tarea.kpiUnidad,
+              kpiActual: tarea.kpiActual == null ? null : Number(tarea.kpiActual),
               vencida: tareaVencida(tarea),
             }))}
           />

@@ -164,7 +164,15 @@ async function complementar() {
   }
   await prisma.tarea.updateMany({
     where: { title: { startsWith: "Establecer investigación" }, assigneeId: null, project: { description: { contains: MARCA } } },
-    data: { assigneeId: admin.id },
+    data: { assigneeId: admin.id, horasEstimadas: 6, horasReales: 2, kpiNombre: "Investigaciones", kpiMeta: 4, kpiActual: 1, kpiUnidad: "piezas" },
+  })
+  await prisma.tarea.updateMany({
+    where: { title: { startsWith: "Parrilla mensual" }, horasEstimadas: null, project: { description: { contains: MARCA } } },
+    data: { horasEstimadas: 8, horasReales: 3, kpiNombre: "Piezas publicadas", kpiMeta: 4, kpiActual: 1, kpiUnidad: "videos" },
+  })
+  await prisma.tarea.updateMany({
+    where: { title: { startsWith: "Creación de plan de contenidos" }, horasEstimadas: null, project: { description: { contains: MARCA } } },
+    data: { horasEstimadas: 10, kpiNombre: "Guiones", kpiMeta: 5, kpiActual: 2, kpiUnidad: "%" },
   })
 }
 

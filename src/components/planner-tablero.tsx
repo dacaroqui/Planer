@@ -39,6 +39,12 @@ export type TareaPlanner = {
   assignee: string
   assigneeId: string
   dueDate: string | null
+  fechaInicio?: string | null
+  horasEstimadas?: number | null
+  kpiNombre?: string | null
+  kpiMeta?: number | null
+  kpiUnidad?: string | null
+  kpiActual?: number | null
   vencida: boolean
   porcentaje: number
   hechas: number
@@ -314,7 +320,12 @@ export function PlannerVista({
             </label>
             <Elegir ariaLabel="Área de la tarea" value={areaNueva} onValueChange={(valor) => { setAreaNueva(valor as TeamName); setResponsableNuevo("") }} placeholder="Área" opciones={[{ value: "", label: "Área" }, ...TEAMS.map((equipo) => ({ value: equipo, label: TEAM_LABEL[equipo] }))]} />
             <Elegir name="assigneeId" ariaLabel="Responsable de la tarea" value={responsableNuevo} onValueChange={setResponsableNuevo} placeholder="Responsable" opciones={[{ value: "", label: "Sin responsable" }, ...responsables.filter((item) => !areaNueva || item.grupo === "Líderes" || item.grupo === TEAM_LABEL[areaNueva] || item.grupo === "Cualquier área" || !item.grupo).map((item) => ({ value: item.id, label: item.name, grupo: item.grupo }))]} />
-            <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" min={new Date().toISOString().slice(0, 10)} />
+            <Input name="fechaInicio" type="date" lang="es-CO" aria-label="Fecha de inicio" />
+            <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha de fin" min={new Date().toISOString().slice(0, 10)} />
+            <Input name="horasEstimadas" inputMode="decimal" aria-label="Horas estimadas" placeholder="Horas estimadas" />
+            <Input name="kpiNombre" aria-label="Nombre del KPI" placeholder="KPI (opcional)" />
+            <Input name="kpiMeta" inputMode="decimal" aria-label="Meta del KPI" placeholder="Meta" />
+            <Input name="kpiUnidad" aria-label="Unidad del KPI" placeholder="%, videos, leads" />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCrear(null)} disabled={pending}>Cancelar</Button>
               <Button type="submit" disabled={pending}>Crear tarea</Button>
@@ -342,7 +353,13 @@ export function PlannerVista({
                   <option value="">Sin responsable</option>
                   {responsables.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
-                <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha límite" defaultValue={editando.dueDate ?? ""} />
+                <Input name="fechaInicio" type="date" lang="es-CO" aria-label="Fecha de inicio" defaultValue={editando.fechaInicio ?? ""} />
+                <Input name="dueDate" type="date" lang="es-CO" aria-label="Fecha de fin" defaultValue={editando.dueDate ?? ""} />
+                <Input name="horasEstimadas" inputMode="decimal" aria-label="Horas estimadas" defaultValue={editando.horasEstimadas ?? ""} placeholder="Horas estimadas" />
+                <Input name="kpiNombre" aria-label="Nombre del KPI" defaultValue={editando.kpiNombre ?? ""} placeholder="KPI (opcional)" />
+                <Input name="kpiMeta" inputMode="decimal" aria-label="Meta del KPI" defaultValue={editando.kpiMeta ?? ""} placeholder="Meta" />
+                <Input name="kpiUnidad" aria-label="Unidad del KPI" defaultValue={editando.kpiUnidad ?? ""} placeholder="%, videos, leads" />
+                <Input name="kpiActual" inputMode="decimal" aria-label="Valor actual del KPI" defaultValue={editando.kpiActual ?? ""} placeholder="Actual" />
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setEditId(null)} disabled={pending}>Cancelar</Button>
                   <Button type="submit" disabled={pending}>Guardar</Button>

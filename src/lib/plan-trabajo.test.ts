@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { filtrarPlan, parsearTituloPlan, presentarTarea, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
 import { filasExportables, libroXlsx } from "@/lib/xlsx-minimo"
@@ -23,7 +24,9 @@ describe("plan de trabajo", () => {
       proyecto: "Escuela Cifes",
       team: "MARKETING" as const,
       description: "Área: Marketing",
+      fechaInicio: null,
       puedeEditar: false,
+      puedeRegistrar: false,
     }
     const desdeTitulo = presentarTarea({
       ...base,
@@ -75,12 +78,18 @@ describe("plan de trabajo", () => {
       participantes: ["Valeria"],
       estado: "Pendiente",
       bloqueo: "",
-      fechas: "Sin fecha",
+      inicio: "2026-11-01",
+      fin: "2026-11-30",
+      horasEstimadas: "8",
+      horasReales: "3",
+      kpi: "1 / 4 piezas",
     }]))
     const texto = libro.toString("utf8")
     expect(libro.subarray(0, 2).toString()).toBe("PK")
     expect(texto).toContain("Parrilla mensual")
     expect(texto).toContain("Participantes")
+    expect(texto).toContain("Horas est.")
+    expect(texto).toContain("1 / 4 piezas")
   })
 })
 
@@ -108,9 +117,28 @@ function fila(
     estado,
     bloqueo,
     notaRol: "",
-    fecha: null,
-    fechaInicio: null,
-    fechaFin: null,
+    inicio: null,
+    fin: null,
+    inicioProyecto: null,
+    finProyecto: null,
+    horasEstimadas: null,
+    horasReales: null,
+    kpiNombre: "",
+    kpiMeta: null,
+    kpiUnidad: "",
+    kpiActual: null,
     puedeEditar: false,
+    puedeRegistrar: false,
   }
 }
+
+describe("migración de fechas y KPI", () => {
+  it("solo agrega columnas opcionales", () => {
+    const sql = readFileSync("prisma/migrations/20261125190000_tarea_fechas_kpi/migration.sql", "utf8")
+    for (const columna of ["fechaInicio", "kpiNombre", "kpiMeta", "kpiUnidad", "kpiActual"]) {
+      expect(sql).toContain(`ADD COLUMN "${columna}"`)
+    }
+    expect(sql.toLowerCase()).not.toContain("drop ")
+    expect(sql.toLowerCase()).not.toContain("update ")
+  })
+})

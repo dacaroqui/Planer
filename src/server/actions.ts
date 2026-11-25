@@ -801,6 +801,11 @@ export async function guardarTareaAction(formData: FormData): Promise<ActionResu
       parentId: opcional("parentId"),
       horasEstimadas: formData.has("horasEstimadas") ? String(formData.get("horasEstimadas") || "") : undefined,
       horasReales: formData.has("horasReales") ? String(formData.get("horasReales") || "") : undefined,
+      fechaInicio: opcional("fechaInicio"),
+      kpiNombre: opcional("kpiNombre"),
+      kpiMeta: opcional("kpiMeta"),
+      kpiUnidad: opcional("kpiUnidad"),
+      kpiActual: opcional("kpiActual"),
     })
   } catch (error) {
     return fallo(error)

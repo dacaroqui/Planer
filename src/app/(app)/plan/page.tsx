@@ -1,16 +1,22 @@
 import { ClipboardListIcon } from "lucide-react"
 import { PlanTrabajo } from "@/components/plan-trabajo"
+import { esEspacio, TEAMS, TEAM_LABEL } from "@/lib/domain"
+import { etiquetaArea } from "@/lib/plan-trabajo"
+import { esAdmin } from "@/lib/permissions"
+import { prisma } from "@/lib/prisma"
 import { listarProyectos } from "@/server/proyectos"
 import { listarPlan, responsablesDeArea } from "@/server/plan-trabajo"
 import { requireActor } from "@/server/session"
 
 export default async function PlanPage() {
   const actor = await requireActor()
-  const [proyectos, filas, gente] = await Promise.all([
+  const [proyectos, filas, gente, empresas] = await Promise.all([
     listarProyectos(actor),
     listarPlan(actor),
     responsablesDeArea(null),
+    prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
   ])
+  const empresa = empresas.find((item) => esEspacio(item.name)) ?? empresas[0]
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
@@ -21,13 +27,23 @@ export default async function PlanPage() {
         </div>
       </div>
       <PlanTrabajo
-        hayProyectos={proyectos.length > 0}
         filas={filas}
+        proyectos={proyectos.map((item) => ({
+          id: item.id,
+          name: item.name,
+          team: item.team,
+          area: etiquetaArea(item.team, item.description),
+          inicio: item.startsAt.toISOString().slice(0, 10),
+          fin: item.targetAt.toISOString().slice(0, 10),
+        }))}
         responsables={gente.map((persona) => ({
           id: persona.id,
           name: persona.name,
           teams: persona.areaRoles.map((rol) => rol.team),
         }))}
+        esAdmin={esAdmin(actor)}
+        empresaId={empresa?.id ?? ""}
+        equipos={TEAMS.map((team) => ({ value: team, label: TEAM_LABEL[team] }))}
       />
     </div>
   )

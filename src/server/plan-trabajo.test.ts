@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/prisma"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { toActor } from "@/lib/actor"
-import { editarFilaPlan, listarPlan } from "@/server/plan-trabajo"
+import { crearActividadPlan, editarFilaPlan, listarPlan } from "@/server/plan-trabajo"
 
 const SUFIJO = ".plan@cifes.edu.co"
 
@@ -24,6 +24,7 @@ async function persona(nombre: string, rol: "LIDER" | "AGENTE" | "ADMIN", team: 
 beforeEach(async () => {
   await prisma.notification.deleteMany({ where: { user: { email: { endsWith: SUFIJO } } } })
   await prisma.tarea.deleteMany({ where: { createdBy: { email: { endsWith: SUFIJO } } } })
+  await prisma.request.deleteMany({ where: { requester: { email: { endsWith: SUFIJO } } } })
   await prisma.proyecto.deleteMany({ where: { leader: { email: { endsWith: SUFIJO } } } })
   await prisma.areaRole.deleteMany({ where: { user: { email: { endsWith: SUFIJO } } } })
   await prisma.user.deleteMany({ where: { email: { endsWith: SUFIJO } } })
@@ -99,5 +100,91 @@ describe("permisos del plan de trabajo", () => {
     const aviso = await prisma.notification.findFirst({ where: { userId: agente.id, subject: { contains: "se te asignó" } } })
     expect(aviso?.subject).toContain("Crear la pauta")
     expect(aviso?.href).toBe("/planner")
+  })
+
+  it("crea la actividad desde el plan, avisa al responsable y deja el KPI", async () => {
+    const lider = await persona("Líder Crea", "LIDER")
+    const agente = await persona("Agente Crea", "AGENTE")
+    const empresa = await prisma.empresa.create({ data: { name: `Empresa plan crea ${Date.now()}` } })
+    const proyecto = await prisma.proyecto.create({
+      data: {
+        name: "Plan con KPI",
+        team: "MARKETING",
+        empresaId: empresa.id,
+        leaderId: lider.id,
+        startsAt: new Date("2026-11-01"),
+        targetAt: new Date("2026-11-30"),
+      },
+    })
+    const creada = await crearActividadPlan(lider.actor, {
+      proyectoId: proyecto.id,
+      titulo: "Publicar la parrilla",
+      assigneeId: agente.id,
+      horasEstimadas: "6",
+      kpiNombre: "Piezas",
+      kpiMeta: "4",
+      kpiUnidad: "videos",
+      kpiActual: "1",
+      fechaInicio: "2026-11-02",
+      fechaFin: "2026-11-20",
+    })
+    const fila = await prisma.tarea.findUniqueOrThrow({ where: { id: creada.id } })
+    expect(fila.assigneeId).toBe(agente.id)
+    expect(Number(fila.horasEstimadas)).toBe(6)
+    expect(fila.kpiNombre).toBe("Piezas")
+    expect(Number(fila.kpiMeta)).toBe(4)
+    expect(fila.fechaInicio).toBeTruthy()
+    expect(await prisma.notification.findFirst({ where: { userId: agente.id, subject: { contains: "se te asignó" } } })).toBeTruthy()
+    await editarFilaPlan(agente.actor, { id: creada.id, soloAvance: true, horasReales: "2", kpiActual: "3" })
+    const avance = await prisma.tarea.findUniqueOrThrow({ where: { id: creada.id } })
+    expect(Number(avance.horasReales)).toBe(2)
+    expect(Number(avance.kpiActual)).toBe(3)
+    await expect(editarFilaPlan(agente.actor, { id: creada.id, status: "EN_CURSO" })).rejects.toBeInstanceOf(PermisoDenegado)
+  })
+
+  it("quien no lidera crea la actividad sin responsable y avisa al líder", async () => {
+    const lider = await persona("Líder Aviso Plan", "LIDER")
+    const agente = await persona("Agente Aviso Plan", "AGENTE")
+    const empresa = await prisma.empresa.create({ data: { name: `Empresa plan aviso ${Date.now()}` } })
+    const tipo = await prisma.requestType.findFirst({ where: { team: "MARKETING" } })
+      ?? await prisma.requestType.create({ data: { team: "MARKETING", name: `Plan ${Date.now()}`, description: "Tipo de prueba del plan" } })
+    const proyecto = await prisma.proyecto.create({
+      data: {
+        name: "Plan del agente",
+        team: "MARKETING",
+        empresaId: empresa.id,
+        leaderId: lider.id,
+        startsAt: new Date("2026-11-01"),
+        targetAt: new Date("2026-11-30"),
+      },
+    })
+    await prisma.request.create({
+      data: {
+        code: `MKT-PLAN-${Date.now()}`,
+        title: "Caso visible del plan",
+        description: "Sirve para que el agente vea el proyecto.",
+        brand: "CIFES",
+        empresaId: empresa.id,
+        projectId: proyecto.id,
+        priority: "MEDIA",
+        prioritySuggested: "MEDIA",
+        team: "MARKETING",
+        status: "NUEVO",
+        typeId: tipo.id,
+        areaId: agente.actor.areaId,
+        requesterId: agente.id,
+        slaStartedAt: new Date(),
+        slaTargetMinutes: 60,
+      },
+    })
+    const creada = await crearActividadPlan(agente.actor, {
+      proyectoId: proyecto.id,
+      titulo: "Grabar el aula",
+      assigneeId: lider.id,
+    })
+    const fila = await prisma.tarea.findUniqueOrThrow({ where: { id: creada.id } })
+    expect(fila.assigneeId).toBeNull()
+    const aviso = await prisma.notification.findFirst({ where: { userId: lider.id, subject: { contains: "sin responsable" } } })
+    expect(aviso?.subject).toContain("Grabar el aula")
   })
 })

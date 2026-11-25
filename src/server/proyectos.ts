@@ -82,6 +82,7 @@ export async function guardarProyecto(
     startsAt: string
     targetAt: string
     status: "PLANIFICADO" | "EN_CURSO" | "EN_PAUSA" | "CERRADO"
+    team?: TeamName | null
   },
 ) {
   if (!puedeCrearProyecto(actor)) throw new DomainError("Solo un líder o el administrador crea proyectos.")
@@ -97,6 +98,7 @@ export async function guardarProyecto(
     startsAt: fecha(input.startsAt),
     targetAt: fecha(input.targetAt),
     status: input.status,
+    ...(input.team !== undefined ? { team: input.team } : {}),
   }
   if (data.name.length < 3) throw new DomainError("El nombre del proyecto es muy corto.")
   if (data.targetAt < data.startsAt) throw new DomainError("La fecha objetivo no puede ser anterior al inicio.")
@@ -133,6 +135,14 @@ export async function guardarTarea(
     parentId?: string | null
     horasEstimadas?: string | null
     horasReales?: string | null
+    fechaInicio?: string | null
+    kpiNombre?: string | null
+    kpiMeta?: string | null
+    kpiUnidad?: string | null
+    kpiActual?: string | null
+    participantes?: string | null
+    bloqueo?: string | null
+    desdePlan?: boolean
   },
 ) {
   const title = input.title.trim()
@@ -149,9 +159,9 @@ export async function guardarTarea(
     if (!projectId) projectId = padre.projectId
   }
   const { request, project } = await contextoTarea({ requestId, projectId })
-  const team = request?.team ?? "DESARROLLO"
+  const team = request?.team ?? project?.team ?? "DESARROLLO"
   const puede = request ? puedeGestionarTareas(actor, request.team) : puedeCrearProyecto(actor) || esAdmin(actor)
-  if (!puede && !(request && actor.id === request.requesterId && !input.id)) {
+  if (!input.desdePlan && !puede && !(request && actor.id === request.requesterId && !input.id)) {
     if (!puedeGestionarTareas(actor, team) && !esAdmin(actor)) {
       throw new DomainError("No puede gestionar tareas de esta área.")
     }
@@ -159,7 +169,7 @@ export async function guardarTarea(
   if (request && !puedeGestionarTareas(actor, request.team)) {
     throw new DomainError("Solo el equipo del área gestiona las tareas del requerimiento.")
   }
-  if (!request && !puedeCrearProyecto(actor)) {
+  if (!request && !puedeCrearProyecto(actor) && !input.desdePlan) {
     throw new DomainError("Solo un líder o el administrador crea tareas sueltas del proyecto.")
   }
   const nuevoResponsable = input.assigneeId !== undefined ? (input.assigneeId || null) : (existente?.assigneeId ?? null)
@@ -211,6 +221,13 @@ export async function guardarTarea(
     ...(input.horasReales !== undefined
       ? { horasReales: input.horasReales && Number.isFinite(Number(input.horasReales)) ? Number(input.horasReales) : null }
       : {}),
+    ...(input.fechaInicio !== undefined ? { fechaInicio: input.fechaInicio ? fecha(input.fechaInicio) : null } : {}),
+    ...(input.kpiNombre !== undefined ? { kpiNombre: input.kpiNombre?.trim() || null } : {}),
+    ...(input.kpiUnidad !== undefined ? { kpiUnidad: input.kpiUnidad?.trim() || null } : {}),
+    ...(input.kpiMeta !== undefined ? { kpiMeta: input.kpiMeta && Number.isFinite(Number(input.kpiMeta)) ? Number(input.kpiMeta) : null } : {}),
+    ...(input.kpiActual !== undefined ? { kpiActual: input.kpiActual && Number.isFinite(Number(input.kpiActual)) ? Number(input.kpiActual) : null } : {}),
+    ...(input.participantes !== undefined ? { participantes: input.participantes?.trim() || null } : {}),
+    ...(input.bloqueo !== undefined ? { bloqueo: input.bloqueo?.trim() || null } : {}),
   }
   const tarea = input.id
     ? await prisma.tarea.update({ where: { id: input.id }, data })
