@@ -34,7 +34,7 @@ export function FormularioEmpresa() {
   )
 }
 
-export function FormularioProyecto({ empresas, lideres }: { empresas: { id: string; name: string }[]; lideres: { id: string; name: string }[] }) {
+export function FormularioProyecto({ empresas, lideres, objetivos = [], fases = [] }: { empresas: { id: string; name: string }[]; lideres: { id: string; name: string }[]; objetivos?: { id: string; titulo: string }[]; fases?: string[] }) {
   const router = useRouter()
   const [empresaId, setEmpresaId] = useState(empresas[0]?.id ?? "")
   const [leaderId, setLeaderId] = useState(lideres[0]?.id ?? "")
@@ -74,6 +74,16 @@ export function FormularioProyecto({ empresas, lideres }: { empresas: { id: stri
           <SelectItem value="CERRADO">Cerrado</SelectItem>
         </SelectContent>
       </Select>
+      <Input name="medio" placeholder="Medio o canal" aria-label="Medio o canal" />
+      <select name="fase" aria-label="Fase" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm">
+        <option value="">Fase</option>
+        {fases.map((fase) => <option key={fase} value={fase}>{fase}</option>)}
+      </select>
+      <Input name="costo" inputMode="decimal" placeholder="Costo" aria-label="Costo" />
+      <select name="objetivoId" aria-label="Objetivo" className="h-10 rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm">
+        <option value="">Sin objetivo</option>
+        {objetivos.map((item) => <option key={item.id} value={item.id}>{item.titulo}</option>)}
+      </select>
       <Button type="submit" disabled={pending}>Crear proyecto</Button>
     </form>
   )

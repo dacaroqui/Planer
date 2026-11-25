@@ -83,6 +83,10 @@ export async function guardarProyecto(
     targetAt: string
     status: "PLANIFICADO" | "EN_CURSO" | "EN_PAUSA" | "CERRADO"
     team?: TeamName | null
+    objetivoId?: string | null
+    medio?: string
+    fase?: string
+    costo?: string | null
   },
 ) {
   if (!puedeCrearProyecto(actor)) throw new DomainError("Solo un líder o el administrador crea proyectos.")
@@ -99,6 +103,10 @@ export async function guardarProyecto(
     targetAt: fecha(input.targetAt),
     status: input.status,
     ...(input.team !== undefined ? { team: input.team } : {}),
+    ...(input.objetivoId !== undefined ? { objetivoId: input.objetivoId || null } : {}),
+    ...(input.medio !== undefined ? { medio: input.medio.trim() } : {}),
+    ...(input.fase !== undefined ? { fase: input.fase } : {}),
+    ...(input.costo !== undefined ? { costo: input.costo && Number.isFinite(Number(input.costo)) ? Number(input.costo) : null } : {}),
   }
   if (data.name.length < 3) throw new DomainError("El nombre del proyecto es muy corto.")
   if (data.targetAt < data.startsAt) throw new DomainError("La fecha objetivo no puede ser anterior al inicio.")

@@ -826,6 +826,7 @@ export async function guardarProyectoAction(formData: FormData): Promise<ActionR
   if (status !== "PLANIFICADO" && status !== "EN_CURSO" && status !== "EN_PAUSA" && status !== "CERRADO") {
     return { ok: false, error: "Estado de proyecto no válido." }
   }
+  const equipo = String(formData.get("team") || "")
   try {
     await guardarProyecto(actor, {
       id: String(formData.get("id") || "") || undefined,
@@ -836,6 +837,11 @@ export async function guardarProyectoAction(formData: FormData): Promise<ActionR
       startsAt: String(formData.get("startsAt") || ""),
       targetAt: String(formData.get("targetAt") || ""),
       status,
+      ...(formData.has("objetivoId") ? { objetivoId: String(formData.get("objetivoId") || "") || null } : {}),
+      ...(formData.has("medio") ? { medio: String(formData.get("medio") || "") } : {}),
+      ...(formData.has("fase") ? { fase: String(formData.get("fase") || "") } : {}),
+      ...(formData.has("costo") ? { costo: String(formData.get("costo") || "") } : {}),
+      ...(formData.has("team") && esTeam(equipo) ? { team: equipo } : {}),
     })
   } catch (error) {
     return fallo(error)

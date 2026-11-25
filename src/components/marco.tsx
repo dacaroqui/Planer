@@ -8,7 +8,9 @@ import {
   HelpCircleIcon,
   ChartColumnIcon,
   ClipboardListIcon,
+  GaugeIcon,
   LayoutDashboardIcon,
+  TargetIcon,
   TrendingUpIcon,
   UsersIcon,
   PanelLeftIcon,
@@ -37,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ROLE_LABEL, esEspacio, type Actor } from "@/lib/domain"
+import { puedeVerMatriz } from "@/lib/objetivos"
 import { cn } from "@/lib/utils"
 
 export type EspacioNav = { id: string; name: string }
@@ -131,6 +134,10 @@ export function Marco({
           {puedeGrowth ? <Enlace href="/growth" activo={path.startsWith("/growth")} etiqueta="Growth" icono={<TrendingUpIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedePlanner ? <Enlace href="/plan" activo={path.startsWith("/plan")} etiqueta="Plan de trabajo" icono={<ClipboardListIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedePlanner ? <Enlace href="/objetivos" activo={path.startsWith("/objetivos")} etiqueta="Objetivos" icono={<TargetIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedePlanner ? <Enlace href="/kpis/areas" activo={path.startsWith("/kpis/areas")} etiqueta="KPIs por área" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedeCola ? <Enlace href="/kpis/personas" activo={path.startsWith("/kpis/personas")} etiqueta="KPIs por persona" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
+          {puedeVerMatriz(actor) ? <Enlace href="/kpis/mios" activo={path.startsWith("/kpis/mios")} etiqueta="Mis KPIs" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeBandeja ? <Enlace href="/bandeja" activo={path.startsWith("/bandeja")} etiqueta="Bandeja de respuesta" icono={<InboxIcon className="size-4" />} compacta={!abierta} /> : null}
           <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
           {puedeCola ? <Enlace href="/cola" activo={path.startsWith("/cola")} etiqueta="Cola de entrada" icono={<FilterIcon className="size-4" />} compacta={!abierta} /> : null}

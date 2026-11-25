@@ -15,4 +15,11 @@ describe("miga del espacio", () => {
     expect(etiquetaMiga("nuevo", 1, ["growth", "nuevo"], "", { nuevo: "Radicar", growth: "Growth" })).toBe("Proponer")
     expect(etiquetaMiga("cmw123", 1, ["growth", "cmw123"], "Facilitar la reprogramación", { growth: "Growth" })).toBe("Facilitar la reprogramación")
   })
+
+  it("nombra el objetivo y el KPI sin mostrar el id ni la miga de radicar", () => {
+    expect(etiquetaMiga("nuevo", 1, ["objetivos", "nuevo"], "", { nuevo: "Radicar" })).toBe("Nuevo objetivo")
+    expect(etiquetaMiga("nuevo", 1, ["kpis", "nuevo"], "", { nuevo: "Radicar" })).toBe("Nuevo KPI")
+    expect(etiquetaMiga("cmw123", 1, ["kpis", "cmw123", "editar"], "", {})).toBe("")
+    expect(etiquetaMiga("editar", 2, ["kpis", "cmw123", "editar"], "", {})).toBe("Editar")
+  })
 })
