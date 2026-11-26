@@ -175,6 +175,7 @@ export async function guardarCeldaAction(input: {
     revalidatePath("/plan")
     revalidatePath("/planner")
     revalidatePath("/proyectos")
+    revalidatePath("/informes")
     return { ok: true, message: "Cambio guardado." }
   } catch (error) {
     return fallo(error)

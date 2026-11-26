@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { filtrarPlan, ordenarKpisDisponibles, parsearTituloPlan, presentarTarea, textoKpi, textoMedidaKpi, totalesPlan, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
+import { alternarHecha, filtrarPlan, ordenarKpisDisponibles, parsearTituloPlan, presentarTarea, textoKpi, textoMedidaKpi, totalesPlan, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
 import { filasExportables, libroXlsx } from "@/lib/xlsx-minimo"
 
 describe("plan de trabajo", () => {
@@ -64,9 +64,14 @@ describe("plan de trabajo", () => {
     expect(filtrarPlan(filas, { sinAsignar: true }).map((item) => item.id)).toEqual(["a", "c"])
     expect(filtrarPlan(filas, { bloqueadas: true }).map((item) => item.id)).toEqual(["b"])
     expect(filtrarPlan(filas, { q: "repo" }).map((item) => item.id)).toEqual(["c"])
-    expect(transicionTareaValida("PENDIENTE", "HECHA")).toBe(false)
+    expect(transicionTareaValida("PENDIENTE", "HECHA")).toBe(true)
     expect(transicionTareaValida("PENDIENTE", "EN_CURSO")).toBe(true)
+    expect(transicionTareaValida("EN_CURSO", "HECHA")).toBe(true)
+    expect(transicionTareaValida("HECHA", "PENDIENTE")).toBe(true)
     expect(transicionTareaValida("HECHA", "EN_CURSO")).toBe(true)
+    expect(alternarHecha("PENDIENTE")).toBe("HECHA")
+    expect(alternarHecha("EN_CURSO")).toBe("HECHA")
+    expect(alternarHecha("HECHA")).toBe("PENDIENTE")
   })
 
   it("arma un xlsx con las mismas columnas", () => {

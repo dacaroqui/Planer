@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
 import Link from "next/link"
-import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, GripVerticalIcon, MoveHorizontalIcon, TargetIcon } from "lucide-react"
+import { CalendarIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, GripVerticalIcon, MoveHorizontalIcon, TargetIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar } from "@/components/iconos-planer"
 import { CUMPLIMIENTO_LABEL, cumplimientoFecha, porcentajeEntregable, porcentajeProyecto } from "@/lib/entregables"
-import { ESTADO_TAREA_LABEL, estadosEditables, ordenarKpisDisponibles, textoKpi as medidaKpi, type FilaPlan } from "@/lib/plan-trabajo"
+import { ESTADO_TAREA_LABEL, ESTADO_TAREA_PUNTO, ESTADOS_TAREA, alternarHecha, ordenarKpisDisponibles, textoKpi as medidaKpi, type FilaPlan } from "@/lib/plan-trabajo"
 import { asignarEntregableAction, crearActividadAction, crearEntregableAction, guardarCeldaAction, moverActividadAction, renombrarEntregableAction, vincularKpiAction } from "@/server/plan-actions"
 
 type ProyectoPlan = { id: string; name: string; team: string | null; area: string; inicio: string; fin: string }
@@ -214,7 +214,24 @@ function Fila({
   const [fecha, setFecha] = useState<"inicio" | "fin" | null>(null)
   const [kpi, setKpi] = useState(false)
   const [titulo, setTitulo] = useState(false)
+  const [estadoAbierto, setEstadoAbierto] = useState(false)
+  const estadoRef = useRef<HTMLSpanElement>(null)
   const [abierta, setAbierta] = useState(hijas.length > 0)
+  useEffect(() => {
+    if (!estadoAbierto) return
+    function fuera(event: MouseEvent) {
+      if (!estadoRef.current?.contains(event.target as Node)) setEstadoAbierto(false)
+    }
+    function tecla(event: KeyboardEvent) {
+      if (event.key === "Escape") setEstadoAbierto(false)
+    }
+    document.addEventListener("mousedown", fuera)
+    document.addEventListener("keydown", tecla)
+    return () => {
+      document.removeEventListener("mousedown", fuera)
+      document.removeEventListener("keydown", tecla)
+    }
+  }, [estadoAbierto])
   const texto = etiquetaKpi(fila)
   const grupos = ordenarKpisDisponibles(fila.kpisDisponibles ?? [], proyecto.name)
   const finEstado = cumplimientoFecha(fila.fin, fila.estado === "HECHA" ? 100 : 0, hoyIso())
@@ -259,18 +276,29 @@ function Fila({
               {abierta ? <ChevronDownIcon className="size-3.5" /> : <ChevronRightIcon className="size-3.5" />}
             </button>
           ) : <span className="w-3.5" />}
+          <button type="button" aria-label={fila.estado === "HECHA" ? `Volver a pendiente ${fila.actividad}` : `Marcar hecha ${fila.actividad}`} aria-pressed={fila.estado === "HECHA"} className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${fila.estado === "HECHA" ? "border-[#16A34A] bg-[#16A34A] text-white" : "border-[#E4E7EC] text-transparent hover:text-[#16A34A]"}`} onClick={() => { const siguiente = alternarHecha(fila.estado); void guardar({ estado: siguiente }, { id: fila.id, status: siguiente }) }}>
+            <CheckIcon className="size-3" />
+          </button>
           {titulo ? (
             <input autoFocus aria-label="Título" defaultValue={fila.actividad} className="h-7 min-w-0 flex-1 rounded border border-[#1658B0] px-1" onBlur={(event) => { setTitulo(false); const valor = event.target.value.trim(); if (valor.length >= 3 && valor !== fila.actividad) void guardar({ actividad: valor }, { id: fila.id, title: valor }) }} />
           ) : (
-            <button type="button" className="min-w-0 flex-1 truncate text-left" title={fila.actividad} onClick={() => fila.puedeEditar && setTitulo(true)}>{fila.actividad}</button>
+            <button type="button" className={`min-w-0 flex-1 truncate text-left ${fila.estado === "HECHA" ? "text-[#98A2B3] line-through" : ""}`} title={fila.actividad} onClick={() => fila.puedeEditar && setTitulo(true)}>{fila.actividad}</button>
           )}
         </span>
         <span title={fila.responsable}><Avatar nombre={fila.responsableId ? fila.responsable : "?"} /></span>
-        <button type="button" className="truncate rounded-full bg-[#E7F0FB] px-1.5 py-0.5 text-[11px] font-medium text-[#1658B0]" title={ESTADO_TAREA_LABEL[fila.estado]} onClick={() => {
-          const opciones = estadosEditables(fila.estado)
-          const siguiente = opciones[1] || opciones[0]
-          if (siguiente) void guardar({ estado: siguiente }, { id: fila.id, status: siguiente })
-        }}>{ESTADO_TAREA_LABEL[fila.estado]}</button>
+        <span ref={estadoRef} className="relative">
+          <button type="button" aria-expanded={estadoAbierto} aria-haspopup="menu" className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium ${fila.estado === "HECHA" ? "bg-emerald-50 text-[#16A34A]" : fila.estado === "EN_CURSO" ? "bg-[#E7F0FB] text-[#1658B0]" : "bg-[#F3F4F6] text-[#3d4a63]"}`} onClick={() => setEstadoAbierto((valor) => !valor)}>{ESTADO_TAREA_LABEL[fila.estado]}</button>
+          {estadoAbierto ? (
+            <span role="menu" aria-label={`Estado de ${fila.actividad}`} className="absolute left-0 z-30 mt-1 grid w-32 rounded-md border border-[#E4E7EC] bg-white p-1 text-xs shadow" onKeyDown={(event) => { if (event.key === "Escape") setEstadoAbierto(false) }}>
+              {ESTADOS_TAREA.map((estado) => (
+                <button type="button" role="menuitem" key={estado} className="flex items-center gap-2 rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => { setEstadoAbierto(false); if (estado !== fila.estado) void guardar({ estado }, { id: fila.id, status: estado }) }}>
+                  <span className={`size-2 rounded-full ${ESTADO_TAREA_PUNTO[estado]}`} />
+                  {ESTADO_TAREA_LABEL[estado]}
+                </button>
+              ))}
+            </span>
+          ) : null}
+        </span>
         <span title={fila.bloqueo || "Sin bloqueo"} className={fila.bloqueo ? "text-red-700" : "text-[#98A2B3]"}>●</span>
         <span className="group relative">
           <button type="button" className="text-[#98A2B3]" aria-label="Inicio" onClick={() => setFecha(fecha === "inicio" ? null : "inicio")}><CalendarIcon className="size-3.5" /></button>

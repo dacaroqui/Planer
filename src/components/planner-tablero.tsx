@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input"
 import { Elegir } from "@/components/ui/elegir"
 import { TEAM_LABEL, TEAMS, type TeamName } from "@/lib/domain"
+import { alternarHecha } from "@/lib/plan-trabajo"
 
 const COLUMNAS = [
   { key: "PENDIENTE", label: "Pendiente", punto: "bg-[#9CA3AF]" },
@@ -256,7 +257,7 @@ export function PlannerVista({
                             <DropdownMenuTrigger className="inline-flex size-7 items-center justify-center rounded-md hover:bg-[#F3F4F6]" aria-label={`Acciones de ${tarea.title}`}>⋯</DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               {puede ? <DropdownMenuItem onSelect={() => setEditId(tarea.id)}>Editar</DropdownMenuItem> : null}
-                              {puede ? <DropdownMenuItem onSelect={() => setConfirma({ id: tarea.id, status: tarea.status === "HECHA" ? "EN_CURSO" : "HECHA", title: tarea.title })}>Mover</DropdownMenuItem> : null}
+                              {puede ? <DropdownMenuItem onSelect={() => setConfirma({ id: tarea.id, status: alternarHecha(tarea.status), title: tarea.title })}>Mover</DropdownMenuItem> : null}
                               {puedeEliminar ? <DropdownMenuItem onSelect={() => setBorrar(tarea)}>Eliminar</DropdownMenuItem> : null}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -370,14 +371,14 @@ export function PlannerVista({
                 {editando.subtareas.length === 0 ? <p className="text-xs text-muted-foreground">Sin lista de verificación.</p> : editando.subtareas.map((sub) => (
                   <div key={sub.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className={sub.status === "HECHA" ? "line-through" : ""}>{sub.title}</span>
-                    {puede && sub.status !== "HECHA" ? (
+                    {puede ? (
                       <form action={(data) => guardar(data)}>
                         <input type="hidden" name="id" value={sub.id} />
                         <input type="hidden" name="title" value={sub.title} />
-                        <input type="hidden" name="status" value="HECHA" />
+                        <input type="hidden" name="status" value={alternarHecha(sub.status)} />
                         <input type="hidden" name="parentId" value={editando.id} />
                         {proyectoId ? <input type="hidden" name="projectId" value={proyectoId} /> : null}
-                        <Button type="submit" size="sm" variant="outline" disabled={pending}>Marcar hecha</Button>
+                        <Button type="submit" size="sm" variant="outline" disabled={pending}>{sub.status === "HECHA" ? "Volver a pendiente" : "Marcar hecha"}</Button>
                       </form>
                     ) : <span className="text-muted-foreground">{sub.status === "HECHA" ? "Hecha" : "Pendiente"}</span>}
                   </div>
