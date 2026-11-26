@@ -6,7 +6,7 @@ import { CalendarIcon, GripVerticalIcon, MoveHorizontalIcon } from "lucide-react
 import { toast } from "sonner"
 import { Avatar } from "@/components/iconos-planer"
 import { CUMPLIMIENTO_LABEL, cumplimientoFecha, porcentajeEntregable, porcentajeProyecto } from "@/lib/entregables"
-import { ESTADO_TAREA_LABEL, estadosEditables, type FilaPlan } from "@/lib/plan-trabajo"
+import { ESTADO_TAREA_LABEL, estadosEditables, textoKpi as medidaKpi, type FilaPlan } from "@/lib/plan-trabajo"
 import { asignarEntregableAction, crearActividadAction, crearEntregableAction, guardarCeldaAction, renombrarEntregableAction, vincularKpiAction } from "@/server/plan-actions"
 
 type ProyectoPlan = { id: string; name: string; team: string | null; area: string; inicio: string; fin: string }
@@ -181,7 +181,12 @@ function Fila({ fila, onCambio }: { fila: FilaPlan; onCambio: Dispatch<SetStateA
   const [kpi, setKpi] = useState(false)
   const [titulo, setTitulo] = useState(false)
   const vinculado = fila.kpisDisponibles?.find((item) => item.id === fila.kpiId)
-  const textoKpi = vinculado?.nombre || fila.kpiNombre || (fila.kpisDisponibles?.[0]?.nombre ? `${fila.kpisDisponibles[0].nombre}${fila.kpisDisponibles.length > 1 ? ` +${fila.kpisDisponibles.length - 1}` : ""}` : "Sin KPI")
+  const medida = vinculado
+    ? medidaKpi({ kpiNombre: vinculado.nombre, kpiActual: vinculado.actual, kpiMeta: vinculado.meta, kpiUnidad: vinculado.unidad })
+    : medidaKpi(fila)
+  const textoKpi = medida.startsWith("Línea base")
+    ? medida
+    : vinculado?.nombre || fila.kpiNombre || (fila.kpisDisponibles?.[0]?.nombre ? `${fila.kpisDisponibles[0].nombre}${fila.kpisDisponibles.length > 1 ? ` +${fila.kpisDisponibles.length - 1}` : ""}` : "Sin KPI")
   const inicioEstado = cumplimientoFecha(fila.inicio || fila.inicioProyecto, fila.estado === "HECHA" ? 100 : 0, hoyIso())
   const finEstado = cumplimientoFecha(fila.fin || fila.finProyecto, fila.estado === "HECHA" ? 100 : 0, hoyIso())
   async function guardar(patch: Partial<FilaPlan>, envio: Parameters<typeof guardarCeldaAction>[0]) {
@@ -219,7 +224,7 @@ function Fila({ fila, onCambio }: { fila: FilaPlan; onCambio: Dispatch<SetStateA
         {kpi ? (
           <select autoFocus aria-label="Elegir KPI" className="absolute right-0 z-20 mt-1 w-44 rounded border border-[#1658B0] bg-white p-1 text-xs" defaultValue={fila.kpiId ?? ""} onChange={(event) => { setKpi(false); const kpiId = event.target.value || null; onCambio((lista) => lista.map((item) => item.id === fila.id ? { ...item, kpiId } : item)); void vincularKpiAction({ id: fila.id, kpiId }).then((resultado) => { if (!resultado.ok) toast.error(resultado.error) }) }} onBlur={() => setKpi(false)}>
             <option value="">Sin KPI</option>
-            {(fila.kpisDisponibles ?? []).map((item) => <option key={item.id} value={item.id}>{item.nombre} · {item.actual ?? "—"}/{item.meta ?? "—"} {item.unidad}</option>)}
+            {(fila.kpisDisponibles ?? []).map((item) => <option key={item.id} value={item.id}>{item.nombre} · {medidaKpi({ kpiNombre: item.nombre, kpiActual: item.actual, kpiMeta: item.meta, kpiUnidad: item.unidad })}</option>)}
           </select>
         ) : null}
       </span>

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { CUMPLIMIENTO_LABEL, cumplimientoFecha, porcentajeEntregable, porcentajeProyecto } from "@/lib/entregables"
 import { META_LABEL } from "@/lib/objetivos"
 import type { InformePdf } from "@/lib/informe-pdf"
-import { etiquetaArea } from "@/lib/plan-trabajo"
+import { etiquetaArea, textoMedidaKpi } from "@/lib/plan-trabajo"
 import { listarProyectos } from "@/server/proyectos"
 import type { Actor } from "@/lib/domain"
 
@@ -68,8 +68,7 @@ export async function armarInforme(actor: Actor, filtros: { semana?: string; are
   const kpis = piezas.flatMap((proyecto) => proyecto.kpis.map((kpi) => ({
     nombre: kpi.nombre,
     ambito: proyecto.nombre,
-    actual: kpi.actual == null ? "—" : String(kpi.actual),
-    meta: kpi.meta == null ? "—" : String(kpi.meta),
+    medida: textoMedidaKpi(kpi.actual == null ? null : Number(kpi.actual), kpi.meta == null ? null : Number(kpi.meta), kpi.unidad),
     estado: kpi.estadoMeta === "EN_LINEA_BASE" ? "En línea base" : META_LABEL[kpi.estadoMeta],
   })))
   return {

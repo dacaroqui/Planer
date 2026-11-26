@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Chispa, SelloBloqueo, TextoKpi } from "@/components/objetivos-ui"
+import { KpiInline } from "@/components/kpi-inline"
+import { Chispa } from "@/components/objetivos-ui"
 import { TEAM_LABEL, puedeEditarArea, puedeVerMatriz } from "@/lib/objetivos"
 import { kpisDeArea } from "@/server/objetivos"
 import { requireActor } from "@/server/session"
@@ -26,11 +27,12 @@ export default async function KpisAreaPage() {
               {panel.kpis.length === 0 ? <li className="text-sm text-muted-foreground">Esta área todavía no tiene KPIs.</li> : panel.kpis.map((kpi) => (
                 <li key={kpi.id} className="rounded-lg border border-[#F0F2F5] p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <TextoKpi nombre={kpi.nombre} actual={kpi.actual} meta={kpi.meta} unidad={kpi.unidad} />
+                    <div className="min-w-0 flex-1">
+                      <KpiInline kpi={{ id: kpi.id, nombre: kpi.nombre, unidad: kpi.unidad, actual: kpi.actual, meta: kpi.meta, estado: kpi.estadoMeta, actividades: kpi._count.tareas, bloqueado: kpi.bloqueado, motivo: kpi.motivoBloqueo }} puedeEditar={puedeEditarArea(actor, panel.area)} puedeMeta={puedeEditarArea(actor, panel.area)} />
+                      <p className="mt-1 text-xs text-muted-foreground">{kpi.objetivoId ? "Del objetivo" : "Del área"} · <Link href={`/kpis/${kpi.id}/editar`} className="text-[#1658B0]">Ficha</Link></p>
+                    </div>
                     <Chispa valores={kpi.tendencia} />
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{kpi.objetivoId ? "Del objetivo" : "Del área"}{puedeEditarArea(actor, panel.area) ? <> · <Link href={`/kpis/${kpi.id}/editar`} className="text-[#1658B0]">Editar</Link></> : null}</p>
-                  <SelloBloqueo bloqueado={kpi.bloqueado} motivo={kpi.motivoBloqueo} />
                 </li>
               ))}
             </ul>

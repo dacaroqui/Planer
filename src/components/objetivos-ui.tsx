@@ -1,4 +1,5 @@
 import { TIPO_KPI_LABEL } from "@/lib/objetivos"
+import { textoMedidaKpi } from "@/lib/plan-trabajo"
 
 export function BarraMeta({ actual, meta }: { actual: number | null; meta: number | null }) {
   const avance = meta ? Math.max(0, Math.min(100, Math.round(((actual ?? 0) / meta) * 100))) : 0
@@ -30,7 +31,7 @@ export function TextoKpi({ nombre, actual, meta, unidad, tipo }: { nombre: strin
   return (
     <div className="min-w-40">
       <p className="font-medium">{nombre} {tipo ? <span className="text-xs text-muted-foreground">{TIPO_KPI_LABEL[tipo as "PRINCIPAL"] || tipo}</span> : null}</p>
-      <p className="text-xs text-[#3d4a63]">{actual ?? "—"} / {meta ?? "—"} {unidad}</p>
+      <p className="text-xs text-[#3d4a63]">{textoMedidaKpi(actual, meta, unidad)}</p>
       <BarraMeta actual={actual} meta={meta} />
     </div>
   )

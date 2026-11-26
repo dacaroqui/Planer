@@ -183,11 +183,16 @@ export function presentarTarea(input: {
   }
 }
 
+export function textoMedidaKpi(actual: number | null, meta: number | null, unidad: string) {
+  if (actual == null && meta == null) return unidad ? `Línea base · ${unidad}` : "Línea base"
+  const textoActual = actual == null ? "—" : String(actual)
+  const textoMeta = meta == null ? "—" : String(meta)
+  return `${textoActual} / ${textoMeta}${unidad ? ` ${unidad}` : ""}`
+}
+
 export function textoKpi(fila: Pick<FilaPlan, "kpiNombre" | "kpiActual" | "kpiMeta" | "kpiUnidad">) {
   if (!fila.kpiNombre && fila.kpiActual == null && fila.kpiMeta == null) return ""
-  const actual = fila.kpiActual == null ? "—" : String(fila.kpiActual)
-  const meta = fila.kpiMeta == null ? "—" : String(fila.kpiMeta)
-  return `${actual} / ${meta}${fila.kpiUnidad ? ` ${fila.kpiUnidad}` : ""}`
+  return textoMedidaKpi(fila.kpiActual, fila.kpiMeta, fila.kpiUnidad)
 }
 
 export function avanceKpi(actual: number | null, meta: number | null) {
