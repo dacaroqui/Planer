@@ -1,21 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { toast } from "sonner"
-import { SelloBloqueo, TextoKpi, claseTope } from "@/components/objetivos-ui"
+import { EditorLinea } from "@/components/editor-linea"
+import { AltaKpi, KpiInline, type KpiLinea } from "@/components/kpi-inline"
+import { claseTope } from "@/components/objetivos-ui"
 import { MARCA_LABEL, OBJETIVO_LABEL, TEAM_LABEL } from "@/lib/objetivos"
-import { ajustarKpiAction, asignarProyectoAction, moverProyectoObjetivoAction } from "@/server/objetivos-actions"
+import { asignarProyectoAction, crearKpiObjetivoAction, editarCampoObjetivoAction, moverProyectoObjetivoAction } from "@/server/objetivos-actions"
 
 type Proyecto = { id: string; name: string; fase: string; medio: string; horas: number; costo: number; actividades: { id: string; titulo: string; responsable: string; horas: number }[] }
-type Kpi = { id: string; nombre: string; actual: number | null; meta: number | null; unidad: string; bloqueado: boolean; motivo: string }
+type Kpi = KpiLinea & { bloqueado: boolean; motivo: string }
+type Persona = { id: string; name: string }
 type Objetivo = {
   id: string
   marca: string
   titulo: string
   area: string
   dueno: string
+  duenoId: string
+  periodoInicio: string
+  periodoFin: string
   estado: string
   horas: number
   costo: number
@@ -28,7 +35,7 @@ type Objetivo = {
 type Fase = { id: string; team: string; nombre: string }
 type ProyectoLibre = { id: string; name: string; team: string | null }
 
-export function ArbolObjetivos({ objetivos, fases, proyectos, puedeMeta }: { objetivos: Objetivo[]; fases: Fase[]; proyectos: ProyectoLibre[]; puedeMeta: boolean }) {
+export function ArbolObjetivos({ objetivos, fases, proyectos, personas, puedeMeta }: { objetivos: Objetivo[]; fases: Fase[]; proyectos: ProyectoLibre[]; personas: Persona[]; puedeMeta: boolean }) {
   const [arrastre, setArrastre] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const porMarca = new Map<string, Objetivo[]>()
@@ -54,7 +61,7 @@ export function ArbolObjetivos({ objetivos, fases, proyectos, puedeMeta }: { obj
         <section key={marca} className="rounded-xl border border-[#E4E7EC] bg-white">
           <h2 className="border-b border-[#E4E7EC] px-4 py-3 font-heading text-2xl">{MARCA_LABEL[marca as "CIFES"] || marca}</h2>
           {lista.map((objetivo) => (
-            <ObjetivoNodo key={objetivo.id} objetivo={objetivo} fases={fases} proyectos={proyectos} puedeMeta={puedeMeta} arrastrando={Boolean(arrastre)} />
+            <ObjetivoNodo key={objetivo.id} objetivo={objetivo} fases={fases} proyectos={proyectos} personas={personas} puedeMeta={puedeMeta} arrastrando={Boolean(arrastre)} />
           ))}
         </section>
       ))}
@@ -62,18 +69,61 @@ export function ArbolObjetivos({ objetivos, fases, proyectos, puedeMeta }: { obj
   )
 }
 
-function ObjetivoNodo({ objetivo, fases, proyectos, puedeMeta, arrastrando }: { objetivo: Objetivo; fases: Fase[]; proyectos: ProyectoLibre[]; puedeMeta: boolean; arrastrando: boolean }) {
+function fechaCorta(iso: string) {
+  const [anio, mes, dia] = iso.split("-")
+  return dia && mes && anio ? `${dia}/${mes}/${anio}` : iso || "—"
+}
+
+function ObjetivoNodo({ objetivo, fases, proyectos, personas, puedeMeta, arrastrando }: { objetivo: Objetivo; fases: Fase[]; proyectos: ProyectoLibre[]; personas: Persona[]; puedeMeta: boolean; arrastrando: boolean }) {
+  const router = useRouter()
   const { setNodeRef, isOver } = useDroppable({ id: `obj-${objetivo.id}`, disabled: !objetivo.puedeEditar })
+  const [titulo, setTitulo] = useState(objetivo.titulo)
+  const [duenoId, setDuenoId] = useState(objetivo.duenoId)
+  const [inicio, setInicio] = useState(objetivo.periodoInicio)
+  const [fin, setFin] = useState(objetivo.periodoFin)
+  const [tope, setTope] = useState(objetivo.costoTope == null ? "" : String(objetivo.costoTope))
+  const [kpis, setKpis] = useState(objetivo.kpis)
+  useEffect(() => { setKpis(objetivo.kpis) }, [objetivo.kpis])
+  const dueno = personas.find((persona) => persona.id === duenoId)?.name || objetivo.dueno
+  async function guardarCampo(campo: "titulo" | "duenoId" | "periodoInicio" | "periodoFin" | "costoTope", valor: string, aplicar: () => void, revertir: () => void) {
+    aplicar()
+    const resultado = await editarCampoObjetivoAction({ id: objetivo.id, campo, valor })
+    if (!resultado.ok) revertir()
+    else router.refresh()
+    return resultado
+  }
+  async function crearKpi(nombre: string) {
+    const tempId = `tmp-${Date.now()}`
+    const temp: Kpi = { id: tempId, nombre, actual: null, meta: null, unidad: "", estado: "EN_LINEA_BASE", actividades: 0, bloqueado: false, motivo: "" }
+    setKpis((lista) => [...lista, temp])
+    const resultado = await crearKpiObjetivoAction({ objetivoId: objetivo.id, nombre })
+    if (!resultado.ok || !resultado.id) {
+      setKpis((lista) => lista.filter((item) => item.id !== tempId))
+      return { ok: false as const, error: resultado.ok ? "No se pudo agregar el KPI." : resultado.error }
+    }
+    setKpis((lista) => lista.map((item) => (item.id === tempId ? { ...item, id: resultado.id! } : item)))
+    router.refresh()
+    return { ok: true as const }
+  }
   return (
     <details open className="border-b border-[#F0F2F5] px-4 py-3">
       <summary className="cursor-pointer font-medium">
-        {objetivo.titulo}
-        <span className="ml-2 text-sm text-muted-foreground">{TEAM_LABEL[objetivo.area as "MARKETING"] || objetivo.area} · {objetivo.dueno} · {OBJETIVO_LABEL[objetivo.estado as "ABIERTO"] || objetivo.estado} · {objetivo.horas} h</span>
-        <span className={`ml-2 text-sm ${claseTope(objetivo.excede)}`}>Costo {objetivo.costo}{objetivo.costoTope != null ? ` / tope ${objetivo.costoTope}` : ""}{objetivo.excede ? " · por encima del tope" : ""}</span>
+        {titulo}
+        <span className="ml-2 text-sm text-muted-foreground">{TEAM_LABEL[objetivo.area as "MARKETING"] || objetivo.area} · {dueno} · {OBJETIVO_LABEL[objetivo.estado as "ABIERTO"] || objetivo.estado} · {objetivo.horas} h</span>
+        <span className={`ml-2 text-sm ${claseTope(objetivo.excede)}`}>Costo {objetivo.costo}{tope ? ` / tope ${tope}` : ""}{objetivo.excede ? " · por encima del tope" : ""}</span>
+        <span className="ml-2 text-sm text-muted-foreground">{fechaCorta(inicio)} – {fechaCorta(fin)}</span>
       </summary>
-      <p className="mt-3"><Link href={`/objetivos/${objetivo.id}/editar`} className="text-sm text-[#1658B0]">Editar objetivo</Link></p>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        {objetivo.kpis.map((kpi) => <KpiEditable key={kpi.id} kpi={kpi} puedeEditar={objetivo.puedeEditar} puedeMeta={puedeMeta} />)}
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <EditorLinea valor={titulo} etiqueta="Objetivo" puedeEditar={objetivo.puedeEditar} onGuardar={(valor) => guardarCampo("titulo", valor, () => setTitulo(valor), () => setTitulo(titulo))} />
+        <EditorLinea valor={duenoId} etiqueta="Dueño" tipo="lista" opciones={personas.map((persona) => ({ value: persona.id, label: persona.name }))} puedeEditar={objetivo.puedeEditar} onGuardar={(valor) => guardarCampo("duenoId", valor, () => setDuenoId(valor), () => setDuenoId(duenoId))} />
+        <EditorLinea valor={inicio} etiqueta="Inicio del periodo" tipo="fecha" puedeEditar={objetivo.puedeEditar} onGuardar={(valor) => guardarCampo("periodoInicio", valor, () => setInicio(valor), () => setInicio(inicio))} />
+        <EditorLinea valor={fin} etiqueta="Fin del periodo" tipo="fecha" puedeEditar={objetivo.puedeEditar} onGuardar={(valor) => guardarCampo("periodoFin", valor, () => setFin(valor), () => setFin(fin))} />
+        <EditorLinea valor={tope} etiqueta="Costo tope" tipo="numero" puedeEditar={objetivo.puedeEditar} onGuardar={(valor) => guardarCampo("costoTope", valor, () => setTope(valor), () => setTope(tope))} />
+        <Link href={`/objetivos/${objetivo.id}/editar`} className="mb-1 text-sm text-[#1658B0]">Editar objetivo</Link>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {kpis.map((kpi) => <KpiInline key={kpi.id} kpi={kpi} puedeEditar={objetivo.puedeEditar && !kpi.id.startsWith("tmp-")} puedeMeta={puedeMeta || objetivo.puedeEditar} />)}
+        {objetivo.puedeEditar ? <AltaKpi onCrear={crearKpi} /> : null}
       </div>
       <ul ref={setNodeRef} className={`mt-3 grid gap-2 rounded-lg ${isOver || arrastrando ? "bg-[#E7F0FB] p-2" : ""}`}>
         {isOver ? <li className="text-xs text-[#1658B0]">Soltar el proyecto en este objetivo</li> : null}
@@ -114,22 +164,3 @@ function ProyectoArrastrable({ proyecto, puede }: { proyecto: Proyecto; puede: b
   )
 }
 
-function KpiEditable({ kpi, puedeEditar, puedeMeta }: { kpi: Kpi; puedeEditar: boolean; puedeMeta: boolean }) {
-  const [actual, setActual] = useState(kpi.actual == null ? "" : String(kpi.actual))
-  const [meta, setMeta] = useState(kpi.meta == null ? "" : String(kpi.meta))
-  async function guardar(campo: "actual" | "meta", valor: string) {
-    const resultado = await ajustarKpiAction(campo === "actual" ? { id: kpi.id, actual: valor } : { id: kpi.id, meta: valor })
-    if (!resultado.ok) toast.error(resultado.error)
-    else toast.success("KPI actualizado.", { duration: 5000, action: { label: "Deshacer", onClick: () => { void ajustarKpiAction(campo === "actual" ? { id: kpi.id, actual: kpi.actual == null ? "" : String(kpi.actual) } : { id: kpi.id, meta: kpi.meta == null ? "" : String(kpi.meta) }) } } })
-  }
-  return (
-    <div className="rounded-lg border border-[#E4E7EC] p-3">
-      <TextoKpi nombre={kpi.nombre} actual={actual === "" ? null : Number(actual)} meta={meta === "" ? null : Number(meta)} unidad={kpi.unidad} />
-      <SelloBloqueo bloqueado={kpi.bloqueado} motivo={kpi.motivo} />
-      <div className="mt-2 flex flex-wrap gap-2">
-        {puedeEditar ? <label className="grid text-xs">Actual<input value={actual} inputMode="decimal" aria-label={`Actual de ${kpi.nombre}`} onChange={(event) => setActual(event.target.value)} onBlur={() => { if (actual !== (kpi.actual == null ? "" : String(kpi.actual))) void guardar("actual", actual) }} onKeyDown={(event) => { if (event.key === "Enter") void guardar("actual", actual) }} className="h-9 w-24 rounded-lg border border-[#E4E7EC] px-2" /></label> : null}
-        {puedeMeta ? <label className="grid text-xs">Meta<input value={meta} inputMode="decimal" aria-label={`Meta de ${kpi.nombre}`} onChange={(event) => setMeta(event.target.value)} onBlur={() => { if (meta !== (kpi.meta == null ? "" : String(kpi.meta))) void guardar("meta", meta) }} onKeyDown={(event) => { if (event.key === "Enter") void guardar("meta", meta) }} className="h-9 w-24 rounded-lg border border-[#E4E7EC] px-2" /></label> : <span className="self-end text-xs text-muted-foreground" title="La meta la aprueba un administrador.">Meta {kpi.meta ?? "—"}</span>}
-      </div>
-    </div>
-  )
-}

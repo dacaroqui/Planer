@@ -1,6 +1,6 @@
 import Link from "next/link"
-import { Chispa, SelloBloqueo, TextoKpi } from "@/components/objetivos-ui"
-import { META_LABEL } from "@/lib/objetivos"
+import { KpiInline } from "@/components/kpi-inline"
+import { Chispa } from "@/components/objetivos-ui"
 import { aprobarMetaAction, medicionAction, proponerMetaAction } from "@/server/objetivos-actions"
 
 type KpiVista = {
@@ -15,19 +15,21 @@ type KpiVista = {
   motivoBloqueo: string
   tendencia: number[]
   mediciones: unknown[]
+  _count?: { tareas: number }
 }
 
-export function PanelPersona({ kpis, puedeAprobar, propio }: { kpis: KpiVista[]; puedeAprobar: boolean; propio: boolean }) {
+export function PanelPersona({ kpis, puedeAprobar, propio, puedeEditar = propio || puedeAprobar }: { kpis: KpiVista[]; puedeAprobar: boolean; propio: boolean; puedeEditar?: boolean }) {
   return (
     <ul className="grid gap-3">
       {kpis.length === 0 ? <li className="text-sm text-muted-foreground">Todavía no hay KPIs. Un principal y hasta cuatro de apoyo.</li> : kpis.map((kpi) => (
         <li key={kpi.id} className="rounded-xl border border-[#E4E7EC] bg-white p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <TextoKpi nombre={kpi.nombre} actual={kpi.actual} meta={kpi.meta} unidad={kpi.unidad} tipo={kpi.tipo} />
+            <div className="min-w-0 flex-1">
+              <KpiInline kpi={{ id: kpi.id, nombre: kpi.nombre, unidad: kpi.unidad, actual: kpi.actual, meta: kpi.meta, estado: kpi.estadoMeta, actividades: kpi._count?.tareas ?? 0, bloqueado: kpi.bloqueado, motivo: kpi.motivoBloqueo }} puedeEditar={puedeEditar} puedeMeta={puedeAprobar} />
+              <p className="mt-1 text-xs text-muted-foreground">{kpi.tipo === "PRINCIPAL" ? "Principal" : "Apoyo"} · {kpi.mediciones.length} mediciones · <Link href={`/kpis/${kpi.id}/editar`} className="text-[#1658B0]">Ficha</Link></p>
+            </div>
             <Chispa valores={kpi.tendencia} />
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">Meta: {META_LABEL[kpi.estadoMeta]} · {kpi.mediciones.length} mediciones · <Link href={`/kpis/${kpi.id}/editar`} className="text-[#1658B0]">Editar</Link></p>
-          <SelloBloqueo bloqueado={kpi.bloqueado} motivo={kpi.motivoBloqueo} />
           {propio ? (
             <form action={medicionAction} className="mt-3 flex flex-wrap gap-2">
               <input type="hidden" name="kpiId" value={kpi.id} />

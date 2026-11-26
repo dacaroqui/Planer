@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/prisma"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { toActor } from "@/lib/actor"
-import { aprobarMeta, guardarKpi, proponerMeta, registrarMedicion } from "@/server/objetivos"
+import { aprobarMeta, crearKpiEnObjetivo, editarCampoKpi, eliminarKpi, guardarKpi, proponerMeta, registrarMedicion } from "@/server/objetivos"
 
 const SUFIJO = ".obj@cifes.edu.co"
 
@@ -22,6 +22,8 @@ async function persona(nombre: string, rol: "LIDER" | "AGENTE" | "ADMIN", team: 
 }
 
 beforeEach(async () => {
+  await prisma.proyecto.deleteMany({ where: { leader: { email: { endsWith: SUFIJO } } } })
+  await prisma.empresa.deleteMany({ where: { name: { startsWith: "Empresa objetivo" } } })
   await prisma.kpiMedicion.deleteMany({ where: { registradoPor: { email: { endsWith: SUFIJO } } } })
   await prisma.kpi.deleteMany({ where: { OR: [{ persona: { email: { endsWith: SUFIJO } } }, { objetivo: { dueno: { email: { endsWith: SUFIJO } } } }] } })
   await prisma.objetivo.deleteMany({ where: { dueno: { email: { endsWith: SUFIJO } } } })
@@ -81,5 +83,58 @@ describe("permisos y flujo de meta", () => {
     const creado = await guardarKpi(lider.actor, { ...kpiBase, nombre: "Principal del destino", tipo: "PRINCIPAL", personaId: destino.id })
     expect(creado.personaId).toBe(destino.id)
     await expect(guardarKpi(agente.actor, { ...kpiBase, nombre: "Ajeno del agente", tipo: "APOYO", personaId: destino.id })).rejects.toBeInstanceOf(PermisoDenegado)
+  })
+
+  it("el líder edita el KPI del objetivo y al borrarlo suelta las actividades", async () => {
+    const lider = await persona("Líder Inline", "LIDER")
+    const ajeno = await persona("Ajeno Inline", "LIDER", "DESARROLLO")
+    const objetivo = await prisma.objetivo.create({
+      data: {
+        marca: "CIFES",
+        titulo: "Crecer la escuela",
+        area: "MARKETING",
+        duenoId: lider.id,
+        periodoInicio: new Date("2026-11-01"),
+        periodoFin: new Date("2026-12-31"),
+      },
+    })
+    const kpi = await crearKpiEnObjetivo(lider.actor, { objetivoId: objetivo.id, nombre: "Asistencias" })
+    await expect(editarCampoKpi(ajeno.actor, { id: kpi.id, campo: "nombre", valor: "Otro" })).rejects.toBeInstanceOf(PermisoDenegado)
+    await editarCampoKpi(lider.actor, { id: kpi.id, campo: "unidad", valor: "sesiones" })
+    await editarCampoKpi(lider.actor, { id: kpi.id, campo: "meta", valor: "12" })
+    await editarCampoKpi(lider.actor, { id: kpi.id, campo: "estado", valor: "APROBADA" })
+    const empresa = await prisma.empresa.create({ data: { name: `Empresa objetivo ${Date.now()}` } })
+    const proyecto = await prisma.proyecto.create({
+      data: {
+        name: "Escuela inline",
+        empresaId: empresa.id,
+        leaderId: lider.id,
+        startsAt: new Date("2026-11-01"),
+        targetAt: new Date("2026-12-31"),
+        team: "MARKETING",
+      },
+    })
+    const tarea = await prisma.tarea.create({
+      data: { title: "Clase de ejemplo", projectId: proyecto.id, createdById: lider.id, status: "PENDIENTE", kpiId: kpi.id },
+    })
+    const borrado = await eliminarKpi(lider.actor, kpi.id)
+    expect(borrado.actividades).toBe(1)
+    const suelta = await prisma.tarea.findUniqueOrThrow({ where: { id: tarea.id } })
+    expect(suelta.kpiId).toBeNull()
+    const guardado = await prisma.kpi.findUnique({ where: { id: kpi.id } })
+    expect(guardado).toBeNull()
+  })
+
+  it("la persona no cambia la meta ni el estado por el editor", async () => {
+    const dueno = await persona("Dueña Meta", "AGENTE")
+    const admin = await persona("Admin Meta", "ADMIN")
+    const creado = await guardarKpi(dueno.actor, { ...kpiBase, nombre: "Principal", tipo: "PRINCIPAL", personaId: dueno.id })
+    await expect(editarCampoKpi(dueno.actor, { id: creado.id, campo: "meta", valor: "20" })).rejects.toBeInstanceOf(PermisoDenegado)
+    await expect(editarCampoKpi(dueno.actor, { id: creado.id, campo: "estado", valor: "APROBADA" })).rejects.toBeInstanceOf(PermisoDenegado)
+    await editarCampoKpi(dueno.actor, { id: creado.id, campo: "nombre", valor: "Principal nuevo" })
+    await editarCampoKpi(admin.actor, { id: creado.id, campo: "meta", valor: "20" })
+    const actual = await prisma.kpi.findUniqueOrThrow({ where: { id: creado.id } })
+    expect(actual.nombre).toBe("Principal nuevo")
+    expect(Number(actual.meta)).toBe(20)
   })
 })

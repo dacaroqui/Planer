@@ -43,7 +43,7 @@ export type InformePdf = {
     planeadas: string[]
     vencidas: string[]
   }[]
-  kpis: { nombre: string; ambito: string; actual: string; meta: string; estado: string }[]
+  kpis: { nombre: string; ambito: string; medida: string; estado: string }[]
 }
 
 export function DocumentoInforme({ datos }: { datos: InformePdf }) {
@@ -87,7 +87,7 @@ export function DocumentoInforme({ datos }: { datos: InformePdf }) {
         <Text style={estilos.marca}>CIFES · Luvania</Text>
         <Text style={estilos.h2}>KPIs</Text>
         {datos.kpis.length === 0 ? <Text style={estilos.muted}>Sin KPIs en este corte.</Text> : datos.kpis.map((kpi) => (
-          <Text key={`${kpi.ambito}-${kpi.nombre}`}>{kpi.ambito} · {kpi.nombre}: {kpi.actual} / {kpi.meta} · {kpi.estado}</Text>
+          <Text key={`${kpi.ambito}-${kpi.nombre}`}>{kpi.ambito} · {kpi.nombre}: {kpi.medida} · {kpi.estado}</Text>
         ))}
         <Text style={estilos.pie} render={({ pageNumber, totalPages }) => `Planer · ${pageNumber} / ${totalPages}`} fixed />
       </Page>

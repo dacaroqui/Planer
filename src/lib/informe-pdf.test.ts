@@ -25,7 +25,7 @@ const ejemplo: InformePdf = {
     planeadas: ["Cerrar el guion"],
     vencidas: [],
   }],
-  kpis: [{ nombre: "Asistencia de ejemplo", ambito: "CIFES", actual: "68", meta: "75", estado: "Aprobada" }],
+  kpis: [{ nombre: "Asistencia de ejemplo", ambito: "CIFES", medida: "Línea base", estado: "En línea base" }],
 }
 
 describe("informe semanal", () => {
@@ -41,6 +41,7 @@ describe("informe semanal", () => {
     expect(texto).toContain("2026-W48")
     expect(texto).toContain("Escuela de ejemplo")
     expect(texto).toContain("Asistencia de ejemplo")
+    expect(texto).toContain("Línea base")
     const info = execFileSync("pdfinfo", [archivo], { encoding: "utf8" })
     const paginas = Number(info.match(/Pages:\s+(\d+)/)?.[1] || 0)
     expect(paginas).toBeGreaterThanOrEqual(3)

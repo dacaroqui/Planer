@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { requireActor } from "@/server/session"
-import { ajustarKpi, aprobarMeta, asignarProyecto, guardarKpi, guardarObjetivo, moverProyectoAObjetivo, proponerMeta, registrarMedicion, vincularExperimento } from "@/server/objetivos"
+import { ajustarKpi, aprobarMeta, asignarProyecto, crearKpiEnObjetivo, editarCampoKpi, editarCampoObjetivo, eliminarKpi, guardarKpi, guardarObjetivo, moverProyectoAObjetivo, proponerMeta, registrarMedicion, vincularExperimento } from "@/server/objetivos"
 
 function fallo(error: unknown): never {
   if (error instanceof PermisoDenegado || error instanceof DomainError) throw error
@@ -119,6 +119,56 @@ export async function moverProyectoObjetivoAction(input: { proyectoId: string; o
     if (error instanceof PermisoDenegado || error instanceof DomainError) return { ok: false as const, error: error.message }
     console.error(error)
     return { ok: false as const, error: "No se pudo mover el proyecto." }
+  }
+  refrescar()
+  return { ok: true as const }
+}
+
+function resultado(error: unknown) {
+  if (error instanceof PermisoDenegado || error instanceof DomainError) return { ok: false as const, error: error.message }
+  console.error(error)
+  return { ok: false as const, error: "No se pudo guardar." }
+}
+
+export async function editarCampoKpiAction(input: { id: string; campo: "nombre" | "unidad" | "actual" | "meta" | "estado"; valor: string }) {
+  const actor = await requireActor()
+  try {
+    await editarCampoKpi(actor, input)
+  } catch (error) {
+    return resultado(error)
+  }
+  refrescar()
+  return { ok: true as const }
+}
+
+export async function crearKpiObjetivoAction(input: { objetivoId: string; nombre: string }) {
+  const actor = await requireActor()
+  try {
+    const kpi = await crearKpiEnObjetivo(actor, input)
+    refrescar()
+    return { ok: true as const, id: kpi.id }
+  } catch (error) {
+    return resultado(error)
+  }
+}
+
+export async function eliminarKpiAction(input: { id: string }) {
+  const actor = await requireActor()
+  try {
+    const borrado = await eliminarKpi(actor, input.id)
+    refrescar()
+    return { ok: true as const, actividades: borrado.actividades }
+  } catch (error) {
+    return resultado(error)
+  }
+}
+
+export async function editarCampoObjetivoAction(input: { id: string; campo: "titulo" | "duenoId" | "periodoInicio" | "periodoFin" | "costoTope"; valor: string }) {
+  const actor = await requireActor()
+  try {
+    await editarCampoObjetivo(actor, input)
+  } catch (error) {
+    return resultado(error)
   }
   refrescar()
   return { ok: true as const }

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { filtrarPlan, parsearTituloPlan, presentarTarea, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
+import { filtrarPlan, parsearTituloPlan, presentarTarea, textoKpi, textoMedidaKpi, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
 import { filasExportables, libroXlsx } from "@/lib/xlsx-minimo"
 
 describe("plan de trabajo", () => {
@@ -133,6 +133,17 @@ function fila(
     puedeRegistrar: false,
   }
 }
+
+describe("texto del KPI", () => {
+  it("dice línea base cuando no hay meta ni valor actual", () => {
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: null, kpiMeta: null, kpiUnidad: "" })).toBe("Línea base")
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: null, kpiMeta: null, kpiUnidad: "sesiones" })).toBe("Línea base · sesiones")
+    expect(textoMedidaKpi(null, null, "%")).toBe("Línea base · %")
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: 3, kpiMeta: null, kpiUnidad: "sesiones" })).toBe("3 / — sesiones")
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: 1, kpiMeta: 4, kpiUnidad: "piezas" })).toBe("1 / 4 piezas")
+    expect(textoKpi({ kpiNombre: "", kpiActual: null, kpiMeta: null, kpiUnidad: "" })).toBe("")
+  })
+})
 
 describe("migración de fechas y KPI", () => {
   it("solo agrega columnas opcionales", () => {

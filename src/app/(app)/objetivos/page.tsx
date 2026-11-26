@@ -45,6 +45,7 @@ export default async function ObjetivosPage({ searchParams }: { searchParams: Pr
       {arbol.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay objetivos para este filtro.</p> : (
         <ArbolObjetivos
           puedeMeta={esAdmin(actor)}
+          personas={personas}
           fases={fases.map((fase) => ({ id: fase.id, team: fase.team, nombre: fase.nombre }))}
           proyectos={proyectos}
           objetivos={arbol.map((objetivo) => ({
@@ -53,13 +54,16 @@ export default async function ObjetivosPage({ searchParams }: { searchParams: Pr
             titulo: objetivo.titulo,
             area: objetivo.area,
             dueno: objetivo.dueno.name,
+            duenoId: objetivo.dueno.id,
+            periodoInicio: objetivo.periodoInicio.toISOString().slice(0, 10),
+            periodoFin: objetivo.periodoFin.toISOString().slice(0, 10),
             estado: objetivo.estado,
             horas: objetivo.horas,
             costo: objetivo.costo,
             costoTope: objetivo.costoTope,
             excede: objetivo.excede,
             puedeEditar: puedeEditarArea(actor, objetivo.area),
-            kpis: objetivo.kpis.map((kpi) => ({ id: kpi.id, nombre: kpi.nombre, actual: kpi.actual, meta: kpi.meta, unidad: kpi.unidad, bloqueado: kpi.bloqueado, motivo: kpi.motivoBloqueo })),
+            kpis: objetivo.kpis.map((kpi) => ({ id: kpi.id, nombre: kpi.nombre, actual: kpi.actual, meta: kpi.meta, unidad: kpi.unidad, estado: kpi.estadoMeta, actividades: kpi._count.tareas, bloqueado: kpi.bloqueado, motivo: kpi.motivoBloqueo })),
             proyectos: objetivo.proyectos.map((proyecto) => ({
               id: proyecto.id,
               name: proyecto.name,

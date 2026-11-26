@@ -27,7 +27,7 @@ export default async function KpisPersonaPage({ searchParams }: { searchParams: 
           <Link href={nuevo} className="mt-3 inline-flex h-10 items-center rounded-lg bg-[#1658B0] px-3 text-sm font-medium text-white">Nuevo KPI</Link>
         </div>
       ) : (
-        <PanelPersona kpis={vista.kpis} puedeAprobar={esAdmin(actor)} propio={vista.personaId === actor.id} />
+        <PanelPersona kpis={vista.kpis} puedeAprobar={esAdmin(actor)} propio={vista.personaId === actor.id} puedeEditar />
       )}
     </div>
   )

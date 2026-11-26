@@ -19,6 +19,7 @@ import {
   sumarPiezas,
   type Pieza,
 } from "@/lib/objetivos"
+import { textoMedidaKpi } from "@/lib/plan-trabajo"
 
 function exigirVer(actor: Actor) {
   if (!puedeVerMatriz(actor)) throw new PermisoDenegado("Los objetivos son para los equipos y los administradores.")
@@ -71,7 +72,7 @@ export async function listarObjetivos(actor: Actor, filtros: { marca?: string; a
     },
     include: {
       dueno: { select: { id: true, name: true } },
-      kpis: { include: { mediciones: { orderBy: { fecha: "asc" } } } },
+      kpis: { include: { mediciones: { orderBy: { fecha: "asc" } }, _count: { select: { tareas: true } } } },
       proyectos: {
         include: {
           leader: { select: { name: true } },
@@ -263,13 +264,20 @@ export async function moverProyectoAObjetivo(actor: Actor, input: { proyectoId: 
   return prisma.proyecto.update({ where: { id: proyecto.id }, data: { objetivoId: objetivo.id } })
 }
 
+function puedeTocarKpi(actor: Actor, kpi: { area: TeamName | null; personaId: string | null; objetivo: { area: TeamName } | null }) {
+  const area = kpi.area || kpi.objetivo?.area || null
+  const liderArea = area ? puedeEditarArea(actor, area) : false
+  const propio = kpi.personaId === actor.id
+  const lider = actor.memberships.some((item) => item.role === "LIDER")
+  if (esAdmin(actor) || liderArea || propio || (kpi.personaId && lider)) return { area, dePersona: Boolean(kpi.personaId) }
+  throw new PermisoDenegado("Solo el líder del área o un administrador edita este KPI.")
+}
+
 export async function ajustarKpi(actor: Actor, input: { id: string; actual?: string; meta?: string }) {
   const kpi = await prisma.kpi.findUnique({ where: { id: input.id }, include: { objetivo: true } })
   if (!kpi) throw new DomainError("El KPI no existe.")
-  const area = kpi.area || kpi.objetivo?.area || null
-  const propio = kpi.personaId === actor.id
-  if (!esAdmin(actor) && !propio && !(area && puedeEditarArea(actor, area))) throw new PermisoDenegado("Solo el líder del área o un administrador edita este KPI.")
-  if (input.meta !== undefined && !puedeAprobarMeta(actor)) throw new PermisoDenegado("Solo un administrador cambia la meta.")
+  const { dePersona } = puedeTocarKpi(actor, kpi)
+  if (input.meta !== undefined && dePersona && !puedeAprobarMeta(actor)) throw new PermisoDenegado("Solo un administrador cambia la meta.")
   const valor = (texto: string | undefined) => (texto == null || texto.trim() === "" ? null : num(texto))
   return prisma.kpi.update({
     where: { id: kpi.id },
@@ -278,6 +286,77 @@ export async function ajustarKpi(actor: Actor, input: { id: string; actual?: str
       ...(input.meta !== undefined ? { meta: valor(input.meta) } : {}),
     },
   })
+}
+
+const ESTADOS_KPI = ["EN_LINEA_BASE", "PROPUESTA", "APROBADA"] as const
+
+export async function editarCampoKpi(actor: Actor, input: { id: string; campo: "nombre" | "unidad" | "actual" | "meta" | "estado"; valor: string }) {
+  const kpi = await prisma.kpi.findUnique({ where: { id: input.id }, include: { objetivo: true } })
+  if (!kpi) throw new DomainError("El KPI no existe.")
+  const { dePersona } = puedeTocarKpi(actor, kpi)
+  if (input.campo === "nombre") {
+    if (input.valor.trim().length < 2) throw new DomainError("Indique el nombre del KPI.")
+    return prisma.kpi.update({ where: { id: kpi.id }, data: { nombre: input.valor.trim() } })
+  }
+  if (input.campo === "unidad") return prisma.kpi.update({ where: { id: kpi.id }, data: { unidad: input.valor.trim() } })
+  if (input.campo === "actual") return prisma.kpi.update({ where: { id: kpi.id }, data: { actual: num(input.valor) } })
+  if (input.campo === "meta") {
+    if (dePersona && !puedeAprobarMeta(actor)) throw new PermisoDenegado("Solo un administrador cambia la meta.")
+    return prisma.kpi.update({ where: { id: kpi.id }, data: { meta: num(input.valor) } })
+  }
+  if (!ESTADOS_KPI.includes(input.valor as (typeof ESTADOS_KPI)[number])) throw new DomainError("Elija el estado.")
+  if (dePersona && !puedeAprobarMeta(actor)) throw new PermisoDenegado("Solo un administrador cambia el estado de la meta.")
+  return prisma.kpi.update({ where: { id: kpi.id }, data: { estadoMeta: input.valor as (typeof ESTADOS_KPI)[number] } })
+}
+
+export async function crearKpiEnObjetivo(actor: Actor, input: { objetivoId: string; nombre: string }) {
+  return guardarKpi(actor, {
+    nombre: input.nombre,
+    descripcion: "",
+    unidad: "",
+    lineaBase: "",
+    meta: "",
+    actual: "",
+    fuente: "",
+    frecuencia: "MENSUAL",
+    tipo: "APOYO",
+    nivel: "objetivo",
+    objetivoId: input.objetivoId,
+    area: "",
+    personaId: "",
+    apoyaId: "",
+    bloqueado: false,
+    motivoBloqueo: "",
+  })
+}
+
+export async function eliminarKpi(actor: Actor, id: string) {
+  const kpi = await prisma.kpi.findUnique({ where: { id }, include: { objetivo: true, _count: { select: { tareas: true } } } })
+  if (!kpi) throw new DomainError("El KPI no existe.")
+  puedeTocarKpi(actor, kpi)
+  const actividades = kpi._count.tareas
+  await prisma.kpi.delete({ where: { id: kpi.id } })
+  return { actividades }
+}
+
+export async function editarCampoObjetivo(actor: Actor, input: { id: string; campo: "titulo" | "duenoId" | "periodoInicio" | "periodoFin" | "costoTope"; valor: string }) {
+  const objetivo = await prisma.objetivo.findUnique({ where: { id: input.id } })
+  if (!objetivo) throw new DomainError("El objetivo no existe.")
+  if (!puedeEditarArea(actor, objetivo.area)) throw new PermisoDenegado("Solo el líder del área o un administrador edita objetivos.")
+  if (input.campo === "titulo") {
+    if (input.valor.trim().length < 3) throw new DomainError("Indique el título del objetivo.")
+    return prisma.objetivo.update({ where: { id: objetivo.id }, data: { titulo: input.valor.trim() } })
+  }
+  if (input.campo === "duenoId") {
+    const dueno = await prisma.user.findFirst({ where: { id: input.valor, active: true, deactivatedAt: null } })
+    if (!dueno) throw new DomainError("Elija un dueño.")
+    return prisma.objetivo.update({ where: { id: objetivo.id }, data: { duenoId: dueno.id } })
+  }
+  if (input.campo === "costoTope") return prisma.objetivo.update({ where: { id: objetivo.id }, data: { costoTope: num(input.valor) } })
+  const inicio = input.campo === "periodoInicio" ? dia(input.valor) : objetivo.periodoInicio
+  const fin = input.campo === "periodoFin" ? dia(input.valor) : objetivo.periodoFin
+  if (fin < inicio) throw new DomainError("El periodo no puede terminar antes de empezar.")
+  return prisma.objetivo.update({ where: { id: objetivo.id }, data: input.campo === "periodoInicio" ? { periodoInicio: inicio } : { periodoFin: fin } })
 }
 
 export async function asignarProyecto(actor: Actor, input: { proyectoId: string; objetivoId: string; fase: string; medio: string; costo: string }) {
@@ -309,8 +388,8 @@ export async function kpisDeArea(actor: Actor) {
   await asegurarFases()
   const areas = areasVisibles(actor)
   const [propios, deObjetivo] = await Promise.all([
-    prisma.kpi.findMany({ where: { area: { in: areas } }, include: { mediciones: { orderBy: { fecha: "asc" } } } }),
-    prisma.kpi.findMany({ where: { objetivo: { area: { in: areas } } }, include: { objetivo: true, mediciones: { orderBy: { fecha: "asc" } } } }),
+    prisma.kpi.findMany({ where: { area: { in: areas } }, include: { mediciones: { orderBy: { fecha: "asc" } }, _count: { select: { tareas: true } } } }),
+    prisma.kpi.findMany({ where: { objetivo: { area: { in: areas } } }, include: { objetivo: true, mediciones: { orderBy: { fecha: "asc" } }, _count: { select: { tareas: true } } } }),
   ])
   return areas.map((area) => {
     const kpis = [...propios.filter((item) => item.area === area), ...deObjetivo.filter((item) => item.objetivo?.area === area)].map(presentarKpi)
@@ -333,7 +412,7 @@ export async function kpisDePersona(actor: Actor, personaId?: string) {
     : [{ id: actor.id, name: actor.name }]
   const kpis = await prisma.kpi.findMany({
     where: { personaId: id },
-    include: { mediciones: { orderBy: { fecha: "asc" } }, apoya: { select: { id: true, nombre: true } } },
+    include: { mediciones: { orderBy: { fecha: "asc" } }, apoya: { select: { id: true, nombre: true } }, _count: { select: { tareas: true } } },
     orderBy: [{ tipo: "asc" }, { nombre: "asc" }],
   })
   return { personaId: id, personas, kpis: kpis.map(presentarKpi) }
@@ -348,7 +427,7 @@ export async function matrizExportable(actor: Actor) {
     const kpis = objetivo.kpis.map((kpi) => `${kpi.nombre}${kpi.bloqueado ? " (bloqueado)" : ""}`).join("; ")
     const base = objetivo.kpis.map((kpi) => kpi.lineaBase ?? "").join("; ")
     const meta = objetivo.kpis.map((kpi) => kpi.meta ?? "").join("; ")
-    const actual = objetivo.kpis.map((kpi) => kpi.actual ?? "").join("; ")
+    const actual = objetivo.kpis.map((kpi) => (kpi.actual == null && kpi.meta == null ? textoMedidaKpi(null, null, kpi.unidad) : (kpi.actual ?? ""))).join("; ")
     if (objetivo.proyectos.length === 0) {
       filas.push([MARCA_LABEL[objetivo.marca as "CIFES"] || objetivo.marca, objetivo.titulo, TEAM_LABEL[objetivo.area], objetivo.dueno.name, kpis, base, meta, actual, "", "", "", "", "", "", "", "", String(objetivo.horas), String(objetivo.costo)])
     }
@@ -372,10 +451,14 @@ export async function matrizExportable(actor: Actor) {
     orderBy: [{ persona: { name: "asc" } }, { tipo: "asc" }],
   })
   const hojaPersona = [["Persona", "Tipo", "KPI", "Unidad", "Línea base", "Meta", "Actual", "Estado de meta", "Bloqueado", "Motivo"],
-    ...personas.map((kpi) => [kpi.persona?.name ?? "", TIPO_KPI_LABEL[kpi.tipo], kpi.nombre, kpi.unidad, String(numero(kpi.lineaBase) || ""), String(numero(kpi.meta) || ""), String(numero(kpi.actual) || ""), META_LABEL[kpi.estadoMeta], kpi.bloqueado ? "Sí" : "", kpi.motivoBloqueo])]
+    ...personas.map((kpi) => {
+      const meta = kpi.meta == null ? null : numero(kpi.meta)
+      const actual = kpi.actual == null ? null : numero(kpi.actual)
+      return [kpi.persona?.name ?? "", TIPO_KPI_LABEL[kpi.tipo], kpi.nombre, kpi.unidad, kpi.lineaBase == null ? "" : String(numero(kpi.lineaBase)), meta == null ? "" : String(meta), actual == null && meta == null ? textoMedidaKpi(null, null, kpi.unidad) : actual == null ? "" : String(actual), META_LABEL[kpi.estadoMeta], kpi.bloqueado ? "Sí" : "", kpi.motivoBloqueo]
+    })]
   const areas = await kpisDeArea(actor)
   const hojaArea = [["Área", "Origen", "KPI", "Unidad", "Meta", "Actual", "Bloqueado"],
-    ...areas.flatMap((panel) => panel.kpis.map((kpi) => [TEAM_LABEL[panel.area], kpi.objetivoId ? "Objetivo" : "Área", kpi.nombre, kpi.unidad, String(kpi.meta ?? ""), String(kpi.actual ?? ""), kpi.bloqueado ? kpi.motivoBloqueo || "Sí" : ""]))]
+    ...areas.flatMap((panel) => panel.kpis.map((kpi) => [TEAM_LABEL[panel.area], kpi.objetivoId ? "Objetivo" : "Área", kpi.nombre, kpi.unidad, kpi.meta == null ? "" : String(kpi.meta), kpi.actual == null && kpi.meta == null ? textoMedidaKpi(null, null, kpi.unidad) : String(kpi.actual ?? ""), kpi.bloqueado ? kpi.motivoBloqueo || "Sí" : ""]))]
   return { matriz: filas, personas: hojaPersona, areas: hojaArea }
 }
 
