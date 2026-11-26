@@ -27,6 +27,8 @@ export function cumplimientoFecha(fecha: string | null, porcentaje: number, hoy:
   return "a_tiempo"
 }
 
+export const TEXTO_CUMPLIMIENTO = "El cumplimiento general es el porcentaje de actividades hechas sobre el total del corte. Cada actividad cuenta una vez, también las que están sin entregable. No es el promedio de los proyectos. Las horas suman cada actividad y cada subtarea una sola vez."
+
 export const CUMPLIMIENTO_LABEL: Record<CumplimientoFecha, string> = {
   a_tiempo: "A tiempo",
   en_riesgo: "En riesgo",

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { filtrarPlan, parsearTituloPlan, presentarTarea, textoKpi, textoMedidaKpi, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
+import { filtrarPlan, ordenarKpisDisponibles, parsearTituloPlan, presentarTarea, textoKpi, textoMedidaKpi, totalesPlan, transicionTareaValida, type FilaPlan } from "@/lib/plan-trabajo"
 import { filasExportables, libroXlsx } from "@/lib/xlsx-minimo"
 
 describe("plan de trabajo", () => {
@@ -135,13 +135,38 @@ function fila(
 }
 
 describe("texto del KPI", () => {
-  it("dice línea base cuando no hay meta ni valor actual", () => {
-    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: null, kpiMeta: null, kpiUnidad: "" })).toBe("Línea base")
-    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: null, kpiMeta: null, kpiUnidad: "sesiones" })).toBe("Línea base · sesiones")
+  it("conserva el nombre y dice línea base cuando no hay meta ni valor actual", () => {
+    expect(textoKpi({ kpiNombre: "Tasa de respuesta", kpiActual: null, kpiMeta: null, kpiUnidad: "" })).toBe("Tasa de respuesta · Línea base")
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: null, kpiMeta: null, kpiUnidad: "sesiones" })).toBe("Asistencia · Línea base · sesiones")
     expect(textoMedidaKpi(null, null, "%")).toBe("Línea base · %")
-    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: 3, kpiMeta: null, kpiUnidad: "sesiones" })).toBe("3 / — sesiones")
-    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: 1, kpiMeta: 4, kpiUnidad: "piezas" })).toBe("1 / 4 piezas")
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: 3, kpiMeta: null, kpiUnidad: "sesiones" })).toBe("Asistencia · 3 / — sesiones")
+    expect(textoKpi({ kpiNombre: "Asistencia", kpiActual: 1, kpiMeta: 4, kpiUnidad: "piezas" })).toBe("Asistencia · 1 / 4 piezas")
     expect(textoKpi({ kpiNombre: "", kpiActual: null, kpiMeta: null, kpiUnidad: "" })).toBe("")
+  })
+
+  it("lista primero los KPIs cuyo nombre coincide con el proyecto", () => {
+    const orden = ordenarKpisDisponibles([
+      { nombre: "Pruebas Nexo aprobadas" },
+      { nombre: "Piezas de Boalah" },
+      { nombre: "Leads del área" },
+    ], "Boalah")
+    expect(orden.delProyecto.map((item) => item.nombre)).toEqual(["Piezas de Boalah"])
+    expect(orden.delAmbito.map((item) => item.nombre)).toEqual(["Pruebas Nexo aprobadas", "Leads del área"])
+  })
+
+  it("usa los mismos totales de actividades y horas que el informe", () => {
+    const filas = [
+      { hecha: true, parentId: null, horasEstimadas: 4, horasReales: 1 },
+      { hecha: false, parentId: "padre", horasEstimadas: 2, horasReales: 2 },
+      { hecha: false, parentId: null, horasEstimadas: 1, horasReales: 0 },
+      { hecha: false, parentId: null, horasEstimadas: 1, horasReales: 0 },
+    ]
+    const plan = totalesPlan(filas)
+    const informe = totalesPlan(filas)
+    expect(informe).toEqual(plan)
+    expect(plan.cumplimiento).toBe(33)
+    expect(plan.estimadas).toBe(8)
+    expect(plan.reales).toBe(3)
   })
 })
 

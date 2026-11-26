@@ -60,12 +60,17 @@ export async function listarPlan(actor: Actor): Promise<FilaPlan[]> {
       kpiUnidad: tarea.kpiUnidad,
       kpiActual: tarea.kpiActual,
       kpiId: tarea.kpiId,
-      kpisDisponibles: (tarea.kpiEnlace ? [tarea.kpiEnlace] : []).concat(tarea.project.objetivo?.kpis ?? []).concat(deArea.filter((item) => item.area === tarea.project?.team)).filter((item, indice, lista) => lista.findIndex((otro) => otro.id === item.id) === indice).map((item) => ({
+      kpisDisponibles: [
+        ...(tarea.kpiEnlace ? [{ id: tarea.kpiEnlace.id, nombre: tarea.kpiEnlace.nombre, actual: tarea.kpiEnlace.actual, meta: tarea.kpiEnlace.meta, unidad: tarea.kpiEnlace.unidad, origen: "objetivo" as const }] : []),
+        ...(tarea.project.objetivo?.kpis ?? []).map((item) => ({ id: item.id, nombre: item.nombre, actual: item.actual, meta: item.meta, unidad: item.unidad, origen: "objetivo" as const })),
+        ...deArea.filter((item) => item.area === tarea.project?.team).map((item) => ({ id: item.id, nombre: item.nombre, actual: item.actual, meta: item.meta, unidad: item.unidad, origen: "area" as const })),
+      ].filter((item, indice, lista) => lista.findIndex((otro) => otro.id === item.id) === indice).map((item) => ({
         id: item.id,
         nombre: item.nombre,
         actual: item.actual == null ? null : Number(item.actual),
         meta: item.meta == null ? null : Number(item.meta),
         unidad: item.unidad,
+        origen: item.origen,
       })),
       entregableId: tarea.entregableId,
       parentId: tarea.parentId,
@@ -119,11 +124,12 @@ export async function crearActividadPlan(actor: Actor, input: {
   kpiActual?: string | null
   bloqueo?: string | null
   entregableId?: string | null
+  parentId?: string | null
 }) {
   const proyecto = await proyectoVisible(actor, input.proyectoId)
   const asigna = puedeEditarPlan(actor, proyecto.team)
   const responsable = asigna ? (input.assigneeId || null) : null
-  const tope = await prisma.tarea.aggregate({ where: { projectId: proyecto.id, parentId: null }, _max: { orden: true } })
+  const tope = await prisma.tarea.aggregate({ where: { projectId: proyecto.id, parentId: input.parentId || null }, _max: { orden: true } })
   const tarea = await guardarTarea(actor, {
     title: input.titulo,
     status: "PENDIENTE",
@@ -138,9 +144,10 @@ export async function crearActividadPlan(actor: Actor, input: {
     kpiMeta: input.kpiMeta,
     kpiUnidad: input.kpiUnidad,
     kpiActual: input.kpiActual,
+    parentId: input.parentId || null,
     desdePlan: true,
   })
-  await prisma.tarea.update({ where: { id: tarea.id }, data: { orden: (tope._max.orden ?? -1) + 1, ...(input.entregableId ? { entregableId: input.entregableId } : {}) } })
+  await prisma.tarea.update({ where: { id: tarea.id }, data: { orden: (tope._max.orden ?? -1) + 1, ...(input.entregableId ? { entregableId: input.entregableId } : {}), ...(input.parentId ? { parentId: input.parentId } : {}) } })
   if (!asigna && proyecto.team) {
     const lideres = await prisma.areaRole.findMany({
       where: { team: proyecto.team, role: "LIDER", user: { active: true, deactivatedAt: null } },
@@ -262,7 +269,8 @@ export async function editarFilaPlan(
     ...(input.kpiActual !== undefined ? { kpiActual: input.kpiActual } : {}),
   })
   if (projectId !== tarea.projectId) {
-    await prisma.tarea.updateMany({ where: { parentId: tarea.id }, data: { projectId } })
+    await prisma.tarea.update({ where: { id: tarea.id }, data: { entregableId: null } })
+    await prisma.tarea.updateMany({ where: { parentId: tarea.id }, data: { projectId, entregableId: null } })
   }
 }
 

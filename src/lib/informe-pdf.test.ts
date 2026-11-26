@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+import { TEXTO_CUMPLIMIENTO } from "@/lib/entregables"
 import { pdfInforme, type InformePdf } from "@/lib/informe-pdf"
 
 const ejemplo: InformePdf = {
@@ -10,6 +11,7 @@ const ejemplo: InformePdf = {
   desde: "23/11/2026",
   hasta: "29/11/2026",
   cumplimiento: 40,
+  formula: TEXTO_CUMPLIMIENTO,
   aTiempo: 1,
   enRiesgo: 0,
   vencidos: 1,
@@ -24,6 +26,7 @@ const ejemplo: InformePdf = {
     hechasSemana: ["Publicar la pieza"],
     planeadas: ["Cerrar el guion"],
     vencidas: [],
+    kpisVinculados: [{ nombre: "Tasa de respuesta", medida: "Tasa de respuesta · Línea base" }],
   }],
   kpis: [{ nombre: "Asistencia de ejemplo", ambito: "CIFES", medida: "Línea base", estado: "En línea base" }],
 }
@@ -42,6 +45,8 @@ describe("informe semanal", () => {
     expect(texto).toContain("Escuela de ejemplo")
     expect(texto).toContain("Asistencia de ejemplo")
     expect(texto).toContain("Línea base")
+    expect(texto).toContain("No es el promedio")
+    expect(texto).toContain("Tasa de respuesta")
     const info = execFileSync("pdfinfo", [archivo], { encoding: "utf8" })
     const paginas = Number(info.match(/Pages:\s+(\d+)/)?.[1] || 0)
     expect(paginas).toBeGreaterThanOrEqual(3)
