@@ -13,9 +13,15 @@ export const ESTADO_TAREA_LABEL: Record<EstadoTareaPlan, string> = {
 }
 
 const SIGUIENTE: Record<EstadoTareaPlan, EstadoTareaPlan[]> = {
-  PENDIENTE: ["EN_CURSO"],
+  PENDIENTE: ["EN_CURSO", "HECHA"],
   EN_CURSO: ["PENDIENTE", "HECHA"],
-  HECHA: ["EN_CURSO"],
+  HECHA: ["PENDIENTE", "EN_CURSO"],
+}
+
+export const ESTADO_TAREA_PUNTO: Record<EstadoTareaPlan, string> = {
+  PENDIENTE: "bg-[#98A2B3]",
+  EN_CURSO: "bg-[#1658B0]",
+  HECHA: "bg-[#16A34A]",
 }
 
 export type TituloParseado = {
@@ -74,6 +80,10 @@ export function transicionTareaValida(desde: EstadoTareaPlan, hacia: EstadoTarea
 
 export function estadosEditables(actual: EstadoTareaPlan) {
   return [actual, ...SIGUIENTE[actual]]
+}
+
+export function alternarHecha(estado: EstadoTareaPlan): EstadoTareaPlan {
+  return estado === "HECHA" ? "PENDIENTE" : "HECHA"
 }
 
 export type FilaPlan = {

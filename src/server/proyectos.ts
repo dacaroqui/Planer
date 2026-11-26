@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { agruparTareas, avanceProyecto, avanceRequerimiento, tareaVencida } from "@/lib/avance"
 import { DomainError, PermisoDenegado, TERMINAL_STATUSES, type Actor, type TeamName } from "@/lib/domain"
 import { esAdmin, puedeAdministrar, puedeAsignar, puedeAutoasignarse, puedeRadicar, puedeVer, rolEn } from "@/lib/permissions"
+import { transicionTareaValida } from "@/lib/plan-trabajo"
 import { ZONE } from "@/lib/time"
 
 export function puedeCrearProyecto(actor: Actor) {
@@ -213,6 +214,9 @@ export async function guardarTarea(
       })
       if (!miembro) throw new DomainError(esAdmin(actor) ? "Esa persona no está activa o no puede recibir trabajo." : "Esa persona no es agente ni líder del equipo.")
     }
+  }
+  if (existente && existente.status !== input.status && !transicionTareaValida(existente.status, input.status)) {
+    throw new DomainError("Ese cambio de estado no está permitido.")
   }
   const completedAt = input.status === "HECHA" ? (existente?.completedAt ?? new Date()) : null
   const data = {

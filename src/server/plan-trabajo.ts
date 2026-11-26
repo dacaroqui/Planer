@@ -238,7 +238,7 @@ export async function editarFilaPlan(
     return
   }
   if (input.status && !transicionTareaValida(tarea.status, input.status)) {
-    throw new DomainError("Ese cambio de estado no está permitido. Pase por En curso.")
+    throw new DomainError("Ese cambio de estado no está permitido.")
   }
   if (input.parentId) {
     if (input.parentId === tarea.id) throw new DomainError("Una actividad no puede ser subtarea de sí misma.")
@@ -304,7 +304,7 @@ export async function editarMasivo(
   if (tareas.length !== input.ids.length) throw new DomainError("Hay una actividad que no existe.")
   for (const tarea of tareas) {
     if (!tarea.project || !puedeEditarPlan(actor, tarea.project.team)) throw new PermisoDenegado("Solo el líder del área o un administrador edita el plan.")
-    if (input.status && !transicionTareaValida(tarea.status, input.status)) throw new DomainError("Ese cambio de estado no está permitido. Pase por En curso.")
+    if (input.status && !transicionTareaValida(tarea.status, input.status)) throw new DomainError("Ese cambio de estado no está permitido.")
   }
   for (const id of input.ids) {
     await editarFilaPlan(actor, {

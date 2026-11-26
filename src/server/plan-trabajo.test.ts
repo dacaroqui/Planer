@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/prisma"
-import { DomainError, PermisoDenegado } from "@/lib/domain"
+import { PermisoDenegado } from "@/lib/domain"
 import { toActor } from "@/lib/actor"
 import { guardarTarea } from "@/server/proyectos"
 import { crearActividadPlan, editarFilaPlan, editarMasivo, listarPlan, moverActividad, reordenarActividades } from "@/server/plan-trabajo"
@@ -69,7 +69,9 @@ describe("permisos del plan de trabajo", () => {
     const delAgente = await listarPlan(agente.actor)
     expect(delAgente.find((fila) => fila.id === tarea.id)?.puedeEditar ?? false).toBe(false)
     await expect(editarFilaPlan(agente.actor, { id: tarea.id, bloqueo: "Otro" })).rejects.toBeInstanceOf(PermisoDenegado)
-    await expect(editarFilaPlan(lider.actor, { id: tarea.id, status: "HECHA" })).rejects.toBeInstanceOf(DomainError)
+    await editarFilaPlan(lider.actor, { id: tarea.id, status: "HECHA" })
+    const hecha = await prisma.tarea.findUniqueOrThrow({ where: { id: tarea.id } })
+    expect(hecha.status).toBe("HECHA")
     await editarFilaPlan(lider.actor, { id: tarea.id, status: "EN_CURSO", bloqueo: "Guion" })
     const actual = await prisma.tarea.findUniqueOrThrow({ where: { id: tarea.id } })
     expect(actual.status).toBe("EN_CURSO")
