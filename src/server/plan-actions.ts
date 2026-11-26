@@ -61,6 +61,7 @@ export async function crearActividadAction(formData: FormData): Promise<Resultad
       kpiActual: String(formData.get("kpiActual") || ""),
       bloqueo: String(formData.get("bloqueo") || ""),
       entregableId: String(formData.get("entregableId") || "") || null,
+      parentId: String(formData.get("parentId") || "") || null,
     })
     revalidatePath("/plan")
     revalidatePath("/planner")

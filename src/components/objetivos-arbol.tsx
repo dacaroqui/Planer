@@ -74,6 +74,13 @@ function fechaCorta(iso: string) {
   return dia && mes && anio ? `${dia}/${mes}/${anio}` : iso || "—"
 }
 
+function textoCosto(costo: number, tope: string) {
+  const topeTexto = tope.trim()
+  if (!topeTexto && !costo) return "Costo —"
+  if (!topeTexto) return `Costo ${costo}`
+  return `Costo ${costo ? costo : "—"} / tope ${topeTexto}`
+}
+
 function ObjetivoNodo({ objetivo, fases, proyectos, personas, puedeMeta, arrastrando }: { objetivo: Objetivo; fases: Fase[]; proyectos: ProyectoLibre[]; personas: Persona[]; puedeMeta: boolean; arrastrando: boolean }) {
   const router = useRouter()
   const { setNodeRef, isOver } = useDroppable({ id: `obj-${objetivo.id}`, disabled: !objetivo.puedeEditar })
@@ -110,7 +117,7 @@ function ObjetivoNodo({ objetivo, fases, proyectos, personas, puedeMeta, arrastr
       <summary className="cursor-pointer font-medium">
         {titulo}
         <span className="ml-2 text-sm text-muted-foreground">{TEAM_LABEL[objetivo.area as "MARKETING"] || objetivo.area} · {dueno} · {OBJETIVO_LABEL[objetivo.estado as "ABIERTO"] || objetivo.estado} · {objetivo.horas} h</span>
-        <span className={`ml-2 text-sm ${claseTope(objetivo.excede)}`}>Costo {objetivo.costo}{tope ? ` / tope ${tope}` : ""}{objetivo.excede ? " · por encima del tope" : ""}</span>
+        <span className={`ml-2 text-sm ${claseTope(objetivo.excede)}`}>{textoCosto(objetivo.costo, tope)}{objetivo.excede ? " · por encima del tope" : ""}</span>
         <span className="ml-2 text-sm text-muted-foreground">{fechaCorta(inicio)} – {fechaCorta(fin)}</span>
       </summary>
       <div className="mt-3 flex flex-wrap items-end gap-3">
@@ -156,9 +163,9 @@ function ProyectoArrastrable({ proyecto, puede }: { proyecto: Proyecto; puede: b
         {puede ? <button type="button" className="cursor-grab text-xs text-[#1658B0]" aria-label={`Arrastrar ${proyecto.name}`} {...listeners} {...attributes}>Mover</button> : null}
         <Link href={`/proyectos/${proyecto.id}`} className="font-medium text-[#1658B0]">{proyecto.name}</Link>
       </span>
-      <span className="text-muted-foreground"> · {proyecto.fase || "Sin fase"} · {proyecto.medio || "Sin medio"} · {proyecto.horas} h · {proyecto.costo}</span>
+      <span className="text-muted-foreground"> · {proyecto.fase || "Sin fase"} · {proyecto.medio || "Sin medio"} · {proyecto.horas ? `${proyecto.horas} h` : "—"} · {proyecto.costo ? proyecto.costo : "—"}</span>
       <ul className="mt-1 text-xs text-[#3d4a63]">
-        {proyecto.actividades.map((actividad) => <li key={actividad.id}>{actividad.titulo} · {actividad.responsable} · {actividad.horas} h</li>)}
+        {proyecto.actividades.map((actividad) => <li key={actividad.id}>{actividad.titulo} · {actividad.responsable} · {actividad.horas ? `${actividad.horas} h` : "—"}</li>)}
       </ul>
     </li>
   )

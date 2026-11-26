@@ -37,6 +37,7 @@ export type InformePdf = {
   desde: string
   hasta: string
   cumplimiento: number
+  formula: string
   aTiempo: number
   enRiesgo: number
   vencidos: number
@@ -51,6 +52,7 @@ export type InformePdf = {
     hechasSemana: string[]
     planeadas: string[]
     vencidas: string[]
+    kpisVinculados: { nombre: string; medida: string }[]
   }[]
   kpis: { nombre: string; ambito: string; medida: string; estado: string }[]
 }
@@ -65,7 +67,8 @@ export function DocumentoInforme({ datos }: { datos: InformePdf }) {
         <Text style={estilos.h2}>Resumen</Text>
         <View style={estilos.tarjeta}>
           <Text>Cumplimiento general {datos.cumplimiento}%</Text>
-          <View style={estilos.barra}><View style={[estilos.relleno, { width: `${datos.cumplimiento}%` }]} /></View>
+          <View style={estilos.barra}><View style={[estilos.relleno, { width: `${Math.min(100, datos.cumplimiento)}%` }]} /></View>
+          <Text style={estilos.muted}>{datos.formula}</Text>
           <Text style={estilos.muted}>{datos.aTiempo} a tiempo · {datos.enRiesgo} en riesgo · {datos.vencidos} vencidos</Text>
         </View>
         <Text style={estilos.pie} render={({ pageNumber, totalPages }) => `Planer · ${pageNumber} / ${totalPages}`} fixed />
@@ -89,12 +92,16 @@ export function DocumentoInforme({ datos }: { datos: InformePdf }) {
           <Text>Hechas: {proyecto.hechasSemana.join(", ") || "ninguna"}</Text>
           <Text>Planeadas: {proyecto.planeadas.join(", ") || "ninguna"}</Text>
           <Text>Vencidas: {proyecto.vencidas.join(", ") || "ninguna"}</Text>
+          <Text style={estilos.h2}>KPIs vinculados</Text>
+          {proyecto.kpisVinculados.length === 0 ? <Text style={estilos.muted}>Sin KPI vinculado a las actividades.</Text> : proyecto.kpisVinculados.map((kpi) => (
+            <Text key={kpi.nombre}>{kpi.nombre}: {kpi.medida}</Text>
+          ))}
           <Text style={estilos.pie} render={({ pageNumber, totalPages }) => `Planer · ${pageNumber} / ${totalPages}`} fixed />
         </Page>
       ))}
       <Page size="A4" style={estilos.pagina}>
         <Text style={estilos.marca}>CIFES · Luvania</Text>
-        <Text style={estilos.h2}>KPIs</Text>
+        <Text style={estilos.h2}>KPIs por objetivo y área</Text>
         {datos.kpis.length === 0 ? <Text style={estilos.muted}>Sin KPIs en este corte.</Text> : datos.kpis.map((kpi) => (
           <Text key={`${kpi.ambito}-${kpi.nombre}`}>{kpi.ambito} · {kpi.nombre}: {kpi.medida} · {kpi.estado}</Text>
         ))}

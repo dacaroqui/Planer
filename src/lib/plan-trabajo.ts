@@ -1,4 +1,5 @@
 import type { Actor, TeamName } from "@/lib/domain"
+import { porcentajeProyecto } from "@/lib/entregables"
 import { TEAM_LABEL, esTeam } from "@/lib/domain"
 import { esAdmin, rolEn } from "@/lib/permissions"
 
@@ -99,7 +100,7 @@ export type FilaPlan = {
   kpiUnidad: string
   kpiActual: number | null
   kpiId?: string | null
-  kpisDisponibles?: { id: string; nombre: string; actual: number | null; meta: number | null; unidad: string }[]
+  kpisDisponibles?: { id: string; nombre: string; actual: number | null; meta: number | null; unidad: string; origen?: "objetivo" | "area" }[]
   entregableId?: string | null
   parentId: string | null
   orden: number
@@ -138,7 +139,7 @@ export function presentarTarea(input: {
   kpiUnidad?: string | null
   kpiActual?: { toString(): string } | number | null
   kpiId?: string | null
-  kpisDisponibles?: { id: string; nombre: string; actual: number | null; meta: number | null; unidad: string }[]
+  kpisDisponibles?: { id: string; nombre: string; actual: number | null; meta: number | null; unidad: string; origen?: "objetivo" | "area" }[]
   entregableId?: string | null
   parentId?: string | null
   orden?: number
@@ -191,8 +192,33 @@ export function textoMedidaKpi(actual: number | null, meta: number | null, unida
 }
 
 export function textoKpi(fila: Pick<FilaPlan, "kpiNombre" | "kpiActual" | "kpiMeta" | "kpiUnidad">) {
-  if (!fila.kpiNombre && fila.kpiActual == null && fila.kpiMeta == null) return ""
-  return textoMedidaKpi(fila.kpiActual, fila.kpiMeta, fila.kpiUnidad)
+  const nombre = fila.kpiNombre.trim()
+  const sinMedida = fila.kpiActual == null && fila.kpiMeta == null
+  if (!nombre && sinMedida) return ""
+  const medida = textoMedidaKpi(fila.kpiActual, fila.kpiMeta, fila.kpiUnidad)
+  return nombre ? `${nombre} · ${medida}` : medida
+}
+
+export function ordenarKpisDisponibles<T extends { nombre: string }>(kpis: T[], proyecto: string) {
+  const normal = (valor: string) => valor.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  const base = normal(proyecto)
+  const coincide = (nombre: string) => {
+    const texto = normal(nombre)
+    return texto.length >= 3 && base.length >= 3 && (texto.includes(base) || base.includes(texto))
+  }
+  return {
+    delProyecto: kpis.filter((kpi) => coincide(kpi.nombre)),
+    delAmbito: kpis.filter((kpi) => !coincide(kpi.nombre)),
+  }
+}
+
+export function totalesPlan(filas: { hecha: boolean; horasEstimadas: number | null; horasReales: number | null; parentId: string | null }[]) {
+  const horas = sumarHoras(filas)
+  return {
+    cumplimiento: porcentajeProyecto(filas.filter((fila) => !fila.parentId)),
+    estimadas: horas.estimadas,
+    reales: horas.reales,
+  }
 }
 
 export function avanceKpi(actual: number | null, meta: number | null) {
