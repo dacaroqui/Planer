@@ -154,4 +154,50 @@ describe("estado de la actividad", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar eliminar" }))
     expect(eliminarActividadPlanAction).toHaveBeenCalledWith({ id: "t1", subtareas: "soltar" })
   })
+
+  it("cierra KPI y responsable con Escape o un clic fuera, y el arrastre reordena", async () => {
+    reordenarPlanAction.mockResolvedValue({ ok: true })
+    render(
+      <PlanCompacto
+        filas={[fila("PENDIENTE"), { ...fila("PENDIENTE", "t2"), actividad: "Edición" }]}
+        proyectos={[{ id: "p1", name: "Escuela de ejemplo", team: "MARKETING", area: "Marketing", inicio: "2026-11-01", fin: "2026-12-31" }]}
+        entregables={[]}
+        responsables={[{ id: "u1", name: "Valeria Ejemplo", teams: ["MARKETING"] }]}
+        enfocar={null}
+        onDetalles={() => undefined}
+      />,
+    )
+    const filaArrastre = document.querySelector("[data-arrastre='t1']")
+    expect(filaArrastre?.getAttribute("aria-roledescription")).toBe("draggable")
+    fireEvent.click(screen.getAllByRole("button", { name: "Elegir KPI" })[0])
+    expect(screen.getByRole("listbox", { name: "Elegir KPI" })).toBeTruthy()
+    fireEvent.keyDown(document, { key: "Escape" })
+    expect(screen.queryByRole("listbox", { name: "Elegir KPI" })).toBeNull()
+    expect(document.activeElement).toBe(screen.getAllByRole("button", { name: "Elegir KPI" })[0])
+    fireEvent.click(screen.getAllByRole("button", { name: "Elegir KPI" })[0])
+    fireEvent.click(screen.getByRole("button", { name: "+ Nuevo KPI" }))
+    fireEvent.keyDown(screen.getByLabelText("Nombre del KPI nuevo"), { key: "Escape" })
+    expect(screen.queryByLabelText("Nombre del KPI nuevo")).toBeNull()
+    fireEvent.click(screen.getAllByRole("button", { name: "Elegir KPI" })[0])
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByRole("listbox", { name: "Elegir KPI" })).toBeNull()
+    const responsable = screen.getAllByRole("button", { name: "Responsable Sin asignar" })[0]
+    fireEvent.click(responsable)
+    expect(screen.getByLabelText("Buscar responsable")).toBeTruthy()
+    fireEvent.keyDown(document, { key: "Escape" })
+    expect(screen.queryByLabelText("Buscar responsable")).toBeNull()
+    expect(document.activeElement).toBe(responsable)
+    fireEvent.click(responsable)
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByLabelText("Buscar responsable")).toBeNull()
+    document.querySelectorAll<HTMLElement>("[data-arrastre]").forEach((nodo, indice) => {
+      const top = indice * 48
+      nodo.getBoundingClientRect = () => ({ x: 0, y: top, top, left: 0, bottom: top + 40, right: 600, width: 600, height: 40, toJSON() { return {} } })
+    })
+    const mango = screen.getByRole("button", { name: "Arrastrar Parrilla" })
+    fireEvent.pointerDown(mango, { pointerId: 1, isPrimary: true, button: 0, clientX: 12, clientY: 12 })
+    fireEvent.pointerMove(document, { pointerId: 1, isPrimary: true, clientX: 12, clientY: 70 })
+    fireEvent.pointerUp(document, { pointerId: 1, isPrimary: true, clientX: 12, clientY: 70 })
+    await waitFor(() => expect(reordenarPlanAction).toHaveBeenCalled())
+  })
 })

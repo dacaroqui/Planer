@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { Avatar } from "@/components/iconos-planer"
 import { CUMPLIMIENTO_LABEL, cumplimientoFecha, porcentajeEntregable, porcentajeProyecto } from "@/lib/entregables"
 import { ESTADO_TAREA_LABEL, ESTADO_TAREA_PUNTO, ESTADOS_TAREA, alternarHecha, ordenarKpisDisponibles, textoKpi as medidaKpi, type FilaPlan } from "@/lib/plan-trabajo"
+import { useCerrarPopover } from "@/components/use-cerrar-popover"
 import { asignarEntregableAction, crearActividadAction, crearEntregableAction, crearKpiPlanAction, eliminarActividadPlanAction, guardarCeldaAction, moverActividadAction, renombrarEntregableAction, reordenarPlanAction, restaurarActividadPlanAction, vincularKpiAction } from "@/server/plan-actions"
 
 type ProyectoPlan = { id: string; name: string; team: string | null; area: string; inicio: string; fin: string }
@@ -182,8 +183,14 @@ export function PlanCompacto({
         )
       })}
     </div>
-    <DragOverlay>
-      {arrastrada ? <div className="rounded-md border border-[#1658B0] bg-white px-3 py-2 text-sm shadow-lg">{arrastrada.actividad}</div> : null}
+    <DragOverlay style={{ width: "max-content", maxWidth: 420, height: "auto" }}>
+      {arrastrada ? (
+        <div className="flex max-w-[420px] items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-1.5 text-sm shadow-md">
+          <span className="truncate font-medium">{arrastrada.actividad}</span>
+          <Avatar nombre={arrastrada.responsableId ? arrastrada.responsable : "?"} />
+          <span className="shrink-0 rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px]">{ESTADO_TAREA_LABEL[arrastrada.estado]}</span>
+        </div>
+      ) : null}
     </DragOverlay>
     </DndContext>
   )
@@ -216,9 +223,10 @@ function EditorFecha({
   onGuardar: (valor: string | null) => void
 }) {
   const etiqueta = campo === "inicio" ? "Inicio" : "Fin"
+  const pop = useCerrarPopover(abierta, onCerrar)
   return (
-    <span className="group relative">
-      <button type="button" className={color || "text-[#98A2B3]"} aria-label={etiqueta} onClick={onAbrir}><CalendarIcon className="size-3.5" /></button>
+    <span ref={(nodo) => { pop.caja.current = nodo }} className="group relative">
+      <button ref={pop.disparador} type="button" className={color || "text-[#98A2B3]"} aria-label={etiqueta} onClick={() => abierta ? onCerrar() : onAbrir()}><CalendarIcon className="size-3.5" /></button>
       <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-[#15122A] px-2 py-1 text-[10px] text-white group-hover:block">{etiqueta} {fechaCorta(valor)}</span>
       {abierta ? (
         <span className="absolute left-0 z-30 mt-1 flex items-center gap-1 rounded border border-[#1658B0] bg-white p-1 shadow">
@@ -330,23 +338,10 @@ function Fila({
   const [titulo, setTitulo] = useState(false)
   const [borrar, setBorrar] = useState(false)
   const [estadoAbierto, setEstadoAbierto] = useState(false)
-  const estadoRef = useRef<HTMLSpanElement>(null)
+  const estadoPop = useCerrarPopover(estadoAbierto, () => setEstadoAbierto(false))
+  const kpiPop = useCerrarPopover(kpi, () => { setKpi(false); setNuevoKpi(false) })
+  const gentePop = useCerrarPopover(gente, () => setGente(false))
   const [abierta, setAbierta] = useState(hijas.length > 0)
-  useEffect(() => {
-    if (!estadoAbierto) return
-    function fuera(event: MouseEvent) {
-      if (!estadoRef.current?.contains(event.target as Node)) setEstadoAbierto(false)
-    }
-    function tecla(event: KeyboardEvent) {
-      if (event.key === "Escape") setEstadoAbierto(false)
-    }
-    document.addEventListener("mousedown", fuera)
-    document.addEventListener("keydown", tecla)
-    return () => {
-      document.removeEventListener("mousedown", fuera)
-      document.removeEventListener("keydown", tecla)
-    }
-  }, [estadoAbierto])
   const texto = etiquetaKpi(fila)
   const grupos = ordenarKpisDisponibles(fila.kpisDisponibles ?? [], proyecto.name)
   const finEstado = cumplimientoFecha(fila.fin, fila.estado === "HECHA" ? 100 : 0, hoyIso())
@@ -408,7 +403,7 @@ function Fila({
   }
   return (
     <div>
-      <div ref={suelta.setNodeRef} className={`group relative grid items-center gap-1 border-t px-2 py-1 text-sm hover:bg-[#F8FAFD] ${sobre === fila.id ? "border-t-2 border-[#1658B0]" : "border-[#F0F2F5]"} ${arrastre.isDragging ? "opacity-40" : ""}`} style={{ gridTemplateColumns: "22px minmax(0,1fr) 28px 64px 22px 22px 22px 40px minmax(120px,150px) 78px", paddingLeft: nivel ? 28 : 8 }} {...arrastre.attributes}>
+      <div ref={(nodo) => { arrastre.setNodeRef(nodo); suelta.setNodeRef(nodo) }} data-arrastre={fila.id} className={`group relative grid items-center gap-1 border-t px-2 py-1 text-sm hover:bg-[#F8FAFD] ${sobre === fila.id ? "border-t-2 border-[#1658B0]" : "border-[#F0F2F5]"} ${arrastre.isDragging ? "opacity-40" : ""}`} style={{ gridTemplateColumns: "22px minmax(0,1fr) 28px 64px 22px 22px 22px 40px minmax(120px,150px) 78px", paddingLeft: nivel ? 28 : 8 }} {...arrastre.attributes}>
         <button type="button" className="cursor-grab text-[#98A2B3] active:cursor-grabbing" aria-label={`Arrastrar ${fila.actividad}`} aria-keyshortcuts="ArrowUp ArrowDown" {...arrastre.listeners} onKeyDown={(event) => { if (event.key === "ArrowUp") { event.preventDefault(); onMover(fila.id, -1) } if (event.key === "ArrowDown") { event.preventDefault(); onMover(fila.id, 1) } }}><GripVerticalIcon className="size-3.5" /></button>
         <span className="flex min-w-0 items-center gap-1">
           {nivel === 0 ? (
@@ -425,11 +420,11 @@ function Fila({
             <button type="button" className={`min-w-0 flex-1 truncate text-left ${fila.estado === "HECHA" ? "text-[#98A2B3] line-through" : ""}`} title={fila.actividad} onClick={() => fila.puedeEditar && setTitulo(true)}>{fila.actividad}</button>
           )}
         </span>
-        <span className="relative">
-          <button type="button" aria-label={`Responsable ${fila.responsable}`} title={fila.responsable} onClick={() => setGente((valor) => !valor)}><Avatar nombre={fila.responsableId ? fila.responsable : "?"} /></button>
+        <span ref={(nodo) => { gentePop.caja.current = nodo }} className="relative">
+          <button ref={gentePop.disparador} type="button" aria-label={`Responsable ${fila.responsable}`} title={fila.responsable} onClick={() => setGente((valor) => !valor)}><Avatar nombre={fila.responsableId ? fila.responsable : "?"} /></button>
           {gente ? (
             <span className="absolute left-0 z-30 mt-1 grid w-52 rounded-md border border-[#E4E7EC] bg-white p-1 text-xs shadow">
-              <input autoFocus aria-label="Buscar responsable" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Buscar" className="mb-1 h-7 rounded border border-[#E4E7EC] px-2" onKeyDown={(event) => { if (event.key === "Escape") setGente(false) }} />
+              <input autoFocus aria-label="Buscar responsable" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Buscar" className="mb-1 h-7 rounded border border-[#E4E7EC] px-2" />
               <button type="button" className="rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => { setGente(false); void guardar({ responsableId: null, responsable: "Sin asignar" }, { id: fila.id, assigneeId: null }) }}>Sin asignar</button>
               {responsables.filter((persona) => !proyecto.team || persona.teams.includes(proyecto.team) || persona.id === fila.responsableId).filter((persona) => persona.name.toLowerCase().includes(busca.trim().toLowerCase())).map((persona) => (
                 <button type="button" key={persona.id} className="flex items-center gap-2 rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => { setGente(false); void guardar({ responsableId: persona.id, responsable: persona.name }, { id: fila.id, assigneeId: persona.id }) }}>
@@ -439,8 +434,8 @@ function Fila({
             </span>
           ) : null}
         </span>
-        <span ref={estadoRef} className="relative">
-          <button type="button" aria-expanded={estadoAbierto} aria-haspopup="menu" className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium ${fila.estado === "HECHA" ? "bg-emerald-50 text-[#16A34A]" : fila.estado === "EN_CURSO" ? "bg-[#E7F0FB] text-[#1658B0]" : "bg-[#F3F4F6] text-[#3d4a63]"}`} onClick={() => setEstadoAbierto((valor) => !valor)}>{ESTADO_TAREA_LABEL[fila.estado]}</button>
+        <span ref={(nodo) => { estadoPop.caja.current = nodo }} className="relative">
+          <button ref={estadoPop.disparador} type="button" aria-expanded={estadoAbierto} aria-haspopup="menu" className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium ${fila.estado === "HECHA" ? "bg-emerald-50 text-[#16A34A]" : fila.estado === "EN_CURSO" ? "bg-[#E7F0FB] text-[#1658B0]" : "bg-[#F3F4F6] text-[#3d4a63]"}`} onClick={() => setEstadoAbierto((valor) => !valor)}>{ESTADO_TAREA_LABEL[fila.estado]}</button>
           {estadoAbierto ? (
             <span role="menu" aria-label={`Estado de ${fila.actividad}`} className="absolute left-0 z-30 mt-1 grid w-32 rounded-md border border-[#E4E7EC] bg-white p-1 text-xs shadow" onKeyDown={(event) => { if (event.key === "Escape") setEstadoAbierto(false) }}>
               {ESTADOS_TAREA.map((estado) => (
@@ -456,15 +451,15 @@ function Fila({
         <EditorFecha campo="inicio" abierta={fecha === "inicio"} valor={fila.inicio} borrador={borradorFecha} onBorrador={setBorradorFecha} onAbrir={() => { setBorradorFecha(fila.inicio ?? ""); setFecha("inicio") }} onCerrar={() => setFecha(null)} onGuardar={(valor) => { setFecha(null); void guardar({ inicio: valor }, { id: fila.id, fechaInicio: valor }) }} />
         <EditorFecha campo="fin" abierta={fecha === "fin"} valor={fila.fin} color={COLOR_FIN[finEstado]} borrador={borradorFecha} onBorrador={setBorradorFecha} onAbrir={() => { setBorradorFecha(fila.fin ?? ""); setFecha("fin") }} onCerrar={() => setFecha(null)} onGuardar={(valor) => { setFecha(null); void guardar({ fin: valor }, { id: fila.id, fechaFin: valor }) }} />
         <span className="text-[11px] tabular-nums text-[#3d4a63]" title="Horas estimadas / reales">{fila.horasEstimadas ?? "–"}/{fila.horasReales ?? "–"}</span>
-        <span className="relative min-w-0">
-          <button type="button" className={`flex w-full items-center gap-1 text-left text-[11px] leading-tight ${texto ? "text-[#1658B0]" : "text-[#98A2B3]"}`} title={texto || "Elegir KPI"} aria-label={texto ? `KPI ${texto}` : "Elegir KPI"} onClick={() => setKpi((valor) => !valor)}>
+        <span ref={(nodo) => { kpiPop.caja.current = nodo }} className="relative min-w-0">
+          <button ref={kpiPop.disparador} type="button" className={`flex w-full items-center gap-1 text-left text-[11px] leading-tight ${texto ? "text-[#1658B0]" : "text-[#98A2B3]"}`} title={texto || "Elegir KPI"} aria-label={texto ? `KPI ${texto}` : "Elegir KPI"} onClick={() => setKpi((valor) => !valor)}>
             {texto ? <span className="min-w-0 whitespace-normal">{texto}</span> : <><TargetIcon className="size-3 shrink-0" /> Elegir KPI</>}
           </button>
           {kpi ? (
             <span role="listbox" aria-label="Elegir KPI" className="absolute right-0 z-30 mt-1 grid max-h-64 w-64 overflow-auto rounded border border-[#1658B0] bg-white p-1 text-xs shadow">
               {nuevoKpi ? (
                 <span className="mb-1 flex flex-wrap items-center gap-1">
-                  <input autoFocus aria-label="Nombre del KPI nuevo" placeholder="+ Nuevo KPI" value={nombreKpi} onChange={(event) => setNombreKpi(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void crearKpi(); if (event.key === "Escape") setNuevoKpi(false) }} className="h-7 min-w-24 flex-1 rounded border border-[#1658B0] px-1" />
+                  <input autoFocus aria-label="Nombre del KPI nuevo" placeholder="+ Nuevo KPI" value={nombreKpi} onChange={(event) => setNombreKpi(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void crearKpi() } if (event.key === "Escape") { setNuevoKpi(false); setKpi(false) } }} className="h-7 min-w-24 flex-1 rounded border border-[#1658B0] px-1" />
                   <input aria-label="Meta del KPI nuevo" placeholder="Meta" value={metaKpi} onChange={(event) => setMetaKpi(event.target.value)} className="h-7 w-12 rounded border border-[#E4E7EC] px-1" />
                   <input aria-label="Unidad del KPI nuevo" placeholder="Unidad" value={unidadKpi} onChange={(event) => setUnidadKpi(event.target.value)} className="h-7 w-14 rounded border border-[#E4E7EC] px-1" />
                   <button type="button" aria-label="Guardar KPI nuevo" className="inline-flex size-7 items-center justify-center rounded bg-[#1658B0] text-white" onClick={() => { void crearKpi() }}><CheckIcon className="size-3.5" /></button>
