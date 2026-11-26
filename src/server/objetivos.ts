@@ -174,14 +174,17 @@ export async function guardarKpi(actor: Actor, input: {
 }) {
   exigirVer(actor)
   if (input.nombre.trim().length < 2) throw new DomainError("Indique el nombre del KPI.")
-  const dueno = input.nivel === "persona" ? (input.personaId || actor.id) : ""
+  const puedeAsignarPersona = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER")
+  let dueno = actor.id
+  if (input.nivel === "persona" && input.personaId && input.personaId !== actor.id) {
+    if (!puedeAsignarPersona) throw new PermisoDenegado("Solo puede crear sus propios KPIs.")
+    dueno = input.personaId
+  }
+  if (input.nivel !== "persona") dueno = ""
   if (input.nivel === "objetivo" && !input.objetivoId) throw new DomainError("Elija el objetivo.")
   if (input.nivel === "area") {
     if (!esTeam(input.area)) throw new DomainError("Elija el área.")
     if (!puedeEditarArea(actor, input.area)) throw new PermisoDenegado("Solo el líder del área o un administrador edita los KPIs del área.")
-  }
-  if (input.nivel === "persona" && dueno !== actor.id && !esAdmin(actor)) {
-    throw new PermisoDenegado("Solo puede crear sus propios KPIs.")
   }
   if (input.nivel === "persona") {
     const actuales = await prisma.kpi.findMany({ where: { personaId: dueno }, select: { id: true, tipo: true } })

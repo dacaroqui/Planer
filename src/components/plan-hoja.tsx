@@ -706,14 +706,23 @@ function BarraGantt({ fila, onCambio }: { fila: FilaPlan; onCambio: (inicio: str
 function AltaRapida({ nombre, onCrear }: { nombre: string; onCrear: (titulo: string) => Promise<void> }) {
   const [titulo, setTitulo] = useState("")
   const [ocupada, setOcupada] = useState(false)
+  const [avisoCorto, setAvisoCorto] = useState("")
   return (
-    <input value={titulo} disabled={ocupada} aria-label={`Agregar actividad en ${nombre}`} placeholder="+ Escriba y pulse Enter" onChange={(event) => setTitulo(event.target.value)} onKeyDown={(event) => {
-      if (event.key !== "Enter") return
-      const texto = titulo.trim()
-      if (texto.length < 3) return
-      setOcupada(true)
-      void onCrear(texto).finally(() => { setTitulo(""); setOcupada(false) })
-    }} className="h-9 w-72 rounded-md border border-dashed border-[#1658B0] px-2 text-sm" />
+    <span className="flex flex-wrap items-center gap-2">
+      <input value={titulo} disabled={ocupada} aria-label={`Agregar actividad en ${nombre}`} placeholder="+ Escriba y pulse Enter" onChange={(event) => { setTitulo(event.target.value); setAvisoCorto("") }} onKeyDown={(event) => {
+        if (event.key !== "Enter") return
+        const texto = titulo.trim()
+        if (texto.length < 3) {
+          setAvisoCorto("Escriba al menos 3 caracteres.")
+          toast.error("Escriba al menos 3 caracteres.")
+          return
+        }
+        setAvisoCorto("")
+        setOcupada(true)
+        void onCrear(texto).finally(() => { setTitulo(""); setOcupada(false) })
+      }} className="h-9 w-72 rounded-md border border-dashed border-[#1658B0] px-2 text-sm" />
+      {avisoCorto ? <span role="alert" className="text-xs font-medium text-red-700">{avisoCorto}</span> : null}
+    </span>
   )
 }
 

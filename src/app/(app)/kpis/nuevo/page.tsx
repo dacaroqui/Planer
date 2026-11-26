@@ -1,18 +1,24 @@
 import { redirect } from "next/navigation"
 import { TEAMS, TEAM_LABEL, puedeVerMatriz } from "@/lib/objetivos"
+import { esAdmin } from "@/lib/permissions"
 import { guardarKpiAction } from "@/server/objetivos-actions"
 import { prisma } from "@/lib/prisma"
 import { requireActor } from "@/server/session"
 
-export default async function NuevoKpiPage({ searchParams }: { searchParams: Promise<{ nivel?: string; volver?: string }> }) {
+export default async function NuevoKpiPage({ searchParams }: { searchParams: Promise<{ nivel?: string; volver?: string; persona?: string }> }) {
   const actor = await requireActor()
   if (!puedeVerMatriz(actor)) redirect("/panel")
   const params = await searchParams
   const nivel = params.nivel === "objetivo" || params.nivel === "area" ? params.nivel : "persona"
-  const [objetivos, kpis] = await Promise.all([
+  const puedeAsignar = esAdmin(actor) || actor.memberships.some((item) => item.role === "LIDER")
+  const [objetivos, kpis, personas] = await Promise.all([
     prisma.objetivo.findMany({ orderBy: { titulo: "asc" }, select: { id: true, titulo: true } }),
     prisma.kpi.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+    puedeAsignar && nivel === "persona"
+      ? prisma.user.findMany({ where: { active: true, deactivatedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
   ])
+  const personaInicial = personas.some((persona) => persona.id === params.persona) ? params.persona : actor.id
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="font-heading text-4xl">Nuevo KPI</h1>
@@ -31,6 +37,11 @@ export default async function NuevoKpiPage({ searchParams }: { searchParams: Pro
             <select name="frecuencia" aria-label="Frecuencia" className="h-10 rounded-lg border border-[#E4E7EC] px-3"><option value="SEMANAL">Semanal</option><option value="QUINCENAL">Quincenal</option><option value="MENSUAL">Mensual</option></select>
           </label>
         </div>
+        {nivel === "persona" && puedeAsignar ? (
+          <label className="grid gap-1">Persona
+            <select name="personaId" aria-label="Persona" defaultValue={personaInicial} className="h-10 rounded-lg border border-[#E4E7EC] px-3">{personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}</select>
+          </label>
+        ) : null}
         {nivel === "persona" ? (
           <label className="grid gap-1">Tipo
             <select name="tipo" aria-label="Tipo" className="h-10 rounded-lg border border-[#E4E7EC] px-3"><option value="PRINCIPAL">Principal</option><option value="APOYO">Apoyo</option></select>
