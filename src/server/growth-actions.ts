@@ -85,13 +85,18 @@ export async function tareaExperimentoAction(formData: FormData) {
   const id = String(formData.get("id") || "")
   const title = String(formData.get("title") || "").trim()
   if (title.length < 3) throw new DomainError("Indique el título de la tarea.")
+  const projectId = String(formData.get("projectId") || "")
+  if (!projectId) throw new DomainError("Toda actividad pertenece a un proyecto.")
   const experimento = await prisma.growthExperimento.findUnique({ where: { id } })
   if (!experimento) throw new DomainError("El experimento no existe.")
+  const proyecto = await prisma.proyecto.findUnique({ where: { id: projectId } })
+  if (!proyecto) throw new DomainError("Elija un proyecto.")
   await prisma.tarea.create({
     data: {
       title,
       status: "PENDIENTE",
       experimentoId: id,
+      projectId,
       assigneeId: String(formData.get("assigneeId") || "") || null,
       dueDate: formData.get("dueDate") ? new Date(String(formData.get("dueDate"))) : null,
       createdById: actor.id,

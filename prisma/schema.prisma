@@ -114,6 +114,7 @@ model User {
   objetivos          Objetivo[]          @relation("ObjetivoDueno")
   kpisPersona        Kpi[]               @relation("KpiPersona")
   medicionesKpi      KpiMedicion[]
+  entregables        Entregable[]        @relation("EntregableResponsable")
 }
 
 model Empresa {
@@ -208,11 +209,28 @@ model Proyecto {
   costo       Decimal?       @db.Decimal(12, 2)
   requests    Request[]
   tasks       Tarea[]
+  entregables Entregable[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   @@index([empresaId])
   @@index([objetivoId])
+}
+
+model Entregable {
+  id              String    @id @default(cuid())
+  proyectoId      String
+  proyecto        Proyecto  @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  nombre          String
+  fechaCompromiso DateTime?
+  responsableId   String?
+  responsable     User?     @relation("EntregableResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  orden           Int       @default(0)
+  tareas          Tarea[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([proyectoId, orden])
 }
 
 model Tarea {
@@ -246,12 +264,18 @@ model Tarea {
   bloqueo         String?
   notaRol         String?
   orden           Int         @default(0)
+  entregableId    String?
+  entregable      Entregable? @relation(fields: [entregableId], references: [id], onDelete: SetNull)
+  kpiId           String?
+  kpiEnlace       Kpi?        @relation(fields: [kpiId], references: [id], onDelete: SetNull)
   registros       Comment[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([requestId])
   @@index([projectId, orden])
+  @@index([entregableId])
+  @@index([kpiId])
   @@index([assigneeId, createdAt])
   @@index([assigneeId, completedAt])
   @@index([experimentoId])
@@ -686,6 +710,7 @@ model Kpi {
   apoyados      Kpi[]         @relation("KpiApoya")
   mediciones    KpiMedicion[]
   experimentos  GrowthExperimento[]
+  tareas        Tarea[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

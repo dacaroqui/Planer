@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -105,9 +105,36 @@ export function Marco({
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto pb-6 text-sm" aria-label="Principal">
-          {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel" activo={path === "/panel"} etiqueta="Para ti" icono={<HomeIcon className="size-4" />} compacta={!abierta} />}
-          <Recientes items={recientes} compacta={!abierta} destino={inicio} />
-          {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel?tab=marcado" activo={false} etiqueta="Favoritos" icono={<StarIcon className="size-4" />} compacta={!abierta} />}
+          {puedePlanner ? <Enlace href="/plan" activo={path.startsWith("/plan")} etiqueta="Plan de trabajo" icono={<ClipboardListIcon className="size-4" />} compacta={!abierta} /> : null}
+          <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Requerimientos" icono={<ListIcon className="size-4" />} compacta={!abierta} />
+          <GrupoMenu id="seguimiento" titulo="Seguimiento" path={path} compacta={!abierta}>
+            {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel" activo={path === "/panel"} etiqueta="Para ti" icono={<HomeIcon className="size-4" />} compacta={!abierta} />}
+            <Recientes items={recientes} compacta={!abierta} destino={inicio} />
+            {actor.role === "SOLICITANTE" ? null : <Enlace href="/panel?tab=marcado" activo={false} etiqueta="Favoritos" icono={<StarIcon className="size-4" />} compacta={!abierta} />}
+            {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+            {puedeTablero ? <Enlace href="/paneles" activo={path.startsWith("/paneles") || path.startsWith("/gerencia")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+            {puedeTablero ? <Enlace href="/tablero" activo={path.startsWith("/tablero")} etiqueta="Tablero" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
+            {puedeBandeja ? <Enlace href="/bandeja" activo={path.startsWith("/bandeja")} etiqueta="Bandeja de respuesta" icono={<InboxIcon className="size-4" />} compacta={!abierta} /> : null}
+            {puedeCola ? <Enlace href="/cola" activo={path.startsWith("/cola")} etiqueta="Cola de entrada" icono={<FilterIcon className="size-4" />} compacta={!abierta} /> : null}
+            {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
+            <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
+          </GrupoMenu>
+          {puedePlanner || puedeVerMatriz(actor) ? (
+            <GrupoMenu id="objetivos" titulo="Objetivos y KPIs" path={path} compacta={!abierta}>
+              {puedePlanner ? <Enlace href="/objetivos" activo={path.startsWith("/objetivos")} etiqueta="Objetivos" icono={<TargetIcon className="size-4" />} compacta={!abierta} /> : null}
+              {puedePlanner ? <Enlace href="/informes" activo={path.startsWith("/informes")} etiqueta="Informe semanal" icono={<ClipboardListIcon className="size-4" />} compacta={!abierta} /> : null}
+              {puedePlanner ? <Enlace href="/kpis" activo={path === "/kpis"} etiqueta="KPIs" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
+              {puedePlanner ? <Enlace href="/kpis/areas" activo={path.startsWith("/kpis/areas")} etiqueta="KPIs por área" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
+              {puedeCola ? <Enlace href="/kpis/personas" activo={path.startsWith("/kpis/personas")} etiqueta="KPIs por persona" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
+              {puedeVerMatriz(actor) ? <Enlace href="/kpis/mios" activo={path.startsWith("/kpis/mios")} etiqueta="Mis KPIs" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
+            </GrupoMenu>
+          ) : null}
+          {puedeGrowth ? <Enlace href="/growth" activo={path.startsWith("/growth")} etiqueta="Growth" icono={<TrendingUpIcon className="size-4" />} compacta={!abierta} /> : null}
+          {actor.role !== "SOLICITANTE" ? (
+            <GrupoMenu id="equipo" titulo="Equipo" path={path} compacta={!abierta}>
+              <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} />
+            </GrupoMenu>
+          ) : null}
           <div className="mt-3">
             <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase hover:bg-sidebar-accent" onClick={() => setEspaciosAbiertos((v) => !v)} aria-expanded={espaciosAbiertos}>
               <ChevronDownIcon className={cn("size-3", espaciosAbiertos ? "" : "-rotate-90")} />
@@ -127,29 +154,13 @@ export function Marco({
               </div>
             ) : null}
           </div>
-          <Enlace href="/requerimientos" activo={path.startsWith("/requerimientos") && !path.endsWith("/nuevo")} etiqueta="Requerimientos" icono={<ListIcon className="size-4" />} compacta={!abierta} />
-          {puedeTablero ? <Enlace href="/paneles" activo={path.startsWith("/paneles") || path.startsWith("/gerencia")} etiqueta="Paneles" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
-          {actor.role !== "SOLICITANTE" ? <Enlace href="/personas" activo={path.startsWith("/personas")} etiqueta="Personas" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
-          {rendimiento ? <Enlace href="/rendimiento" activo={path.startsWith("/rendimiento")} etiqueta={rendimiento === "propio" ? "Mi rendimiento" : "Rendimiento"} icono={<ChartColumnIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedeGrowth ? <Enlace href="/growth" activo={path.startsWith("/growth")} etiqueta="Growth" icono={<TrendingUpIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedePlanner ? <Enlace href="/planner" activo={path.startsWith("/planner")} etiqueta="Planner" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedePlanner ? <Enlace href="/plan" activo={path.startsWith("/plan")} etiqueta="Plan de trabajo" icono={<ClipboardListIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedePlanner ? <Enlace href="/objetivos" activo={path.startsWith("/objetivos")} etiqueta="Objetivos" icono={<TargetIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedePlanner ? <Enlace href="/kpis/areas" activo={path.startsWith("/kpis/areas")} etiqueta="KPIs por área" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedeCola ? <Enlace href="/kpis/personas" activo={path.startsWith("/kpis/personas")} etiqueta="KPIs por persona" icono={<UsersIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedeVerMatriz(actor) ? <Enlace href="/kpis/mios" activo={path.startsWith("/kpis/mios")} etiqueta="Mis KPIs" icono={<GaugeIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedeBandeja ? <Enlace href="/bandeja" activo={path.startsWith("/bandeja")} etiqueta="Bandeja de respuesta" icono={<InboxIcon className="size-4" />} compacta={!abierta} /> : null}
-          <Enlace href="/mis-solicitudes" activo={path.startsWith("/mis-solicitudes")} etiqueta="Mis solicitudes" icono={<ClockIcon className="size-4" />} compacta={!abierta} />
-          {puedeCola ? <Enlace href="/cola" activo={path.startsWith("/cola")} etiqueta="Cola de entrada" icono={<FilterIcon className="size-4" />} compacta={!abierta} /> : null}
-          {puedeTablero ? <Enlace href="/tablero" activo={path.startsWith("/tablero")} etiqueta="Tablero" icono={<LayoutDashboardIcon className="size-4" />} compacta={!abierta} /> : null}
           {puedeAdmin ? (
-            <div className="mt-4 border-t border-sidebar-border pt-3">
-              {abierta ? <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">Administración</p> : null}
+            <GrupoMenu id="configuracion" titulo="Configuración" path={path} compacta={!abierta}>
               <Enlace href="/admin/usuarios" activo={path.startsWith("/admin/usuarios")} etiqueta="Usuarios" icono={<UsersIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/areas" activo={path.startsWith("/admin/areas")} etiqueta="Áreas" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/catalogos" activo={path.startsWith("/admin/catalogos")} etiqueta="Catálogos" icono={<BookOpenIcon className="size-4" />} compacta={!abierta} />
               <Enlace href="/admin/flujos" activo={path.startsWith("/admin/flujos")} etiqueta="Flujos y SLA" icono={<WorkflowIcon className="size-4" />} compacta={!abierta} />
-            </div>
+            </GrupoMenu>
           ) : null}
         </nav>
       </aside>
@@ -232,5 +243,36 @@ function Usuario({ actor }: { actor: Actor }) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+const RUTAS_GRUPO: Record<string, string[]> = {
+  seguimiento: ["/panel", "/planner", "/paneles", "/gerencia", "/tablero", "/bandeja", "/cola", "/rendimiento", "/mis-solicitudes"],
+  objetivos: ["/objetivos", "/informes", "/kpis"],
+  equipo: ["/personas"],
+  configuracion: ["/admin"],
+}
+
+function GrupoMenu({ id, titulo, path, compacta, children }: { id: string; titulo: string; path: string; compacta: boolean; children: ReactNode }) {
+  const coincide = (RUTAS_GRUPO[id] || []).some((ruta) => path === ruta || path.startsWith(`${ruta}/`) || path.startsWith(`${ruta}?`))
+  const [abierto, setAbierto] = useState(false)
+  useEffect(() => {
+    const guardado = localStorage.getItem(`planer-grupo-${id}`)
+    setAbierto(guardado === "1" || coincide || (guardado === null && coincide))
+  }, [id, coincide])
+  function alternar() {
+    setAbierto((valor) => {
+      localStorage.setItem(`planer-grupo-${id}`, valor ? "0" : "1")
+      return !valor
+    })
+  }
+  return (
+    <div className="mt-2">
+      <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase hover:bg-sidebar-accent" aria-expanded={abierto} onClick={alternar}>
+        <ChevronDownIcon className={cn("size-3", abierto ? "" : "-rotate-90")} />
+        {compacta ? <span className="sr-only">{titulo}</span> : titulo}
+      </button>
+      {abierto ? <div className="mt-1 grid gap-0.5">{children}</div> : null}
+    </div>
   )
 }

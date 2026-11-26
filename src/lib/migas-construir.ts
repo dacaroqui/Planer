@@ -9,6 +9,7 @@ export const NOMBRES_MIGA: Record<string, string> = {
   planner: "Planner",
   plan: "Plan de trabajo",
   objetivos: "Objetivos",
+  informes: "Informe semanal",
   kpis: "KPIs",
   areas: "Por área",
   mios: "Mis KPIs",

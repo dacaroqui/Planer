@@ -22,12 +22,13 @@ export default async function FichaPage({ params }: { params: Promise<{ id: stri
     throw error
   }
   const edita = puedeEditarGrowth(actor)
-  const [objetivos, kpis] = edita
+  const [objetivos, kpis, proyectos] = edita
     ? await Promise.all([
         prisma.objetivo.findMany({ orderBy: { titulo: "asc" }, select: { id: true, titulo: true } }),
         prisma.kpi.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+        prisma.proyecto.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
       ])
-    : [[], []]
+    : [[], [], []]
   const destino = siguienteEstado(ficha.estado)
   const hechas = ficha.tareas.filter((tarea) => tarea.status === "HECHA").length
   const responsable = ficha.owner?.name || ficha.ownerName
@@ -87,6 +88,9 @@ export default async function FichaPage({ params }: { params: Promise<{ id: stri
           <form action={tareaExperimentoAction} className="mt-3 grid gap-2 sm:grid-cols-2">
             <input type="hidden" name="id" value={ficha.id} />
             <input name="title" required minLength={3} aria-label="Tarea" placeholder="Nueva tarea" className="h-10 rounded-lg border border-[#E4E7EC] px-3 sm:col-span-2" />
+            <label className="grid gap-1 text-xs sm:col-span-2">Proyecto
+              <select name="projectId" required aria-label="Proyecto de la tarea" className="h-10 rounded-lg border border-[#E4E7EC] px-3"><option value="">Elija un proyecto</option>{proyectos.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+            </label>
             <input name="dueDate" type="date" aria-label="Fecha de la tarea" className="h-10 rounded-lg border border-[#E4E7EC] px-3" />
             <button className="h-10 rounded-lg border border-[#1658B0] text-sm text-[#1658B0]" type="submit">Agregar tarea</button>
           </form>

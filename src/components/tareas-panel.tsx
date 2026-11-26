@@ -12,6 +12,7 @@ import { EliminarTarea } from "@/components/confirmar-eliminar"
 import { EstadoVacio } from "@/components/estado-vacio"
 import { Avatar } from "@/components/iconos-planer"
 import { guardarTareaAction } from "@/server/actions"
+import { crearProyectoPlanAction } from "@/server/plan-actions"
 import { Barra } from "@/components/barra"
 import { Elegir } from "@/components/ui/elegir"
 import { Button } from "@/components/ui/button"
@@ -52,6 +53,9 @@ export function TareasPanel({
   projectId,
   parentId,
   agentes,
+  proyectos = [],
+  empresaId,
+  equipo,
 }: {
   tareas: TareaVista[]
   porcentaje: number
@@ -61,6 +65,9 @@ export function TareasPanel({
   projectId?: string
   parentId?: string
   agentes: { id: string; name: string; grupo?: string }[]
+  proyectos?: { id: string; name: string }[]
+  empresaId?: string
+  equipo?: string
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -68,10 +75,25 @@ export function TareasPanel({
   const [assigneeId, setAssigneeId] = useState("")
   const [agregar, setAgregar] = useState(false)
 
+  async function resolverProyecto(data: FormData) {
+    if (projectId) { data.set("projectId", projectId); return true }
+    if (String(data.get("projectId") || "")) return true
+    const nuevo = String(data.get("name") || "").trim()
+    if (nuevo.length >= 3 && empresaId && equipo) {
+      data.set("name", nuevo)
+      const creado = await crearProyectoPlanAction(data)
+      if (!creado.ok || !creado.id) { toast.error(creado.ok ? "No se pudo crear el proyecto." : creado.error); return false }
+      data.set("projectId", creado.id)
+      return true
+    }
+    if (!String(data.get("projectId") || "")) { toast.error("Toda actividad pertenece a un proyecto."); return false }
+    return true
+  }
   function enviar(data: FormData) {
     const responsable = String(data.get("assigneeId") || "")
     const nombre = agentes.find((agente) => agente.id === responsable)?.name
     start(async () => {
+      if (!(await resolverProyecto(data))) return
       const result = await guardarTareaAction(data)
       if (!result.ok) {
         toast.error(result.error)
@@ -113,6 +135,26 @@ export function TareasPanel({
           event.currentTarget.reset()
         }}>
           <Input name="title" placeholder={parentId ? "Subtarea" : "Nueva tarea"} required minLength={3} />
+          {projectId ? null : (
+            <label className="grid gap-1 text-xs">Proyecto
+              <select name="projectId" aria-label="Proyecto de la tarea" className="h-10 rounded-lg border border-[#E4E7EC] px-2">
+                <option value="">Elija un proyecto</option>
+                {proyectos.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+          )}
+          {!projectId && empresaId ? (
+            <details className="rounded-lg border border-[#E4E7EC] p-2 text-xs">
+              <summary className="cursor-pointer font-medium text-[#1658B0]">Crear proyecto nuevo</summary>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input type="hidden" name="empresaId" value={empresaId} />
+                <input type="hidden" name="team" value={equipo || "DESARROLLO"} />
+                <input name="name" aria-label="Nombre del proyecto nuevo" placeholder="Nombre del proyecto" className="h-9 rounded-lg border border-[#E4E7EC] px-2 sm:col-span-2" />
+                <input name="startsAt" type="date" required aria-label="Inicio del proyecto nuevo" className="h-9 rounded-lg border border-[#E4E7EC] px-2" />
+                <input name="targetAt" type="date" required aria-label="Fin del proyecto nuevo" className="h-9 rounded-lg border border-[#E4E7EC] px-2" />
+              </div>
+            </details>
+          ) : null}
           <div className="grid gap-2 sm:grid-cols-3">
             <Elegir ariaLabel="Estado" value={status} onValueChange={(valor) => setStatus(valor as typeof status)} opciones={ESTADOS.map((item) => ({ value: item.value, label: item.label }))} />
             <Elegir ariaLabel="Responsable" value={assigneeId} onValueChange={setAssigneeId} placeholder="Sin responsable" opciones={[{ value: "", label: "Sin responsable" }, ...agentes.map((agente) => ({ value: agente.id, label: agente.name, iniciales: iniciales(agente.name), grupo: agente.grupo }))]} />

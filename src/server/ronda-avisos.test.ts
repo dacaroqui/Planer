@@ -115,7 +115,10 @@ describe("avisos de asignación", () => {
         slaTargetMinutes: 60,
       },
     })
-    const tarea = await guardarTarea(helena, { title: "Revisar el aula", status: "PENDIENTE", requestId: request.id, assigneeId: valentina.id })
+    const proyecto = await prisma.proyecto.create({
+      data: { name: "Aula de prueba", empresaId: empresa.id, leaderId: helena.id, team: "DESARROLLO", startsAt: new Date("2026-11-01"), targetAt: new Date("2026-12-01") },
+    })
+    const tarea = await guardarTarea(helena, { title: "Revisar el aula", status: "PENDIENTE", requestId: request.id, projectId: proyecto.id, assigneeId: valentina.id })
     expect(await prisma.notification.findFirst({ where: { userId: valentina.id, subject: { contains: "se te asignó" } } })).toBeTruthy()
     expect(await prisma.notification.count({ where: { userId: helena.id } })).toBe(0)
     await guardarTarea(helena, { id: tarea.id, title: "Revisar el aula", status: "PENDIENTE", requestId: request.id, assigneeId: mateo.id })

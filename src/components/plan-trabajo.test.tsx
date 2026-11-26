@@ -17,6 +17,10 @@ vi.mock("@/server/plan-actions", () => ({
   guardarCeldaAction: vi.fn(),
   moverActividadAction: vi.fn(),
   reordenarPlanAction: vi.fn(),
+  crearEntregableAction: vi.fn(),
+  renombrarEntregableAction: vi.fn(),
+  asignarEntregableAction: vi.fn(),
+  vincularKpiAction: vi.fn(),
 }))
 
 import { PlanTrabajo } from "@/components/plan-trabajo"
@@ -36,8 +40,8 @@ describe("alta por proyecto", () => {
       />,
     )
     fireEvent.click(screen.getByRole("button", { name: "+ Agregar actividad" }))
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Agregar actividad en Escuela de ejemplo")
+    fireEvent.click(screen.getByRole("button", { name: "Más detalles" }))
     expect(screen.getByText(/Proyecto:/).textContent).toContain("Escuela de ejemplo")
-    expect(screen.queryByLabelText("Proyecto de la actividad")).toBeNull()
-    expect(screen.getByLabelText("Título de la actividad")).toBeTruthy()
   })
 })

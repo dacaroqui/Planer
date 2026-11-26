@@ -20,7 +20,7 @@ import { armarEtapas, pasoEsperado } from "@/lib/seguimiento"
 import { RESOLUCION_LABEL, TRANSICIONES_OFICIALES } from "@/lib/flujo-oficial"
 import { FormularioClasificar } from "@/components/formulario-clasificar"
 import { PasosInteractivos } from "@/components/pasos-interactivos"
-import { puedeGestionarTareas } from "@/server/proyectos"
+import { listarProyectos, puedeGestionarTareas } from "@/server/proyectos"
 import { prisma } from "@/lib/prisma"
 import { DateTime } from "luxon"
 import { ZONE } from "@/lib/time"
@@ -33,6 +33,7 @@ export default async function DetallePage({
   searchParams: Promise<{ confirmado?: string; guardado?: string }>
 }) {
   const actor = await requireActor()
+  const catalogoProyectos = await listarProyectos(actor)
   const { codigo } = await params
   const consulta = await searchParams
   const detail = await getDetalle(actor, codigo)
@@ -217,6 +218,9 @@ export default async function DetallePage({
                 puedeEliminar={actor.isAdmin}
                 requestId={request.id}
                 projectId={request.projectId ?? undefined}
+                proyectos={catalogoProyectos.map((item) => ({ id: item.id, name: item.name }))}
+                empresaId={request.empresaId}
+                equipo={request.team}
                 agentes={agentesTarea}
                 tareas={tareasRaiz.map((tarea) => ({
                   id: tarea.id,
