@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs"
 import { describe, expect, it } from "vitest"
+import { construirMigas } from "@/lib/migas-construir"
 import { etiquetaMiga } from "@/lib/migas-etiqueta"
 
 const conocidas = { tablero: "Tablero", espacios: "Espacios" }
@@ -21,5 +23,17 @@ describe("miga del espacio", () => {
     expect(etiquetaMiga("nuevo", 1, ["kpis", "nuevo"], "", { nuevo: "Radicar" })).toBe("Nuevo KPI")
     expect(etiquetaMiga("cmw123", 1, ["kpis", "cmw123", "editar"], "", {})).toBe("")
     expect(etiquetaMiga("editar", 2, ["kpis", "cmw123", "editar"], "", {})).toBe("Editar")
+  })
+
+  it("llama Por persona a la miga y no enlaza un /kpis inexistente", () => {
+    const personas = construirMigas("/kpis/personas")
+    expect(personas.map((item) => item.label)).toEqual(["Inicio", "KPIs", "Por persona"])
+    expect(personas.map((item) => item.href)).toEqual(["/panel", "/kpis", "/kpis/personas"])
+    for (const ruta of ["/kpis", "/kpis/areas", "/kpis/personas", "/kpis/mios", "/kpis/nuevo"]) {
+      for (const miga of construirMigas(ruta)) {
+        if (!miga.href.startsWith("/kpis")) continue
+        expect(existsSync(`src/app/(app)${miga.href}/page.tsx`), miga.href).toBe(true)
+      }
+    }
   })
 })

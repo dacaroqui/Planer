@@ -84,7 +84,7 @@ export function PlanTrabajo({
         {esAdmin ? <button type="button" className="inline-flex h-10 items-center gap-1 rounded-lg border border-[#1658B0] px-3 text-sm font-medium text-[#1658B0]" onClick={() => setNuevo(true)}><PlusIcon className="size-4" /> Nuevo proyecto</button> : null}
         <a href={exportar} className="ml-auto inline-flex h-10 items-center rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm font-medium text-[#1658B0]">Exportar .xlsx</a>
       </div>
-      {agregar === "global" ? <FormularioActividad proyectos={proyectos} responsables={responsables} onClose={() => setAgregar(null)} /> : null}
+      {agregar ? <FormularioActividad proyectos={proyectos} proyectoId={agregar === "global" ? undefined : agregar} responsables={responsables} onClose={() => setAgregar(null)} /> : null}
       {nuevo ? <ProyectoNuevo empresaId={empresaId} equipos={equipos} onClose={() => setNuevo(false)} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative">
@@ -165,13 +165,15 @@ function FormularioActividad({
         router.refresh()
       })
     }}>
-      {!proyectoId ? (
+      {proyectoId ? (
+        <p className="text-sm text-[#3d4a63] sm:col-span-2">Proyecto: <span className="font-medium text-[#15122A]">{proyectos.find((item) => item.id === proyectoId)?.name}</span></p>
+      ) : (
         <label className="grid gap-1 text-xs font-medium text-[#3d4a63] sm:col-span-2">Proyecto
           <select aria-label="Proyecto de la actividad" value={proyecto} onChange={(event) => setProyecto(event.target.value)} className="h-10 w-full rounded-lg border border-[#E4E7EC] bg-white px-2 text-sm">
             {proyectos.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
-      ) : null}
+      )}
       <label className="grid gap-1 text-xs font-medium text-[#3d4a63] sm:col-span-2">Actividad
         <input name="titulo" required minLength={3} aria-label="Título de la actividad" className="h-10 w-full rounded-lg border border-[#E4E7EC] bg-white px-2 text-sm" />
       </label>

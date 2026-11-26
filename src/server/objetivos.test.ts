@@ -73,4 +73,13 @@ describe("permisos y flujo de meta", () => {
     expect(aprobado.estadoMeta).toBe("APROBADA")
     expect(Number(aprobado.meta)).toBe(20)
   })
+
+  it("un líder asigna el KPI a otra persona y un agente no", async () => {
+    const lider = await persona("Líder Cupo", "LIDER")
+    const destino = await persona("Destino Cupo", "AGENTE")
+    const agente = await persona("Agente Cupo", "AGENTE", "DESARROLLO")
+    const creado = await guardarKpi(lider.actor, { ...kpiBase, nombre: "Principal del destino", tipo: "PRINCIPAL", personaId: destino.id })
+    expect(creado.personaId).toBe(destino.id)
+    await expect(guardarKpi(agente.actor, { ...kpiBase, nombre: "Ajeno del agente", tipo: "APOYO", personaId: destino.id })).rejects.toBeInstanceOf(PermisoDenegado)
+  })
 })
