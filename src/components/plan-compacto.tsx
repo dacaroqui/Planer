@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
 import Link from "next/link"
-import { CalendarIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, GripVerticalIcon, MoveHorizontalIcon, TargetIcon } from "lucide-react"
+import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
+import { CalendarIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, GripVerticalIcon, MoveHorizontalIcon, TargetIcon, Trash2Icon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar } from "@/components/iconos-planer"
 import { CUMPLIMIENTO_LABEL, cumplimientoFecha, porcentajeEntregable, porcentajeProyecto } from "@/lib/entregables"
 import { ESTADO_TAREA_LABEL, ESTADO_TAREA_PUNTO, ESTADOS_TAREA, alternarHecha, ordenarKpisDisponibles, textoKpi as medidaKpi, type FilaPlan } from "@/lib/plan-trabajo"
-import { asignarEntregableAction, crearActividadAction, crearEntregableAction, guardarCeldaAction, moverActividadAction, renombrarEntregableAction, vincularKpiAction } from "@/server/plan-actions"
+import { asignarEntregableAction, crearActividadAction, crearEntregableAction, crearKpiPlanAction, eliminarActividadPlanAction, guardarCeldaAction, moverActividadAction, renombrarEntregableAction, reordenarPlanAction, restaurarActividadPlanAction, vincularKpiAction } from "@/server/plan-actions"
 
 type ProyectoPlan = { id: string; name: string; team: string | null; area: string; inicio: string; fin: string }
 type EntregableVista = { id: string; proyectoId: string; nombre: string; fecha: string | null; orden: number }
+type ResponsablePlan = { id: string; name: string; teams: string[] }
 
 const COLOR: Record<string, string> = {
   a_tiempo: "text-[#1658B0]",
@@ -49,16 +51,21 @@ export function PlanCompacto({
   entregables,
   enfocar,
   onDetalles,
+  responsables = [],
 }: {
   filas: FilaPlan[]
   proyectos: ProyectoPlan[]
   entregables: EntregableVista[]
   enfocar: string | null
   onDetalles: (proyectoId: string) => void
+  responsables?: ResponsablePlan[]
 }) {
   const [local, setLocal] = useState(filas)
   const [listaEntregables, setListaEntregables] = useState(entregables)
+  const [activo, setActivo] = useState<string | null>(null)
+  const [sobre, setSobre] = useState<string | null>(null)
   const altas = useRef<Record<string, HTMLInputElement | null>>({})
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   useEffect(() => { setLocal(filas) }, [filas])
   useEffect(() => { setListaEntregables(entregables) }, [entregables])
   useEffect(() => {
@@ -98,7 +105,55 @@ export function PlanCompacto({
     setLocal((lista) => lista.map((item) => (item.id === temp ? { ...item, id: resultado.id || item.id } : item)))
   }
 
+  async function alSoltar(event: DragEndEvent) {
+    const id = String(event.active.id)
+    const over = event.over ? String(event.over.id) : ""
+    setActivo(null)
+    setSobre(null)
+    if (!over || over === id) return
+    const fila = local.find((item) => item.id === id)
+    if (!fila) return
+    const previo = local
+    let entregableId = fila.entregableId ?? null
+    let antesDe: string | null = null
+    if (over.startsWith("grupo-")) {
+      entregableId = over === "grupo-sin" ? null : over.slice("grupo-".length)
+    } else {
+      const destino = local.find((item) => item.id === over)
+      if (!destino || destino.proyectoId !== fila.proyectoId || (destino.parentId ?? null) !== (fila.parentId ?? null)) return
+      if (!fila.parentId) entregableId = destino.entregableId ?? null
+      antesDe = destino.id
+    }
+    const sin = local.filter((item) => item.id !== id)
+    const movida = { ...fila, entregableId }
+    const indice = antesDe ? sin.findIndex((item) => item.id === antesDe) : sin.length
+    const siguiente = [...sin.slice(0, indice < 0 ? sin.length : indice), movida, ...sin.slice(indice < 0 ? sin.length : indice)]
+    setLocal(siguiente)
+    if (!fila.parentId && (fila.entregableId ?? null) !== entregableId) {
+      const movido = await asignarEntregableAction({ id, entregableId })
+      if (!movido.ok) { toast.error(movido.error); setLocal(previo); return }
+    }
+    const ids = siguiente.filter((item) => item.proyectoId === fila.proyectoId && (item.parentId ?? null) === (fila.parentId ?? null) && (fila.parentId || (item.entregableId ?? null) === entregableId)).map((item) => item.id)
+    const orden = await reordenarPlanAction(ids)
+    if (!orden.ok) { toast.error(orden.error); setLocal(previo) }
+  }
+
+  async function moverTeclado(id: string, delta: number) {
+    const previo = local
+    const siguiente = moverFila(local, id, delta)
+    if (siguiente === local) return
+    setLocal(siguiente)
+    const fila = local.find((item) => item.id === id)
+    if (!fila) return
+    const ids = siguiente.filter((item) => item.proyectoId === fila.proyectoId && (item.parentId ?? null) === (fila.parentId ?? null) && (fila.parentId || (item.entregableId ?? null) === (fila.entregableId ?? null))).map((item) => item.id)
+    const orden = await reordenarPlanAction(ids)
+    if (!orden.ok) { toast.error(orden.error); setLocal(previo) }
+  }
+
+  const arrastrada = local.find((item) => item.id === activo)
+
   return (
+    <DndContext sensors={sensors} onDragStart={(event) => setActivo(String(event.active.id))} onDragOver={(event) => setSobre(event.over ? String(event.over.id) : null)} onDragEnd={(event) => { void alSoltar(event) }} onDragCancel={() => { setActivo(null); setSobre(null) }}>
     <div className="overflow-x-hidden">
       {proyectos.map((proyecto) => {
         const todas = local.filter((fila) => fila.proyectoId === proyecto.id)
@@ -107,7 +162,7 @@ export function PlanCompacto({
         const pct = porcentajeProyecto(raices.map((fila) => ({ hecha: fila.estado === "HECHA" })))
         const estado = cumplimientoFecha(proyecto.fin, pct, hoyIso())
         return (
-          <section key={proyecto.id} className="mb-3 overflow-hidden rounded-xl border border-[#E4E7EC] bg-white">
+          <section key={proyecto.id} className="mb-3 rounded-xl border border-[#E4E7EC] bg-white">
             <header className="flex items-center gap-3 border-b border-[#E4E7EC] bg-[#F4F8FE] px-3 py-2">
               <div className="min-w-0 flex-1">
                 <Link href={`/proyectos/${proyecto.id}`} className="truncate font-medium text-[#1658B0] hover:underline">{proyecto.name}</Link>
@@ -119,14 +174,61 @@ export function PlanCompacto({
               <button type="button" className="shrink-0 text-xs text-[#3d4a63]" onClick={() => onDetalles(proyecto.id)}>Más detalles</button>
             </header>
             {grupos.map((entregable) => (
-              <BloqueEntregable key={entregable.id} entregable={entregable} filas={raices.filter((fila) => fila.entregableId === entregable.id)} todas={todas} proyecto={proyecto} proyectos={proyectos} entregables={grupos} altas={altas} onCrear={crear} onCambio={setLocal} onRenombrar={setListaEntregables} />
+              <BloqueEntregable key={entregable.id} entregable={entregable} filas={raices.filter((fila) => fila.entregableId === entregable.id)} todas={todas} proyecto={proyecto} proyectos={proyectos} entregables={grupos} responsables={responsables} sobre={sobre} altas={altas} onCrear={crear} onCambio={setLocal} onRenombrar={setListaEntregables} onMover={moverTeclado} />
             ))}
-            <BloqueEntregable entregable={null} filas={raices.filter((fila) => !fila.entregableId)} todas={todas} proyecto={proyecto} proyectos={proyectos} entregables={grupos} altas={altas} onCrear={crear} onCambio={setLocal} onRenombrar={setListaEntregables} />
+            <BloqueEntregable entregable={null} filas={raices.filter((fila) => !fila.entregableId)} todas={todas} proyecto={proyecto} proyectos={proyectos} entregables={grupos} responsables={responsables} sobre={sobre} altas={altas} onCrear={crear} onCambio={setLocal} onRenombrar={setListaEntregables} onMover={moverTeclado} />
             <AltaEntregable proyectoId={proyecto.id} onCreado={(item) => setListaEntregables((lista) => [...lista, item])} />
           </section>
         )
       })}
     </div>
+    <DragOverlay>
+      {arrastrada ? <div className="rounded-md border border-[#1658B0] bg-white px-3 py-2 text-sm shadow-lg">{arrastrada.actividad}</div> : null}
+    </DragOverlay>
+    </DndContext>
+  )
+}
+
+function moverFila(lista: FilaPlan[], id: string, delta: number) {
+  const fila = lista.find((item) => item.id === id)
+  if (!fila) return lista
+  const grupo = lista.filter((item) => item.proyectoId === fila.proyectoId && (item.parentId ?? null) === (fila.parentId ?? null) && (fila.parentId || (item.entregableId ?? null) === (fila.entregableId ?? null)))
+  const indice = grupo.findIndex((item) => item.id === id)
+  const destino = grupo[indice + delta]
+  if (!destino) return lista
+  const sin = lista.filter((item) => item.id !== id)
+  const puesto = sin.findIndex((item) => item.id === destino.id)
+  const insertarEn = delta > 0 ? puesto + 1 : puesto
+  return [...sin.slice(0, insertarEn), fila, ...sin.slice(insertarEn)]
+}
+
+function EditorFecha({
+  campo, abierta, valor, color, borrador, onBorrador, onAbrir, onCerrar, onGuardar,
+}: {
+  campo: "inicio" | "fin"
+  abierta: boolean
+  valor: string | null
+  color?: string
+  borrador: string
+  onBorrador: (valor: string) => void
+  onAbrir: () => void
+  onCerrar: () => void
+  onGuardar: (valor: string | null) => void
+}) {
+  const etiqueta = campo === "inicio" ? "Inicio" : "Fin"
+  return (
+    <span className="group relative">
+      <button type="button" className={color || "text-[#98A2B3]"} aria-label={etiqueta} onClick={onAbrir}><CalendarIcon className="size-3.5" /></button>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-[#15122A] px-2 py-1 text-[10px] text-white group-hover:block">{etiqueta} {fechaCorta(valor)}</span>
+      {abierta ? (
+        <span className="absolute left-0 z-30 mt-1 flex items-center gap-1 rounded border border-[#1658B0] bg-white p-1 shadow">
+          <input autoFocus type="date" lang="es-CO" aria-label={`Elegir ${etiqueta.toLowerCase()}`} value={borrador} onChange={(event) => onBorrador(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onGuardar(borrador || null); if (event.key === "Escape") onCerrar() }} className="h-8 w-36 rounded border border-[#E4E7EC] px-1" />
+          <button type="button" aria-label={`Guardar ${etiqueta.toLowerCase()}`} className="inline-flex size-7 items-center justify-center rounded bg-[#1658B0] text-white" onClick={() => onGuardar(borrador || null)}><CheckIcon className="size-3.5" /></button>
+          <button type="button" aria-label={`Cancelar ${etiqueta.toLowerCase()}`} className="inline-flex size-7 items-center justify-center rounded border border-[#E4E7EC]" onClick={onCerrar}><XIcon className="size-3.5" /></button>
+          <button type="button" aria-label={`Quitar ${etiqueta.toLowerCase()}`} className="h-7 rounded border border-[#E4E7EC] px-1 text-[11px]" onClick={() => onGuardar(null)}>Quitar</button>
+        </span>
+      ) : null}
+    </span>
   )
 }
 
@@ -139,7 +241,7 @@ function Barra({ valor }: { valor: number }) {
 }
 
 function BloqueEntregable({
-  entregable, filas, todas, proyecto, proyectos, entregables, altas, onCrear, onCambio, onRenombrar,
+  entregable, filas, todas, proyecto, proyectos, entregables, responsables, sobre, altas, onCrear, onCambio, onRenombrar, onMover,
 }: {
   entregable: EntregableVista | null
   filas: FilaPlan[]
@@ -147,23 +249,23 @@ function BloqueEntregable({
   proyecto: ProyectoPlan
   proyectos: ProyectoPlan[]
   entregables: EntregableVista[]
+  responsables: ResponsablePlan[]
+  sobre: string | null
   altas: MutableRefObject<Record<string, HTMLInputElement | null>>
   onCrear: (proyectoId: string, entregableId: string | null, titulo: string, campo: HTMLInputElement, parentId?: string | null) => Promise<void>
   onCambio: Dispatch<SetStateAction<FilaPlan[]>>
   onRenombrar: Dispatch<SetStateAction<EntregableVista[]>>
+  onMover: (id: string, delta: number) => void
 }) {
   const clave = `${proyecto.id}:${entregable?.id || "sin"}`
   const pct = porcentajeEntregable(filas.map((fila) => ({ hecha: fila.estado === "HECHA" })))
   const marca = cumplimientoFecha(entregable?.fecha || proyecto.fin, pct, hoyIso())
   const [nombre, setNombre] = useState(entregable?.nombre || "")
   const [editando, setEditando] = useState(false)
+  const zona = useDroppable({ id: `grupo-${entregable?.id || "sin"}` })
+  const marcado = sobre === `grupo-${entregable?.id || "sin"}` || filas.some((fila) => fila.id === sobre)
   return (
-    <div className="border-b border-[#F0F2F5]" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
-      const id = event.dataTransfer.getData("text/actividad")
-      if (!id) return
-      onCambio((lista) => lista.map((fila) => (fila.id === id ? { ...fila, entregableId: entregable?.id || null } : fila)))
-      void asignarEntregableAction({ id, entregableId: entregable?.id || null }).then((resultado) => { if (!resultado.ok) toast.error(resultado.error) })
-    }}>
+    <div ref={zona.setNodeRef} className={`border-b border-[#F0F2F5] ${marcado ? "bg-[#E7F0FB]" : ""}`}>
       <div className="flex items-center gap-2 bg-[#F8FAFD] px-3 py-1.5">
         {entregable ? (
           editando ? (
@@ -177,7 +279,7 @@ function BloqueEntregable({
         {entregable?.fecha ? <span className={`text-xs ${COLOR[marca]}`} title={fechaCorta(entregable.fecha)}><CalendarIcon className="inline size-3.5" /></span> : null}
       </div>
       {filas.map((fila) => (
-        <Fila key={fila.id} fila={fila} hijas={todas.filter((item) => item.parentId === fila.id)} nivel={0} proyecto={proyecto} proyectos={proyectos} entregables={entregables} onCambio={onCambio} onCrear={onCrear} />
+        <Fila key={fila.id} fila={fila} hijas={todas.filter((item) => item.parentId === fila.id)} nivel={0} proyecto={proyecto} proyectos={proyectos} entregables={entregables} responsables={responsables} sobre={sobre} onCambio={onCambio} onCrear={onCrear} onMover={onMover} />
       ))}
       <div className="px-3 py-1.5">
         <input
@@ -199,7 +301,7 @@ function BloqueEntregable({
 }
 
 function Fila({
-  fila, hijas, nivel, proyecto, proyectos, entregables, onCambio, onCrear,
+  fila, hijas, nivel, proyecto, proyectos, entregables, responsables, sobre, onCambio, onCrear, onMover,
 }: {
   fila: FilaPlan
   hijas: FilaPlan[]
@@ -207,13 +309,26 @@ function Fila({
   proyecto: ProyectoPlan
   proyectos: ProyectoPlan[]
   entregables: EntregableVista[]
+  responsables: ResponsablePlan[]
+  sobre: string | null
   onCambio: Dispatch<SetStateAction<FilaPlan[]>>
   onCrear: (proyectoId: string, entregableId: string | null, titulo: string, campo: HTMLInputElement, parentId?: string | null) => Promise<void>
+  onMover: (id: string, delta: number) => void
 }) {
+  const arrastre = useDraggable({ id: fila.id, disabled: !fila.puedeEditar })
+  const suelta = useDroppable({ id: fila.id })
   const [menu, setMenu] = useState<"cerrado" | "entregables" | "proyectos">("cerrado")
   const [fecha, setFecha] = useState<"inicio" | "fin" | null>(null)
+  const [borradorFecha, setBorradorFecha] = useState("")
   const [kpi, setKpi] = useState(false)
+  const [nuevoKpi, setNuevoKpi] = useState(false)
+  const [nombreKpi, setNombreKpi] = useState("")
+  const [metaKpi, setMetaKpi] = useState("")
+  const [unidadKpi, setUnidadKpi] = useState("")
+  const [gente, setGente] = useState(false)
+  const [busca, setBusca] = useState("")
   const [titulo, setTitulo] = useState(false)
+  const [borrar, setBorrar] = useState(false)
   const [estadoAbierto, setEstadoAbierto] = useState(false)
   const estadoRef = useRef<HTMLSpanElement>(null)
   const [abierta, setAbierta] = useState(hijas.length > 0)
@@ -239,6 +354,31 @@ function Fila({
     onCambio((lista) => lista.map((item) => (item.id === fila.id ? { ...item, ...patch } : item)))
     const resultado = await guardarCeldaAction(envio)
     if (!resultado.ok) { toast.error(resultado.error); onCambio((lista) => lista.map((item) => (item.id === fila.id ? fila : item))) }
+  }
+  async function crearKpi() {
+    const nombre = nombreKpi.trim()
+    if (nombre.length < 2) { toast.error("Indique el nombre del KPI."); return }
+    const resultado = await crearKpiPlanAction({ tareaId: fila.id, nombre, meta: metaKpi, unidad: unidadKpi })
+    if (!resultado.ok || !("kpi" in resultado)) { toast.error(resultado.ok ? "No se pudo crear el KPI." : resultado.error); return }
+    const creado = { ...resultado.kpi, origen: resultado.kpi.origen }
+    onCambio((lista) => lista.map((item) => item.proyectoId === fila.proyectoId ? { ...item, kpisDisponibles: [...(item.kpisDisponibles ?? []).filter((kpi) => kpi.id !== creado.id), creado], ...(item.id === fila.id ? { kpiId: creado.id } : {}) } : item))
+    setNombreKpi("")
+    setMetaKpi("")
+    setUnidadKpi("")
+    setNuevoKpi(false)
+    setKpi(false)
+    toast.success("KPI creado y vinculado.")
+  }
+  async function quitar(subtareas: "borrar" | "soltar") {
+    const previo = fila
+    const previas = hijas
+    setBorrar(false)
+    onCambio((lista) => lista.filter((item) => item.id !== fila.id && (subtareas === "soltar" || item.parentId !== fila.id)).map((item) => subtareas === "soltar" && item.parentId === fila.id ? { ...item, parentId: null } : item))
+    const resultado = await eliminarActividadPlanAction({ id: fila.id, subtareas })
+    if (!resultado.ok || !("foto" in resultado)) { toast.error(resultado.ok ? "No se pudo eliminar." : resultado.error); onCambio((lista) => [previo, ...(subtareas === "borrar" ? previas : []), ...lista.filter((item) => item.id !== fila.id)]); return }
+    const foto = resultado.foto
+    const fotosHijas = resultado.hijas
+    toast.success("Actividad eliminada.", { duration: 5000, action: { label: "Deshacer", onClick: () => { void restaurarActividadPlanAction({ foto, hijas: fotosHijas }).then((restaurada) => { if (!restaurada.ok) toast.error(restaurada.error) }) } } })
   }
   async function moverEntregable(entregableId: string | null) {
     setMenu("cerrado")
@@ -268,8 +408,8 @@ function Fila({
   }
   return (
     <div>
-      <div className="grid items-center gap-1 border-t border-[#F0F2F5] px-2 py-1 text-sm" style={{ gridTemplateColumns: "22px minmax(0,1fr) 28px 64px 22px 22px 22px 40px minmax(132px,160px) 78px", paddingLeft: nivel ? 28 : 8 }} draggable onDragStart={(event) => event.dataTransfer.setData("text/actividad", fila.id)}>
-        <button type="button" className="cursor-grab text-[#98A2B3]" aria-label={`Arrastrar ${fila.actividad}`}><GripVerticalIcon className="size-3.5" /></button>
+      <div ref={suelta.setNodeRef} className={`group relative grid items-center gap-1 border-t px-2 py-1 text-sm hover:bg-[#F8FAFD] ${sobre === fila.id ? "border-t-2 border-[#1658B0]" : "border-[#F0F2F5]"} ${arrastre.isDragging ? "opacity-40" : ""}`} style={{ gridTemplateColumns: "22px minmax(0,1fr) 28px 64px 22px 22px 22px 40px minmax(120px,150px) 78px", paddingLeft: nivel ? 28 : 8 }} {...arrastre.attributes}>
+        <button type="button" className="cursor-grab text-[#98A2B3] active:cursor-grabbing" aria-label={`Arrastrar ${fila.actividad}`} aria-keyshortcuts="ArrowUp ArrowDown" {...arrastre.listeners} onKeyDown={(event) => { if (event.key === "ArrowUp") { event.preventDefault(); onMover(fila.id, -1) } if (event.key === "ArrowDown") { event.preventDefault(); onMover(fila.id, 1) } }}><GripVerticalIcon className="size-3.5" /></button>
         <span className="flex min-w-0 items-center gap-1">
           {nivel === 0 ? (
             <button type="button" aria-expanded={abierta} aria-label={`Subtareas de ${fila.actividad}`} className="text-[#98A2B3]" onClick={() => setAbierta((valor) => !valor)}>
@@ -285,7 +425,20 @@ function Fila({
             <button type="button" className={`min-w-0 flex-1 truncate text-left ${fila.estado === "HECHA" ? "text-[#98A2B3] line-through" : ""}`} title={fila.actividad} onClick={() => fila.puedeEditar && setTitulo(true)}>{fila.actividad}</button>
           )}
         </span>
-        <span title={fila.responsable}><Avatar nombre={fila.responsableId ? fila.responsable : "?"} /></span>
+        <span className="relative">
+          <button type="button" aria-label={`Responsable ${fila.responsable}`} title={fila.responsable} onClick={() => setGente((valor) => !valor)}><Avatar nombre={fila.responsableId ? fila.responsable : "?"} /></button>
+          {gente ? (
+            <span className="absolute left-0 z-30 mt-1 grid w-52 rounded-md border border-[#E4E7EC] bg-white p-1 text-xs shadow">
+              <input autoFocus aria-label="Buscar responsable" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Buscar" className="mb-1 h-7 rounded border border-[#E4E7EC] px-2" onKeyDown={(event) => { if (event.key === "Escape") setGente(false) }} />
+              <button type="button" className="rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => { setGente(false); void guardar({ responsableId: null, responsable: "Sin asignar" }, { id: fila.id, assigneeId: null }) }}>Sin asignar</button>
+              {responsables.filter((persona) => !proyecto.team || persona.teams.includes(proyecto.team) || persona.id === fila.responsableId).filter((persona) => persona.name.toLowerCase().includes(busca.trim().toLowerCase())).map((persona) => (
+                <button type="button" key={persona.id} className="flex items-center gap-2 rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => { setGente(false); void guardar({ responsableId: persona.id, responsable: persona.name }, { id: fila.id, assigneeId: persona.id }) }}>
+                  <Avatar nombre={persona.name} /> {persona.name}
+                </button>
+              ))}
+            </span>
+          ) : null}
+        </span>
         <span ref={estadoRef} className="relative">
           <button type="button" aria-expanded={estadoAbierto} aria-haspopup="menu" className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium ${fila.estado === "HECHA" ? "bg-emerald-50 text-[#16A34A]" : fila.estado === "EN_CURSO" ? "bg-[#E7F0FB] text-[#1658B0]" : "bg-[#F3F4F6] text-[#3d4a63]"}`} onClick={() => setEstadoAbierto((valor) => !valor)}>{ESTADO_TAREA_LABEL[fila.estado]}</button>
           {estadoAbierto ? (
@@ -300,23 +453,24 @@ function Fila({
           ) : null}
         </span>
         <span title={fila.bloqueo || "Sin bloqueo"} className={fila.bloqueo ? "text-red-700" : "text-[#98A2B3]"}>●</span>
-        <span className="group relative">
-          <button type="button" className="text-[#98A2B3]" aria-label="Inicio" onClick={() => setFecha(fecha === "inicio" ? null : "inicio")}><CalendarIcon className="size-3.5" /></button>
-          <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-[#15122A] px-2 py-1 text-[10px] text-white group-hover:block">Inicio {fechaCorta(fila.inicio)}</span>
-          {fecha === "inicio" ? <input autoFocus type="date" lang="es-CO" aria-label="Elegir inicio" defaultValue={fila.inicio ?? ""} className="absolute z-20 mt-1 h-8 w-36 rounded border border-[#1658B0] bg-white px-1" onBlur={(event) => { setFecha(null); void guardar({ inicio: event.target.value || null }, { id: fila.id, fechaInicio: event.target.value || null }) }} /> : null}
-        </span>
-        <span className="group relative">
-          <button type="button" className={COLOR_FIN[finEstado]} aria-label="Fin" onClick={() => setFecha(fecha === "fin" ? null : "fin")}><CalendarIcon className="size-3.5" /></button>
-          <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-[#15122A] px-2 py-1 text-[10px] text-white group-hover:block">Fin {fechaCorta(fila.fin)}</span>
-          {fecha === "fin" ? <input autoFocus type="date" lang="es-CO" aria-label="Elegir fin" defaultValue={fila.fin ?? ""} className="absolute right-0 z-20 mt-1 h-8 w-36 rounded border border-[#1658B0] bg-white px-1" onBlur={(event) => { setFecha(null); void guardar({ fin: event.target.value || null }, { id: fila.id, fechaFin: event.target.value || null }) }} /> : null}
-        </span>
+        <EditorFecha campo="inicio" abierta={fecha === "inicio"} valor={fila.inicio} borrador={borradorFecha} onBorrador={setBorradorFecha} onAbrir={() => { setBorradorFecha(fila.inicio ?? ""); setFecha("inicio") }} onCerrar={() => setFecha(null)} onGuardar={(valor) => { setFecha(null); void guardar({ inicio: valor }, { id: fila.id, fechaInicio: valor }) }} />
+        <EditorFecha campo="fin" abierta={fecha === "fin"} valor={fila.fin} color={COLOR_FIN[finEstado]} borrador={borradorFecha} onBorrador={setBorradorFecha} onAbrir={() => { setBorradorFecha(fila.fin ?? ""); setFecha("fin") }} onCerrar={() => setFecha(null)} onGuardar={(valor) => { setFecha(null); void guardar({ fin: valor }, { id: fila.id, fechaFin: valor }) }} />
         <span className="text-[11px] tabular-nums text-[#3d4a63]" title="Horas estimadas / reales">{fila.horasEstimadas ?? "–"}/{fila.horasReales ?? "–"}</span>
         <span className="relative min-w-0">
           <button type="button" className={`flex w-full items-center gap-1 text-left text-[11px] leading-tight ${texto ? "text-[#1658B0]" : "text-[#98A2B3]"}`} title={texto || "Elegir KPI"} aria-label={texto ? `KPI ${texto}` : "Elegir KPI"} onClick={() => setKpi((valor) => !valor)}>
             {texto ? <span className="min-w-0 whitespace-normal">{texto}</span> : <><TargetIcon className="size-3 shrink-0" /> Elegir KPI</>}
           </button>
           {kpi ? (
-            <span role="listbox" aria-label="Elegir KPI" className="absolute right-0 z-30 mt-1 grid max-h-64 w-56 overflow-auto rounded border border-[#1658B0] bg-white p-1 text-xs shadow">
+            <span role="listbox" aria-label="Elegir KPI" className="absolute right-0 z-30 mt-1 grid max-h-64 w-64 overflow-auto rounded border border-[#1658B0] bg-white p-1 text-xs shadow">
+              {nuevoKpi ? (
+                <span className="mb-1 flex flex-wrap items-center gap-1">
+                  <input autoFocus aria-label="Nombre del KPI nuevo" placeholder="+ Nuevo KPI" value={nombreKpi} onChange={(event) => setNombreKpi(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void crearKpi(); if (event.key === "Escape") setNuevoKpi(false) }} className="h-7 min-w-24 flex-1 rounded border border-[#1658B0] px-1" />
+                  <input aria-label="Meta del KPI nuevo" placeholder="Meta" value={metaKpi} onChange={(event) => setMetaKpi(event.target.value)} className="h-7 w-12 rounded border border-[#E4E7EC] px-1" />
+                  <input aria-label="Unidad del KPI nuevo" placeholder="Unidad" value={unidadKpi} onChange={(event) => setUnidadKpi(event.target.value)} className="h-7 w-14 rounded border border-[#E4E7EC] px-1" />
+                  <button type="button" aria-label="Guardar KPI nuevo" className="inline-flex size-7 items-center justify-center rounded bg-[#1658B0] text-white" onClick={() => { void crearKpi() }}><CheckIcon className="size-3.5" /></button>
+                  <button type="button" aria-label="Cancelar KPI nuevo" className="inline-flex size-7 items-center justify-center rounded border border-[#E4E7EC]" onClick={() => setNuevoKpi(false)}><XIcon className="size-3.5" /></button>
+                </span>
+              ) : <button type="button" className="mb-1 rounded px-2 py-1 text-left text-[#1658B0]" onClick={() => setNuevoKpi(true)}>+ Nuevo KPI</button>}
               <button type="button" className="rounded px-2 py-1 text-left text-[#98A2B3] hover:bg-[#E7F0FB]" onClick={() => { setKpi(false); onCambio((lista) => lista.map((item) => item.id === fila.id ? { ...item, kpiId: null } : item)); void vincularKpiAction({ id: fila.id, kpiId: null }).then((resultado) => { if (!resultado.ok) toast.error(resultado.error) }) }}>Sin KPI</button>
               {grupos.delProyecto.length > 0 ? <span className="px-2 pt-1 text-[10px] uppercase tracking-wide text-[#98A2B3]">De este proyecto</span> : null}
               {grupos.delProyecto.map((item) => <OpcionKpi key={item.id} item={item} onElegir={(kpiId) => { setKpi(false); onCambio((lista) => lista.map((filaActual) => filaActual.id === fila.id ? { ...filaActual, kpiId } : filaActual)); void vincularKpiAction({ id: fila.id, kpiId }).then((resultado) => { if (!resultado.ok) toast.error(resultado.error) }) }} />)}
@@ -325,7 +479,18 @@ function Fila({
             </span>
           ) : null}
         </span>
-        <span className="relative">
+        <span className="relative flex items-center gap-1">
+          {borrar ? (
+            <span className="absolute right-0 bottom-full z-30 mb-1 w-44 rounded-md border border-[#E4E7EC] bg-white p-2 text-[11px] shadow">
+              {hijas.length > 0 ? <span className="mb-1 block">Esta actividad tiene subtareas.</span> : <span className="mb-1 block">¿Eliminar esta actividad?</span>}
+              <span className="flex flex-wrap gap-1">
+                <button type="button" aria-label="Confirmar eliminar" className="inline-flex size-7 items-center justify-center rounded bg-red-700 text-white" onClick={() => { void quitar(hijas.length > 0 ? "borrar" : "soltar") }}><CheckIcon className="size-3.5" /></button>
+                {hijas.length > 0 ? <button type="button" className="h-7 rounded border border-[#E4E7EC] px-1" onClick={() => { void quitar("soltar") }}>Soltar</button> : null}
+                <button type="button" aria-label="Cancelar eliminar" className="inline-flex size-7 items-center justify-center rounded border border-[#E4E7EC]" onClick={() => setBorrar(false)}><XIcon className="size-3.5" /></button>
+              </span>
+            </span>
+          ) : null}
+          <button type="button" aria-label={`Eliminar ${fila.actividad}`} className="absolute top-1 right-1 z-10 inline-flex size-7 items-center justify-center rounded-md bg-white text-[#98A2B3] opacity-0 group-hover:opacity-100 focus:opacity-100" onClick={() => setBorrar(true)}><Trash2Icon className="size-3.5" /></button>
           <button type="button" aria-expanded={menu !== "cerrado"} aria-haspopup="menu" className="inline-flex h-7 items-center gap-1 rounded-md border border-[#E4E7EC] bg-white px-1.5 text-[11px] font-medium text-[#1658B0]" onClick={() => setMenu((valor) => valor === "cerrado" ? "entregables" : "cerrado")}>
             <MoveHorizontalIcon className="size-3.5" /> Mover
           </button>
@@ -345,7 +510,7 @@ function Fila({
       </div>
       {nivel === 0 && abierta ? (
         <div>
-          {hijas.map((hija) => <Fila key={hija.id} fila={hija} hijas={[]} nivel={1} proyecto={proyecto} proyectos={proyectos} entregables={entregables} onCambio={onCambio} onCrear={onCrear} />)}
+          {hijas.map((hija) => <Fila key={hija.id} fila={hija} hijas={[]} nivel={1} proyecto={proyecto} proyectos={proyectos} entregables={entregables} responsables={responsables} sobre={sobre} onCambio={onCambio} onCrear={onCrear} onMover={onMover} />)}
           <div className="px-3 py-1" style={{ paddingLeft: 36 }}>
             <input
               aria-label={`Subtarea de ${fila.actividad}`}
@@ -368,7 +533,7 @@ function Fila({
 
 function OpcionKpi({ item, onElegir }: { item: { id: string; nombre: string; actual: number | null; meta: number | null; unidad: string }; onElegir: (id: string) => void }) {
   const medida = medidaKpi({ kpiNombre: item.nombre, kpiActual: item.actual, kpiMeta: item.meta, kpiUnidad: item.unidad })
-  return <button type="button" role="option" aria-selected={false} className="truncate rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => onElegir(item.id)}>{medida}</button>
+  return <button type="button" role="option" aria-selected={false} title={medida} className="truncate rounded px-2 py-1 text-left hover:bg-[#E7F0FB]" onClick={() => onElegir(item.id)}>{medida}</button>
 }
 
 function AltaEntregable({ proyectoId, onCreado }: { proyectoId: string; onCreado: (item: EntregableVista) => void }) {

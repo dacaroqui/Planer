@@ -11,6 +11,7 @@ import {
   type EstadoTareaPlan,
   type FilaPlan,
 } from "@/lib/plan-trabajo"
+import { crearKpiEnObjetivo, guardarKpi } from "@/server/objetivos"
 import { guardarProyecto, guardarTarea, listarProyectos } from "@/server/proyectos"
 
 export async function listarPlan(actor: Actor): Promise<FilaPlan[]> {
@@ -396,4 +397,122 @@ export async function vincularKpiActividad(actor: Actor, input: { id: string; kp
     where: { id: tarea.id },
     data: { kpiId: input.kpiId },
   })
+}
+
+export async function crearKpiPlan(actor: Actor, input: { tareaId: string; nombre: string; meta?: string; unidad?: string }) {
+  const tarea = await prisma.tarea.findUnique({ where: { id: input.tareaId }, include: { project: true } })
+  if (!tarea?.projectId || !tarea.project) throw new DomainError("La actividad no está en un proyecto.")
+  await exigirEditor(actor, tarea.projectId)
+  const nombre = input.nombre.trim()
+  if (nombre.length < 2) throw new DomainError("Indique el nombre del KPI.")
+  const unidad = input.unidad?.trim() || ""
+  const meta = input.meta?.trim() || ""
+  const kpi = tarea.project.objetivoId
+    ? await crearKpiEnObjetivo(actor, { objetivoId: tarea.project.objetivoId, nombre })
+    : await guardarKpi(actor, {
+      nombre,
+      descripcion: "",
+      unidad,
+      lineaBase: "",
+      meta,
+      actual: "",
+      fuente: "",
+      frecuencia: "MENSUAL",
+      tipo: "APOYO",
+      nivel: "area",
+      objetivoId: "",
+      area: tarea.project.team || "",
+      personaId: "",
+      apoyaId: "",
+      bloqueado: false,
+      motivoBloqueo: "",
+    })
+  if (tarea.project.objetivoId && (unidad || meta)) {
+    await prisma.kpi.update({ where: { id: kpi.id }, data: { unidad, ...(meta ? { meta: Number(meta.replace(",", ".")) } : {}) } })
+  }
+  await prisma.tarea.update({ where: { id: tarea.id }, data: { kpiId: kpi.id } })
+  const guardado = await prisma.kpi.findUniqueOrThrow({ where: { id: kpi.id } })
+  return {
+    id: guardado.id,
+    nombre: guardado.nombre,
+    unidad: guardado.unidad,
+    meta: guardado.meta == null ? null : Number(guardado.meta),
+    actual: guardado.actual == null ? null : Number(guardado.actual),
+    origen: tarea.project.objetivoId ? "objetivo" as const : "area" as const,
+  }
+}
+
+function fotoTarea(tarea: {
+  id: string
+  title: string
+  status: EstadoTareaPlan
+  assigneeId: string | null
+  projectId: string | null
+  parentId: string | null
+  entregableId: string | null
+  createdById: string
+  dueDate: Date | null
+  fechaInicio: Date | null
+  orden: number
+  kpiId: string | null
+  bloqueo: string | null
+  participantes: string | null
+  notaRol: string | null
+}) {
+  return {
+    id: tarea.id,
+    title: tarea.title,
+    status: tarea.status,
+    assigneeId: tarea.assigneeId,
+    projectId: tarea.projectId,
+    parentId: tarea.parentId,
+    entregableId: tarea.entregableId,
+    createdById: tarea.createdById,
+    dueDate: tarea.dueDate?.toISOString() ?? null,
+    fechaInicio: tarea.fechaInicio?.toISOString() ?? null,
+    orden: tarea.orden,
+    kpiId: tarea.kpiId,
+    bloqueo: tarea.bloqueo,
+    participantes: tarea.participantes,
+    notaRol: tarea.notaRol,
+  }
+}
+
+export type FotoActividad = ReturnType<typeof fotoTarea>
+
+export async function eliminarActividadPlan(actor: Actor, input: { id: string; subtareas: "borrar" | "soltar" }) {
+  const tarea = await prisma.tarea.findUnique({ where: { id: input.id }, include: { project: true, children: true } })
+  if (!tarea?.projectId || !tarea.project) throw new DomainError("La actividad no está en un proyecto.")
+  await exigirEditor(actor, tarea.projectId)
+  const foto = fotoTarea(tarea)
+  const hijas = tarea.children.map(fotoTarea)
+  if (input.subtareas === "soltar" && hijas.length > 0) {
+    await prisma.tarea.updateMany({ where: { parentId: tarea.id }, data: { parentId: null } })
+  }
+  await prisma.tarea.delete({ where: { id: tarea.id } })
+  return { foto, hijas: input.subtareas === "borrar" ? hijas : [] }
+}
+
+export async function restaurarActividadPlan(actor: Actor, input: { foto: FotoActividad; hijas: FotoActividad[] }) {
+  if (!input.foto.projectId) throw new DomainError("La actividad no está en un proyecto.")
+  await exigirEditor(actor, input.foto.projectId)
+  const datos = (foto: FotoActividad) => ({
+    id: foto.id,
+    title: foto.title,
+    status: foto.status,
+    assigneeId: foto.assigneeId,
+    projectId: foto.projectId,
+    parentId: foto.parentId,
+    entregableId: foto.entregableId,
+    createdById: foto.createdById,
+    dueDate: foto.dueDate ? new Date(foto.dueDate) : null,
+    fechaInicio: foto.fechaInicio ? new Date(foto.fechaInicio) : null,
+    orden: foto.orden,
+    kpiId: foto.kpiId,
+    bloqueo: foto.bloqueo,
+    participantes: foto.participantes,
+    notaRol: foto.notaRol,
+  })
+  await prisma.tarea.create({ data: datos(input.foto) })
+  for (const hija of input.hijas) await prisma.tarea.create({ data: datos(hija) })
 }

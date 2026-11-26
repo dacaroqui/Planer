@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { PermisoDenegado } from "@/lib/domain"
 import { toActor } from "@/lib/actor"
 import { guardarTarea } from "@/server/proyectos"
-import { crearActividadPlan, editarFilaPlan, editarMasivo, listarPlan, moverActividad, reordenarActividades } from "@/server/plan-trabajo"
+import { crearActividadPlan, crearKpiPlan, editarFilaPlan, editarMasivo, eliminarActividadPlan, listarPlan, moverActividad, reordenarActividades, restaurarActividadPlan } from "@/server/plan-trabajo"
 
 const SUFIJO = ".plan@cifes.edu.co"
 
@@ -214,6 +214,26 @@ describe("permisos del plan de trabajo", () => {
     await expect(editarMasivo(agente.actor, { ids: [segunda.id], status: "EN_CURSO" })).rejects.toBeInstanceOf(PermisoDenegado)
     await editarMasivo(lider.actor, { ids: [segunda.id], status: "EN_CURSO" })
     expect((await prisma.tarea.findUniqueOrThrow({ where: { id: segunda.id } })).status).toBe("EN_CURSO")
+  })
+
+  it("crea el KPI del área, lo vincula y restaura una actividad borrada", async () => {
+    const lider = await persona("Líder Kpi Plan", "LIDER")
+    const empresa = await prisma.empresa.create({ data: { name: `Empresa plan kpi ${Date.now()}` } })
+    const proyecto = await prisma.proyecto.create({
+      data: { name: "Escuela kpi", description: "Área: Marketing", team: "MARKETING", empresaId: empresa.id, leaderId: lider.id, startsAt: new Date("2026-11-01"), targetAt: new Date("2026-11-30") },
+    })
+    const tarea = await prisma.tarea.create({ data: { title: "Medir la respuesta", projectId: proyecto.id, createdById: lider.id, status: "PENDIENTE" } })
+    const hija = await prisma.tarea.create({ data: { title: "Subtarea de ejemplo", projectId: proyecto.id, createdById: lider.id, status: "PENDIENTE", parentId: tarea.id } })
+    const kpi = await crearKpiPlan(lider.actor, { tareaId: tarea.id, nombre: "Tasa de ejemplo", unidad: "sesiones" })
+    expect(kpi.origen).toBe("area")
+    expect((await prisma.tarea.findUniqueOrThrow({ where: { id: tarea.id } })).kpiId).toBe(kpi.id)
+    const borrado = await eliminarActividadPlan(lider.actor, { id: tarea.id, subtareas: "borrar" })
+    expect(borrado.hijas.map((item) => item.id)).toEqual([hija.id])
+    expect(await prisma.tarea.findUnique({ where: { id: tarea.id } })).toBeNull()
+    expect(await prisma.tarea.findUnique({ where: { id: hija.id } })).toBeNull()
+    await restaurarActividadPlan(lider.actor, borrado)
+    expect((await prisma.tarea.findUniqueOrThrow({ where: { id: tarea.id } })).kpiId).toBe(kpi.id)
+    expect(await prisma.tarea.findUnique({ where: { id: hija.id } })).not.toBeNull()
   })
 
   it("rechaza una actividad nueva sin proyecto", async () => {
