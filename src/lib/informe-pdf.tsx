@@ -2,25 +2,34 @@ import React from "react"
 import path from "node:path"
 import { Document, Font, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer"
 
+const regular = path.join(process.cwd(), "src/lib/fonts/Poppins-Regular.ttf")
+const semi = path.join(process.cwd(), "src/lib/fonts/Poppins-SemiBold.ttf")
+
 Font.register({
   family: "Poppins",
   fonts: [
-    { src: path.join(process.cwd(), "src/lib/fonts/Poppins-Regular.ttf"), fontWeight: 400 },
-    { src: path.join(process.cwd(), "src/lib/fonts/Poppins-SemiBold.ttf"), fontWeight: 600 },
+    { src: regular, fontWeight: 400, fontStyle: "normal" },
+    { src: regular, fontWeight: 400, fontStyle: "italic" },
+    { src: semi, fontWeight: 600, fontStyle: "normal" },
+    { src: semi, fontWeight: 600, fontStyle: "italic" },
+    { src: semi, fontWeight: 700, fontStyle: "normal" },
+    { src: semi, fontWeight: 700, fontStyle: "italic" },
   ],
 })
 
+const texto = { fontFamily: "Poppins", fontStyle: "normal" as const }
+
 const estilos = StyleSheet.create({
-  pagina: { fontFamily: "Poppins", fontSize: 10, color: "#15122A", padding: 36, paddingBottom: 48 },
-  marca: { color: "#1658B0", fontSize: 12, fontWeight: 600 },
-  h1: { fontSize: 22, fontWeight: 600, marginTop: 8 },
-  h2: { fontSize: 14, fontWeight: 600, marginTop: 14, marginBottom: 6, color: "#222B7C" },
-  muted: { color: "#3d4a63" },
-  fila: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  pagina: { ...texto, fontWeight: 400, fontSize: 10, color: "#15122A", padding: 36, paddingBottom: 48 },
+  marca: { ...texto, color: "#1658B0", fontSize: 12, fontWeight: 600 },
+  h1: { ...texto, fontSize: 22, fontWeight: 600, marginTop: 8 },
+  h2: { ...texto, fontSize: 14, fontWeight: 600, marginTop: 14, marginBottom: 6, color: "#222B7C" },
+  muted: { ...texto, fontWeight: 400, color: "#3d4a63" },
+  fila: { ...texto, fontWeight: 400, flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   barra: { height: 6, backgroundColor: "#E7F0FB", borderRadius: 3, marginVertical: 3 },
   relleno: { height: 6, backgroundColor: "#1658B0", borderRadius: 3 },
-  tarjeta: { borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 6, padding: 8, marginBottom: 8 },
-  pie: { position: "absolute", bottom: 20, left: 36, right: 36, fontSize: 8, color: "#98A2B3", flexDirection: "row", justifyContent: "space-between" },
+  tarjeta: { ...texto, fontWeight: 400, borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 6, padding: 8, marginBottom: 8 },
+  pie: { ...texto, fontWeight: 400, position: "absolute", bottom: 20, left: 36, right: 36, fontSize: 8, color: "#98A2B3", flexDirection: "row", justifyContent: "space-between" },
 })
 
 export type InformePdf = {

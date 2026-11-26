@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -45,5 +45,21 @@ describe("informe semanal", () => {
     const info = execFileSync("pdfinfo", [archivo], { encoding: "utf8" })
     const paginas = Number(info.match(/Pages:\s+(\d+)/)?.[1] || 0)
     expect(paginas).toBeGreaterThanOrEqual(3)
+  })
+
+  it("deja pdfkit fuera del bundle y no usa Helvetica en los estilos", () => {
+    const config = readFileSync("next.config.ts", "utf8")
+    const ruta = readFileSync("src/app/api/informes/route.ts", "utf8")
+    const documento = readFileSync("src/lib/informe-pdf.tsx", "utf8")
+    expect(config).toContain("serverExternalPackages")
+    expect(config).toContain('"pdfkit"')
+    expect(config).toContain('"@react-pdf/renderer"')
+    expect(config).toContain('"/api/informes"')
+    expect(config).toContain("./src/lib/fonts/**/*")
+    expect(config).toContain("./node_modules/pdfkit/js/standard-fonts/**/*")
+    expect(ruta).toContain('runtime = "nodejs"')
+    expect(documento).toContain('fontStyle: "italic"')
+    expect(documento).toContain("fontWeight: 700")
+    expect(documento).not.toContain("Helvetica")
   })
 })
