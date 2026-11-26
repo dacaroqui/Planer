@@ -120,7 +120,7 @@ export function PlanTrabajo({
       {grupos.length === 0 ? (
         <EstadoVacio compacto titulo="Ninguna actividad coincide" texto="Quite un filtro o busque con otras palabras." />
       ) : (
-        <PlanCompacto filas={visibles} proyectos={grupos.map((grupo) => grupo.proyecto)} entregables={entregables} enfocar={enfocar} onDetalles={(proyectoId) => setAgregar(proyectoId)} />
+        <PlanCompacto filas={visibles} proyectos={grupos.map((grupo) => grupo.proyecto)} entregables={entregables} enfocar={enfocar} responsables={responsables} onDetalles={(proyectoId) => setAgregar(proyectoId)} />
       )}
     </div>
   )

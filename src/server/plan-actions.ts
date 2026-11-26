@@ -4,9 +4,16 @@ import { revalidatePath } from "next/cache"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { ESTADOS_TAREA, type EstadoTareaPlan } from "@/lib/plan-trabajo"
 import { requireActor } from "@/server/session"
-import { asignarEntregable, crearActividadPlan, crearEntregable, crearProyectoPlan, deshacerAlta, editarFilaPlan, editarMasivo, moverActividad, renombrarEntregable, reordenarActividades, vincularKpiActividad } from "@/server/plan-trabajo"
+import { asignarEntregable, crearActividadPlan, crearEntregable, crearKpiPlan, crearProyectoPlan, deshacerAlta, editarFilaPlan, editarMasivo, eliminarActividadPlan, moverActividad, renombrarEntregable, reordenarActividades, restaurarActividadPlan, vincularKpiActividad, type FotoActividad } from "@/server/plan-trabajo"
 
 export type ResultadoPlan = { ok: true; message: string; id?: string } | { ok: false; error: string }
+
+function refrescarPlan() {
+  revalidatePath("/plan")
+  revalidatePath("/planner")
+  revalidatePath("/proyectos")
+  revalidatePath("/informes")
+}
 
 function fallo(error: unknown): ResultadoPlan {
   if (error instanceof PermisoDenegado || error instanceof DomainError) return { ok: false, error: error.message }
@@ -116,7 +123,7 @@ export async function asignarEntregableAction(input: { id: string; entregableId:
   const actor = await requireActor()
   try {
     await asignarEntregable(actor, input)
-    revalidatePath("/plan")
+    refrescarPlan()
     return { ok: true, message: "Actividad movida." }
   } catch (error) {
     return fallo(error)
@@ -127,7 +134,7 @@ export async function vincularKpiAction(input: { id: string; kpiId: string | nul
   const actor = await requireActor()
   try {
     await vincularKpiActividad(actor, input)
-    revalidatePath("/plan")
+    refrescarPlan()
     return { ok: true, message: "KPI vinculado." }
   } catch (error) {
     return fallo(error)
@@ -172,10 +179,7 @@ export async function guardarCeldaAction(input: {
       projectId: input.projectId,
       parentId: input.parentId,
     })
-    revalidatePath("/plan")
-    revalidatePath("/planner")
-    revalidatePath("/proyectos")
-    revalidatePath("/informes")
+    refrescarPlan()
     return { ok: true, message: "Cambio guardado." }
   } catch (error) {
     return fallo(error)
@@ -186,8 +190,7 @@ export async function reordenarPlanAction(ids: string[]): Promise<ResultadoPlan>
   const actor = await requireActor()
   try {
     await reordenarActividades(actor, ids)
-    revalidatePath("/plan")
-    revalidatePath("/proyectos")
+    refrescarPlan()
     return { ok: true, message: "Orden actualizado." }
   } catch (error) {
     return fallo(error)
@@ -230,9 +233,41 @@ export async function deshacerAltaAction(id: string): Promise<ResultadoPlan> {
   const actor = await requireActor()
   try {
     await deshacerAlta(actor, id)
-    revalidatePath("/plan")
-    revalidatePath("/proyectos")
+    refrescarPlan()
     return { ok: true, message: "Alta deshecha." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function crearKpiPlanAction(input: { tareaId: string; nombre: string; meta?: string; unidad?: string }) {
+  const actor = await requireActor()
+  try {
+    const kpi = await crearKpiPlan(actor, input)
+    refrescarPlan()
+    return { ok: true as const, kpi }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function eliminarActividadPlanAction(input: { id: string; subtareas: "borrar" | "soltar" }) {
+  const actor = await requireActor()
+  try {
+    const borrado = await eliminarActividadPlan(actor, input)
+    refrescarPlan()
+    return { ok: true as const, ...borrado }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function restaurarActividadPlanAction(input: { foto: FotoActividad; hijas: FotoActividad[] }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await restaurarActividadPlan(actor, input)
+    refrescarPlan()
+    return { ok: true, message: "Actividad restaurada." }
   } catch (error) {
     return fallo(error)
   }
