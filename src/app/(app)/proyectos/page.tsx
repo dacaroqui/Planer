@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Barra } from "@/components/barra"
+import { porcentajeProyecto } from "@/lib/entregables"
 import { FormularioEmpresa, FormularioProyecto } from "@/components/formularios-proyecto"
 import { listarFases } from "@/server/objetivos"
 import { puedeCrearProyecto } from "@/server/proyectos"
@@ -49,6 +50,7 @@ export default async function ProyectosPage({
               <Barra porcentaje={proyecto.avance.porcentaje} />
               <span className="text-sm font-medium" title="El porcentaje es el promedio del avance de las tareas y de los requerimientos cerrados. Si hay un requerimiento abierto, no llega a 100 %.">{proyecto.avance.porcentaje}%</span>
             </div>
+            <p className="mt-2 text-xs text-[#1658B0]">Cumplimiento del plan {porcentajeProyecto(proyecto.tasks.filter((tarea) => !tarea.parentId).map((tarea) => ({ hecha: tarea.status === "HECHA" })))}%</p>
             <p className="mt-2 text-xs text-muted-foreground">
               {proyecto.abiertos} requerimientos abiertos · {proyecto.cerrados} cerrados · {proyecto.pendientes} {proyecto.pendientes === 1 ? "tarea pendiente" : "tareas pendientes"} · {proyecto.hechas} {proyecto.hechas === 1 ? "hecha" : "hechas"}
               {proyecto.vencidas ? ` · ${proyecto.vencidas} vencidas` : ""}

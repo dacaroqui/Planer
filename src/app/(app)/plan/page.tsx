@@ -1,31 +1,24 @@
-import { ClipboardListIcon } from "lucide-react"
 import { PlanTrabajo } from "@/components/plan-trabajo"
 import { esEspacio, TEAMS, TEAM_LABEL } from "@/lib/domain"
 import { etiquetaArea } from "@/lib/plan-trabajo"
 import { esAdmin } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { listarProyectos } from "@/server/proyectos"
-import { listarPlan, responsablesDeArea } from "@/server/plan-trabajo"
+import { listarEntregables, listarPlan, responsablesDeArea } from "@/server/plan-trabajo"
 import { requireActor } from "@/server/session"
 
 export default async function PlanPage() {
   const actor = await requireActor()
-  const [proyectos, filas, gente, empresas] = await Promise.all([
+  const [proyectos, filas, gente, empresas, entregables] = await Promise.all([
     listarProyectos(actor),
     listarPlan(actor),
     responsablesDeArea(null),
     prisma.empresa.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    listarEntregables(actor),
   ])
   const empresa = empresas.find((item) => esEspacio(item.name)) ?? empresas[0]
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex size-10 items-center justify-center rounded-lg bg-[#E7F0FB] text-[#1658B0]"><ClipboardListIcon className="size-5" /></span>
-        <div>
-          <h1 className="font-heading text-4xl text-[#15122A]">Plan de trabajo</h1>
-          <p className="mt-1 text-sm text-muted-foreground">La hoja del equipo: un proyecto, sus actividades y lo que las frena.</p>
-        </div>
-      </div>
       <PlanTrabajo
         filas={filas}
         proyectos={proyectos.map((item) => ({
@@ -44,6 +37,13 @@ export default async function PlanPage() {
         esAdmin={esAdmin(actor)}
         empresaId={empresa?.id ?? ""}
         equipos={TEAMS.map((team) => ({ value: team, label: TEAM_LABEL[team] }))}
+        entregables={entregables.map((item) => ({
+          id: item.id,
+          proyectoId: item.proyectoId,
+          nombre: item.nombre,
+          fecha: item.fechaCompromiso ? item.fechaCompromiso.toISOString().slice(0, 10) : null,
+          orden: item.orden,
+        }))}
       />
     </div>
   )

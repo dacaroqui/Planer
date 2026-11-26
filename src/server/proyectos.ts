@@ -159,6 +159,7 @@ export async function guardarTarea(
   let requestId = input.requestId !== undefined ? input.requestId : existente?.requestId
   let projectId = input.projectId !== undefined ? input.projectId : existente?.projectId
   const parentId = input.parentId !== undefined ? input.parentId : existente?.parentId ?? null
+  if (!input.id && !projectId) throw new DomainError("Toda actividad pertenece a un proyecto.")
   if (parentId) {
     const padre = await prisma.tarea.findUnique({ where: { id: parentId } })
     if (!padre) throw new DomainError("La tarea padre no existe.")

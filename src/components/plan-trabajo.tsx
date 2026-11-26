@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { PlusIcon, SearchIcon } from "lucide-react"
 import { toast } from "sonner"
 import { EstadoVacio } from "@/components/estado-vacio"
-import { PlanHoja } from "@/components/plan-hoja"
+import { PlanCompacto } from "@/components/plan-compacto"
 import {
   ESTADO_TAREA_LABEL,
   filtrarPlan,
@@ -14,12 +14,6 @@ import {
   type FilaPlan,
 } from "@/lib/plan-trabajo"
 import { crearActividadAction, crearProyectoPlanAction } from "@/server/plan-actions"
-
-const PILLS: Record<EstadoTareaPlan, string> = {
-  PENDIENTE: "bg-[#F3F4F6] text-[#3d4a63]",
-  EN_CURSO: "bg-[#E7F0FB] text-[#1658B0]",
-  HECHA: "bg-emerald-100 text-emerald-800",
-}
 
 type ProyectoPlan = { id: string; name: string; team: string | null; area: string; inicio: string; fin: string }
 
@@ -30,6 +24,7 @@ export function PlanTrabajo({
   esAdmin,
   empresaId,
   equipos,
+  entregables = [],
 }: {
   filas: FilaPlan[]
   proyectos: ProyectoPlan[]
@@ -37,6 +32,7 @@ export function PlanTrabajo({
   esAdmin: boolean
   empresaId: string
   equipos: { value: string; label: string }[]
+  entregables?: { id: string; proyectoId: string; nombre: string; fecha: string | null; orden: number }[]
 }) {
   const [q, setQ] = useState("")
   const [area, setArea] = useState("")
@@ -47,6 +43,8 @@ export function PlanTrabajo({
   const [bloqueadas, setBloqueadas] = useState(false)
   const [agregar, setAgregar] = useState<string | null>(null)
   const [nuevo, setNuevo] = useState(false)
+  const [enfocar, setEnfocar] = useState<string | null>(null)
+  const [elegir, setElegir] = useState(false)
   const areasMenu = [...new Map(proyectos.filter((item) => item.team).map((item) => [item.team, item.area])).entries()].map(([team, etiqueta]) => ({ team: String(team), area: etiqueta }))
   const visibles = useMemo(
     () => filtrarPlan(filas, { q, area, persona, estado, proyecto, sinAsignar, bloqueadas }),
@@ -73,17 +71,26 @@ export function PlanTrabajo({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {resumen.map((item) => (
-          <span key={item.estado} className={`rounded-full px-3 py-1 text-sm font-medium ${PILLS[item.estado]}`}>{ESTADO_TAREA_LABEL[item.estado]} {item.total}</span>
-        ))}
-        <span className="text-sm text-muted-foreground">{visibles.length} {visibles.length === 1 ? "actividad" : "actividades"}</span>
-        <span className="text-sm text-muted-foreground">Horas est. {horas.estimadas} · Horas reales {horas.reales}</span>
-        <button type="button" className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#1658B0] px-3 text-sm font-medium text-white" onClick={() => setAgregar("global")}><PlusIcon className="size-4" /> Agregar actividad</button>
-        {esAdmin ? <button type="button" className="inline-flex h-10 items-center gap-1 rounded-lg border border-[#1658B0] px-3 text-sm font-medium text-[#1658B0]" onClick={() => setNuevo(true)}><PlusIcon className="size-4" /> Nuevo proyecto</button> : null}
-        <a href={exportar} className="ml-auto inline-flex h-10 items-center rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm font-medium text-[#1658B0]">Exportar .xlsx</a>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-4xl text-[#15122A]">Plan de trabajo</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Proyecto, entregable y actividad. Escriba en la fila y pulse Enter.</p>
+          <p className="mt-2 text-xs text-muted-foreground">{resumen.map((item) => `${ESTADO_TAREA_LABEL[item.estado]} ${item.total}`).join(" · ")} · {visibles.length} actividades · {horas.estimadas} h est. · {horas.reales} h reales</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <a href={exportar} className="inline-flex h-9 items-center rounded-lg border border-[#E4E7EC] bg-white px-3 text-sm text-[#1658B0]">Exportar</a>
+          {esAdmin ? <button type="button" className="inline-flex h-9 items-center rounded-lg border border-[#1658B0] px-3 text-sm font-medium text-[#1658B0]" onClick={() => setNuevo(true)}>Nuevo proyecto</button> : null}
+          <button type="button" className="inline-flex h-9 items-center rounded-lg bg-[#1658B0] px-3 text-sm font-medium text-white" onClick={() => setElegir((valor) => !valor)}>Agregar actividad</button>
+        </div>
       </div>
+      {elegir ? (
+        <form className="ml-auto flex w-full max-w-xl flex-wrap items-center justify-end gap-2 rounded-lg border border-[#E4E7EC] bg-white p-2" onSubmit={(event) => { event.preventDefault(); const id = String(new FormData(event.currentTarget).get("proyecto") || ""); if (id) { setEnfocar(id); setElegir(false) } }}>
+          <select name="proyecto" required aria-label="Proyecto de la actividad" className="h-9 min-w-48 rounded-lg border border-[#E4E7EC] px-2 text-sm"><option value="">Elija un proyecto</option>{proyectos.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          <button type="submit" className="h-9 rounded-lg bg-[#1658B0] px-3 text-sm text-white">Escribir actividad</button>
+          {esAdmin ? <button type="button" className="h-9 rounded-lg border border-[#E4E7EC] px-3 text-sm" onClick={() => { setNuevo(true); setElegir(false) }}>Crear proyecto nuevo</button> : null}
+        </form>
+      ) : null}
       {agregar ? <FormularioActividad proyectos={proyectos} proyectoId={agregar === "global" ? undefined : agregar} responsables={responsables} onClose={() => setAgregar(null)} /> : null}
       {nuevo ? <ProyectoNuevo empresaId={empresaId} equipos={equipos} onClose={() => setNuevo(false)} /> : null}
       <div className="flex flex-wrap items-center gap-2">
@@ -113,7 +120,7 @@ export function PlanTrabajo({
       {grupos.length === 0 ? (
         <EstadoVacio compacto titulo="Ninguna actividad coincide" texto="Quite un filtro o busque con otras palabras." />
       ) : (
-        <PlanHoja filas={visibles} proyectos={grupos.map((grupo) => grupo.proyecto)} catalogo={proyectos} responsables={responsables} onFormulario={(proyectoId) => setAgregar(proyectoId)} />
+        <PlanCompacto filas={visibles} proyectos={grupos.map((grupo) => grupo.proyecto)} entregables={entregables} enfocar={enfocar} onDetalles={(proyectoId) => setAgregar(proyectoId)} />
       )}
     </div>
   )

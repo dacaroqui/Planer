@@ -23,8 +23,16 @@ export async function listarPlan(actor: Actor): Promise<FilaPlan[]> {
         { assigneeId: actor.id, projectId: { not: null } },
       ],
     },
-    include: { assignee: { select: { id: true, name: true } }, project: true },
+    include: {
+      assignee: { select: { id: true, name: true } },
+      kpiEnlace: { select: { id: true, nombre: true, actual: true, meta: true, unidad: true } },
+      project: { include: { objetivo: { include: { kpis: { select: { id: true, nombre: true, actual: true, meta: true, unidad: true } } } } } },
+    },
     orderBy: [{ project: { name: "asc" } }, { orden: "asc" }, { createdAt: "asc" }],
+  })
+  const deArea = await prisma.kpi.findMany({
+    where: { area: { not: null } },
+    select: { id: true, nombre: true, actual: true, meta: true, unidad: true, area: true },
   })
   return tareas.flatMap((tarea) => {
     if (!tarea.project) return []
@@ -51,6 +59,15 @@ export async function listarPlan(actor: Actor): Promise<FilaPlan[]> {
       kpiMeta: tarea.kpiMeta,
       kpiUnidad: tarea.kpiUnidad,
       kpiActual: tarea.kpiActual,
+      kpiId: tarea.kpiId,
+      kpisDisponibles: (tarea.kpiEnlace ? [tarea.kpiEnlace] : []).concat(tarea.project.objetivo?.kpis ?? []).concat(deArea.filter((item) => item.area === tarea.project?.team)).filter((item, indice, lista) => lista.findIndex((otro) => otro.id === item.id) === indice).map((item) => ({
+        id: item.id,
+        nombre: item.nombre,
+        actual: item.actual == null ? null : Number(item.actual),
+        meta: item.meta == null ? null : Number(item.meta),
+        unidad: item.unidad,
+      })),
+      entregableId: tarea.entregableId,
       parentId: tarea.parentId,
       orden: tarea.orden,
       puedeEditar: puedeEditarPlan(actor, tarea.project.team),
@@ -101,6 +118,7 @@ export async function crearActividadPlan(actor: Actor, input: {
   kpiUnidad?: string | null
   kpiActual?: string | null
   bloqueo?: string | null
+  entregableId?: string | null
 }) {
   const proyecto = await proyectoVisible(actor, input.proyectoId)
   const asigna = puedeEditarPlan(actor, proyecto.team)
@@ -122,7 +140,7 @@ export async function crearActividadPlan(actor: Actor, input: {
     kpiActual: input.kpiActual,
     desdePlan: true,
   })
-  await prisma.tarea.update({ where: { id: tarea.id }, data: { orden: (tope._max.orden ?? -1) + 1 } })
+  await prisma.tarea.update({ where: { id: tarea.id }, data: { orden: (tope._max.orden ?? -1) + 1, ...(input.entregableId ? { entregableId: input.entregableId } : {}) } })
   if (!asigna && proyecto.team) {
     const lideres = await prisma.areaRole.findMany({
       where: { team: proyecto.team, role: "LIDER", user: { active: true, deactivatedAt: null } },
@@ -298,4 +316,76 @@ export async function deshacerAlta(actor: Actor, id: string) {
   if (tarea.createdById !== actor.id) throw new PermisoDenegado("Solo puede deshacer una actividad que acaba de agregar.")
   await proyectoVisible(actor, tarea.projectId)
   await prisma.tarea.delete({ where: { id: tarea.id } })
+}
+
+async function exigirEditor(actor: Actor, proyectoId: string) {
+  const proyecto = await proyectoVisible(actor, proyectoId)
+  if (!puedeEditarPlan(actor, proyecto.team)) throw new PermisoDenegado("Solo el líder del área o un administrador edita el plan.")
+  return proyecto
+}
+
+export async function listarEntregables(actor: Actor) {
+  const proyectos = await listarProyectos(actor)
+  if (proyectos.length === 0) return []
+  return prisma.entregable.findMany({
+    where: { proyectoId: { in: proyectos.map((item) => item.id) } },
+    orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+    include: { responsable: { select: { name: true } } },
+  })
+}
+
+export async function crearEntregable(actor: Actor, input: { proyectoId: string; nombre: string; fecha?: string | null }) {
+  await exigirEditor(actor, input.proyectoId)
+  if (input.nombre.trim().length < 3) throw new DomainError("Escriba al menos 3 caracteres.")
+  const tope = await prisma.entregable.aggregate({ where: { proyectoId: input.proyectoId }, _max: { orden: true } })
+  return prisma.entregable.create({
+    data: {
+      proyectoId: input.proyectoId,
+      nombre: input.nombre.trim(),
+      fechaCompromiso: input.fecha ? new Date(`${input.fecha}T12:00:00.000Z`) : null,
+      orden: (tope._max.orden ?? -1) + 1,
+    },
+  })
+}
+
+export async function renombrarEntregable(actor: Actor, input: { id: string; nombre: string; fecha?: string | null }) {
+  const actual = await prisma.entregable.findUnique({ where: { id: input.id } })
+  if (!actual) throw new DomainError("El entregable no existe.")
+  await exigirEditor(actor, actual.proyectoId)
+  if (input.nombre.trim().length < 3) throw new DomainError("Escriba al menos 3 caracteres.")
+  return prisma.entregable.update({
+    where: { id: actual.id },
+    data: {
+      nombre: input.nombre.trim(),
+      ...(input.fecha !== undefined ? { fechaCompromiso: input.fecha ? new Date(`${input.fecha}T12:00:00.000Z`) : null } : {}),
+    },
+  })
+}
+
+export async function asignarEntregable(actor: Actor, input: { id: string; entregableId: string | null }) {
+  const tarea = await prisma.tarea.findUnique({ where: { id: input.id }, include: { project: true } })
+  if (!tarea?.projectId || !tarea.project) throw new DomainError("La actividad no está en un proyecto.")
+  await exigirEditor(actor, tarea.projectId)
+  if (input.entregableId) {
+    const entregable = await prisma.entregable.findUnique({ where: { id: input.entregableId } })
+    if (!entregable || entregable.proyectoId !== tarea.projectId) throw new DomainError("El entregable es de otro proyecto.")
+  }
+  return prisma.tarea.update({ where: { id: tarea.id }, data: { entregableId: input.entregableId } })
+}
+
+export async function vincularKpiActividad(actor: Actor, input: { id: string; kpiId: string | null }) {
+  const tarea = await prisma.tarea.findUnique({ where: { id: input.id }, include: { project: { include: { objetivo: true } } } })
+  if (!tarea?.projectId || !tarea.project) throw new DomainError("La actividad no está en un proyecto.")
+  await exigirEditor(actor, tarea.projectId)
+  if (input.kpiId) {
+    const kpi = await prisma.kpi.findUnique({ where: { id: input.kpiId } })
+    if (!kpi) throw new DomainError("El KPI no existe.")
+    const delObjetivo = Boolean(kpi.objetivoId && kpi.objetivoId === tarea.project.objetivoId)
+    const delArea = Boolean(kpi.area && kpi.area === tarea.project.team)
+    if (!delObjetivo && !delArea) throw new DomainError("Ese KPI no pertenece al objetivo ni al área del proyecto.")
+  }
+  return prisma.tarea.update({
+    where: { id: tarea.id },
+    data: { kpiId: input.kpiId },
+  })
 }

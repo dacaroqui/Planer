@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { ESTADOS_TAREA, type EstadoTareaPlan } from "@/lib/plan-trabajo"
 import { requireActor } from "@/server/session"
-import { crearActividadPlan, crearProyectoPlan, deshacerAlta, editarFilaPlan, editarMasivo, moverActividad, reordenarActividades } from "@/server/plan-trabajo"
+import { asignarEntregable, crearActividadPlan, crearEntregable, crearProyectoPlan, deshacerAlta, editarFilaPlan, editarMasivo, moverActividad, renombrarEntregable, reordenarActividades, vincularKpiActividad } from "@/server/plan-trabajo"
 
 export type ResultadoPlan = { ok: true; message: string; id?: string } | { ok: false; error: string }
 
@@ -60,6 +60,7 @@ export async function crearActividadAction(formData: FormData): Promise<Resultad
       kpiUnidad: String(formData.get("kpiUnidad") || ""),
       kpiActual: String(formData.get("kpiActual") || ""),
       bloqueo: String(formData.get("bloqueo") || ""),
+      entregableId: String(formData.get("entregableId") || "") || null,
     })
     revalidatePath("/plan")
     revalidatePath("/planner")
@@ -73,7 +74,7 @@ export async function crearActividadAction(formData: FormData): Promise<Resultad
 export async function crearProyectoPlanAction(formData: FormData): Promise<ResultadoPlan> {
   const actor = await requireActor()
   try {
-    await crearProyectoPlan(actor, {
+    const creado = await crearProyectoPlan(actor, {
       name: String(formData.get("name") || ""),
       team: String(formData.get("team") || ""),
       startsAt: String(formData.get("startsAt") || ""),
@@ -82,7 +83,51 @@ export async function crearProyectoPlanAction(formData: FormData): Promise<Resul
     })
     revalidatePath("/plan")
     revalidatePath("/proyectos")
-    return { ok: true, message: "Proyecto creado." }
+    return { ok: true, message: "Proyecto creado.", id: creado.id }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function crearEntregableAction(input: { proyectoId: string; nombre: string; fecha?: string | null }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    const creado = await crearEntregable(actor, input)
+    revalidatePath("/plan")
+    return { ok: true, message: "Entregable creado.", id: creado.id }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function renombrarEntregableAction(input: { id: string; nombre: string; fecha?: string | null }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await renombrarEntregable(actor, input)
+    revalidatePath("/plan")
+    return { ok: true, message: "Entregable actualizado." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function asignarEntregableAction(input: { id: string; entregableId: string | null }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await asignarEntregable(actor, input)
+    revalidatePath("/plan")
+    return { ok: true, message: "Actividad movida." }
+  } catch (error) {
+    return fallo(error)
+  }
+}
+
+export async function vincularKpiAction(input: { id: string; kpiId: string | null }): Promise<ResultadoPlan> {
+  const actor = await requireActor()
+  try {
+    await vincularKpiActividad(actor, input)
+    revalidatePath("/plan")
+    return { ok: true, message: "KPI vinculado." }
   } catch (error) {
     return fallo(error)
   }

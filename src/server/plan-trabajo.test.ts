@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/prisma"
 import { DomainError, PermisoDenegado } from "@/lib/domain"
 import { toActor } from "@/lib/actor"
+import { guardarTarea } from "@/server/proyectos"
 import { crearActividadPlan, editarFilaPlan, editarMasivo, listarPlan, moverActividad, reordenarActividades } from "@/server/plan-trabajo"
 
 const SUFIJO = ".plan@cifes.edu.co"
@@ -211,5 +212,10 @@ describe("permisos del plan de trabajo", () => {
     await expect(editarMasivo(agente.actor, { ids: [segunda.id], status: "EN_CURSO" })).rejects.toBeInstanceOf(PermisoDenegado)
     await editarMasivo(lider.actor, { ids: [segunda.id], status: "EN_CURSO" })
     expect((await prisma.tarea.findUniqueOrThrow({ where: { id: segunda.id } })).status).toBe("EN_CURSO")
+  })
+
+  it("rechaza una actividad nueva sin proyecto", async () => {
+    const lider = await persona("Líder Suelta", "LIDER")
+    await expect(guardarTarea(lider.actor, { title: "Actividad suelta", status: "PENDIENTE" })).rejects.toThrow(/proyecto/)
   })
 })
